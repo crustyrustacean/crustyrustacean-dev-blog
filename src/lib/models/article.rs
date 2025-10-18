@@ -19,11 +19,13 @@ pub struct Article {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ArticleResponse {
     pub slug: String,
     pub title: String,
     pub description: String,
     pub body: String,
+    #[serde(rename = "tagList")]
     pub tag_list: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -33,6 +35,7 @@ pub struct ArticleResponse {
 }
 
 #[derive(Debug, Deserialize, Validate)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateArticle {
     #[validate(length(min = 1))]
     pub title: String,
@@ -40,6 +43,7 @@ pub struct CreateArticle {
     pub description: String,
     #[validate(length(min = 1))]
     pub body: String,
+    #[serde(rename = "tagList")]
     pub tag_list: Option<Vec<String>>,
 }
 
@@ -56,6 +60,7 @@ pub struct SingleArticleResponse {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MultipleArticlesResponse {
     pub articles: Vec<ArticleResponse>,
     pub articles_count: i32,

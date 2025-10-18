@@ -116,12 +116,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok) {
                 const data = await response.json();
-                // Store token if needed
-                if (data.token) {
-                    localStorage.setItem('authToken', data.token);
+                // Store token in both localStorage and cookies
+                if (data.user && data.user.token) {
+                    localStorage.setItem('authToken', data.user.token);
+                    // Set cookie with 24 hour expiration (same as JWT)
+                    const expires = new Date();
+                    expires.setTime(expires.getTime() + (24 * 60 * 60 * 1000)); // 24 hours
+                    document.cookie = `authToken=${encodeURIComponent(data.user.token)}; expires=${expires.toUTCString()}; path=/; SameSite=Strict`;
                 }
-                // Redirect to dashboard or home
-                window.location.href = '/';
+                // Redirect to admin dashboard
+                window.location.href = '/admin';
             } else {
                 const errorData = await response.json();
                 showError(errorData.message || 'Login failed. Please try again.');

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h1>{{ article.title }}</h1>
+            <p class="lead">{{ article.description }}</p>
+            <div class="mb-3">
+                <strong>By:</strong> {{ article.author.username }}
+                <br>
+                <strong>Created:</strong> {{ article.createdAt | date(format="%Y-%m-%d") }}
+            </div>
+            <div class="article-body">
+                {{ article.body }}
+            </div>
+            
+            {% if article.tagList %}
+                <div class="mt-4">
+                    <strong>Tags:</strong>
+                    {% for tag in article.tagList %}
+                        <span class="badge bg-secondary me-1">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div class="mt-4">
+                <a href="/" class="btn btn-secondary">Back to Home</a>
+                {% if user and user.username == article.author.username %}
+                    <a href="/editor/{{ article.slug }}" class="btn btn-primary">Edit</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

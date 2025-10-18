@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard Debug - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Debug Admin Dashboard</h1>
+    
+    <h2>Articles Data:</h2>
+    <pre>{{ articles | json_encode(pretty=true) }}</pre>
+    
+    <h2>User Data:</h2>
+    <pre>{{ user | json_encode(pretty=true) }}</pre>
+    
+    <h2>All Context Data:</h2>
+    <pre>{{ __tera_context | json_encode(pretty=true) }}</pre>
+</div>
+{% endblock %}

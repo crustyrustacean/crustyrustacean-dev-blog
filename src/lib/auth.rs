@@ -5,7 +5,7 @@ use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::{RequestPartsExt, extract::FromRequestParts, http::request::Parts};
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, authorization::Bearer},
+    headers::{Authorization, authorization::Bearer, Cookie},
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -71,6 +71,11 @@ pub struct AuthenticatedUser {
     pub user_id: Uuid,
 }
 
+// Optional authentication - doesn't fail if no token present
+pub struct OptionalUser {
+    pub user: Option<AuthenticatedUser>,
+}
+
 impl FromRequestParts<crate::AppState> for AuthenticatedUser {
     type Rejection = AppError;
 
@@ -78,19 +83,33 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &crate::AppState,
     ) -> Result<Self, Self::Rejection> {
-        let TypedHeader(Authorization(bearer)) = parts
+        // Try to get token from Authorization header first
+        let token = if let Ok(TypedHeader(Authorization(bearer))) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
-            .map_err(|_| AuthError::MissingToken)?;
+        {
+            bearer.token().to_string()
+        } else if let Ok(TypedHeader(cookie)) = parts
+            .extract::<TypedHeader<Cookie>>()
+            .await
+        {
+            // Fall back to cookie
+            cookie
+                .get("authToken")
+                .ok_or(AuthError::MissingToken)?
+                .to_string()
+        } else {
+            return Err(AuthError::MissingToken.into());
+        };
 
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = true;
         validation.leeway = 60;
 
         let token_data = decode::<Claims>(
-            bearer.token(),
+            &token,
             &state.jwt_keys.decoding,
-            &Validation::default(),
+            &validation,
         )
         .map_err(|_| AuthError::InvalidToken)?;
 
@@ -98,6 +117,20 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
             Uuid::parse_str(&token_data.claims.sub).map_err(|_| AuthError::InvalidToken)?;
 
         Ok(AuthenticatedUser { user_id })
+    }
+}
+
+impl FromRequestParts<crate::AppState> for OptionalUser {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        match AuthenticatedUser::from_request_parts(parts, state).await {
+            Ok(user) => Ok(OptionalUser { user: Some(user) }),
+            Err(_) => Ok(OptionalUser { user: None }),
+        }
     }
 }
 

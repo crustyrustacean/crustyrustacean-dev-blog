@@ -4,18 +4,14 @@
 
 // dependencies
 use crate::errors::AppError;
+use crate::auth::OptionalUser;
 use crate::state::AppState;
 use axum::{extract::State, response::IntoResponse};
 use axum_macros::debug_handler;
 use axum_template::RenderHtml;
 use serde::Serialize;
-
-// struct type to represent login page content
-#[derive(Debug, Serialize)]
-struct LoginPageContent {
-    title: String,
-    error: Option<String>,
-}
+use serde_json::{Value, json};
+use chrono::{Utc, Datelike};
 
 // struct type to represent register page content
 #[derive(Debug, Serialize)]
@@ -26,13 +22,60 @@ struct RegisterPageContent {
 
 // handler which renders the login page template
 #[debug_handler]
-pub async fn get_login_page(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
-    let login_content = LoginPageContent {
-        title: "Login".to_string(),
-        error: None,
+pub async fn get_login_page(
+    State(state): State<AppState>,
+    optional_user: OptionalUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info if authenticated
+    let user_info = if let Some(auth_user) = optional_user.user {
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut rows = conn
+            .query(
+                "SELECT username, email, bio, image FROM users WHERE id = ?",
+                libsql::params![auth_user.user_id.to_string()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let username: String = row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let email: String = row
+                .get(1)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let bio: Option<String> = row.get(2).ok();
+            let image: Option<String> = row.get(3).ok();
+
+            Some(json!({
+                "username": username,
+                "email": email,
+                "bio": bio,
+                "image": image
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
     };
 
-    Ok(RenderHtml("auth/login.html", state.engine, login_content))
+    let context: Value = json!({
+        "title": "Login",
+        "error": null,
+        "user": user_info,
+        "current_year": Utc::now().year()
+    });
+
+    Ok(RenderHtml("auth/login.html", state.engine, context))
 }
 
 // handler which renders the register page template

@@ -13,69 +13,79 @@
             </div>
         </div>
 
+        <!-- Blog Summary Section -->
+        <section class="blog-summary mb-5">
+            <div class="row">
+                <div class="col-md-4 text-center mb-3">
+                    <div class="bg-light p-4 rounded">
+                        <i class="fas fa-newspaper fa-2x text-primary mb-2"></i>
+                        <h4 class="mb-1">{% if articles %}{{ articles | length }}{% else %}0{% endif %}</h4>
+                        <p class="text-muted mb-0">Published Articles</p>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center mb-3">
+                    <div class="bg-light p-4 rounded">
+                        <i class="fas fa-tags fa-2x text-success mb-2"></i>
+                        <h4 class="mb-1">{% if tags_count %}{{ tags_count }}{% else %}0{% endif %}</h4>
+                        <p class="text-muted mb-0">Topics Covered</p>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center mb-3">
+                    <div class="bg-light p-4 rounded">
+                        <i class="fas fa-calendar-alt fa-2x text-info mb-2"></i>
+                        <h4 class="mb-1">{% if latest_post_date %}{{ latest_post_date }}{% else %}Never{% endif %}</h4>
+                        <p class="text-muted mb-0">Latest Post</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section class="latest-articles">
             <h2 class="mb-4">
                 <i class="fas fa-newspaper me-2 text-primary"></i>
                 Latest Articles
             </h2>
 
-            <div class="row">
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge bg-primary">Rust</span>
-                                <small class="text-muted">3 days ago</small>
+            {% if articles and articles|length > 0 %}
+                <div class="row">
+                    {% for article in articles %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        {% if article.tag_list and article.tag_list | length > 0 %}
+                                            <span class="badge bg-primary">{{ article.tag_list.0 }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Article</span>
+                                        {% endif %}
+                                        <small class="text-muted">{{ article.created_at }}</small>
+                                    </div>
+                                    <h5 class="card-title">{{ article.title }}</h5>
+                                    <p class="card-text">{{ article.description }}</p>
+                                    <a href="/articles/{{ article.slug }}" class="btn btn-outline-primary">Read More</a>
+                                </div>
                             </div>
-                            <h5 class="card-title">Getting Started with Axum Web Framework</h5>
-                            <p class="card-text">Learn how to build fast and safe web applications using Axum, Rust's modern async web framework...</p>
-                            <a href="/articles/getting-started-with-axum" class="btn btn-outline-primary">Read More</a>
                         </div>
-                    </div>
+                    {% endfor %}
                 </div>
-
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge bg-success">WebDev</span>
-                                <small class="text-muted">1 week ago</small>
-                            </div>
-                            <h5 class="card-title">Building RESTful APIs with Rust</h5>
-                            <p class="card-text">A comprehensive guide to creating robust and performant REST APIs using Rust and modern frameworks...</p>
-                            <a href="/articles/restful-apis-with-rust" class="btn btn-outline-primary">Read More</a>
-                        </div>
-                    </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No Articles Yet</h4>
+                    <p class="text-muted mb-4">Be the first to share your thoughts and insights!</p>
+                    {% if user %}
+                        <a href="/editor" class="btn btn-primary">
+                            <i class="fas fa-pen-fancy me-2"></i>
+                            Write Your First Article
+                        </a>
+                    {% else %}
+                        <a href="/login" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Login to Write
+                        </a>
+                    {% endif %}
                 </div>
-
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge bg-warning">Tutorial</span>
-                                <small class="text-muted">2 weeks ago</small>
-                            </div>
-                            <h5 class="card-title">Error Handling in Rust: Best Practices</h5>
-                            <p class="card-text">Master Rust's error handling patterns and learn how to write robust applications that gracefully handle failures...</p>
-                            <a href="/articles/error-handling-best-practices" class="btn btn-outline-primary">Read More</a>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge bg-info">DevOps</span>
-                                <small class="text-muted">3 weeks ago</small>
-                            </div>
-                            <h5 class="card-title">Deploying Rust Apps with Shuttle</h5>
-                            <p class="card-text">Streamline your deployment process with Shuttle's platform-as-a-service for Rust applications...</p>
-                            <a href="/articles/deploying-with-shuttle" class="btn btn-outline-primary">Read More</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% endif %}
 
             <div class="text-center mt-4">
                 <a href="/articles" class="btn btn-primary">View All Articles</a>

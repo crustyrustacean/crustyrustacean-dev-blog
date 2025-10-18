@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1>Admin Dashboard</h1>
+    {% if articles %}
+        <p>Articles found: {{ articles | length }}</p>
+        <ul>
+            {% for article in articles %}
+                <li>{{ article.title }} by {{ article.author.username }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No articles found</p>
+    {% endif %}
+</div>
+{% endblock %}

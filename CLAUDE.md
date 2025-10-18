@@ -67,9 +67,19 @@ The application uses Turso/libSQL with the following main tables:
 - **Production-ready security** following industry best practices
 
 ### Template System
-- Tera templating engine configured in AppState
-- Templates located in `templates/` directory
-- Static assets served from `static/` directory
+- **Tera templating engine** configured in AppState with proper error handling
+- **Dynamic templates** with database integration for real content
+- **Template structure**:
+  - `templates/base.html` - Base layout with responsive design
+  - `templates/index.html` - Homepage with article summaries and statistics
+  - `templates/articles/list.html` - Articles listing page
+  - `templates/articles/article.html` - Individual article view
+  - `templates/articles/editor.html` - Article creation/editing
+  - `templates/auth/login.html` - User login
+  - `templates/auth/register.html` - User registration
+  - `templates/admin/dashboard.html` - Admin interface
+- **Static assets** served from `static/` directory (CSS, JS, images)
+- **Production-ready features**: SEO-friendly URLs, responsive design, accessibility
 
 ### Shuttle Integration
 - Uses Shuttle's Turso integration for database provisioning
@@ -77,9 +87,22 @@ The application uses Turso/libSQL with the following main tables:
 - Automatic deployment and scaling
 
 ### API Routes Structure
+**HTML Pages:**
+```
+GET  /                                  # Homepage with dynamic article summaries
+GET  /articles                          # Articles listing page
+GET  /articles/{slug}                   # Individual article view
+GET  /login                             # Login page
+GET  /register                          # Registration page
+GET  /editor                            # Article editor (protected)
+GET  /editor/{slug}                     # Edit existing article (protected)
+GET  /admin                             # Admin dashboard (protected)
+GET  /profiles/{username}               # User profile page
+```
+
+**API Endpoints:**
 ```
 GET  /health_check                      # Health check endpoint
-GET  /                                  # Index page
 POST /api/users                         # User registration
 POST /api/users/login                   # User login
 GET  /api/user                          # Get current user
@@ -87,6 +110,11 @@ PUT  /api/user                          # Update current user
 GET  /api/profiles/{username}           # Get user profile
 POST /api/profiles/{username}/follow    # Follow user
 DELETE /api/profiles/{username}/follow  # Unfollow user
+GET  /api/articles                      # List articles (JSON)
+POST /api/articles                      # Create article (protected)
+GET  /api/articles/{slug}               # Get article (JSON)
+PUT  /api/articles/{slug}               # Update article (protected)
+DELETE /api/articles/{slug}             # Delete article (protected)
 ```
 
 ### Testing Strategy
@@ -115,5 +143,10 @@ DELETE /api/profiles/{username}/follow  # Unfollow user
 - ✅ **Testing**: 10 integration tests covering authentication flows and error scenarios
 - ✅ **API Endpoints**: User management and profile operations
 - ✅ **Code Quality**: Eliminated error handling duplication, improved maintainability
-- 🚧 **Blog Features**: Article CRUD, comments, tags (planned)
-- 🚧 **Frontend**: Tera templates and UI (planned)
+- ✅ **Blog Features**: Complete article CRUD operations with slug-based routing
+- ✅ **Frontend Templates**: Dynamic Tera templates with database integration
+- ✅ **Homepage**: Dynamic article summaries, blog statistics, responsive design
+- ✅ **Articles System**: Full listing page, individual article views, admin interface
+- ✅ **Content Management**: Article creation, editing, deletion with proper authorization
+- ✅ **Production Ready**: Complete blog functionality with user-friendly navigation
+- 🚧 **Advanced Features**: Comments system, advanced filtering, search (planned)

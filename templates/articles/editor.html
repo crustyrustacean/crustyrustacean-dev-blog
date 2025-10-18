@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title | default(value="Write Article") }} - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-7">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-pen-fancy fa-3x text-primary mb-3"></i>
+                    <h2 class="card-title">{{ title | default(value="Write New Article") }}</h2>
+                    <p class="text-muted">Share your knowledge with the community</p>
+                </div>
+
+                {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <form id="articleForm" method="POST" data-edit-mode="{{ is_edit | default(value=false) }}" {% if is_edit %}data-article-slug="{{ article_slug }}"{% endif %}>
+                    <div class="mb-4">
+                        <label for="title" class="form-label">Article Title</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-heading"></i>
+                            </span>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="title" 
+                                name="title" 
+                                required 
+                                placeholder="How to Train Your Dragon"
+                                value="{{ article.title | default(value='') }}"
+                                maxlength="200">
+                        </div>
+                        <div class="form-text">A compelling title helps readers find and understand your article</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="description" class="form-label">Description</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-align-left"></i>
+                            </span>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="description" 
+                                name="description" 
+                                required 
+                                placeholder="Ever wonder how?"
+                                value="{{ article.description | default(value='') }}"
+                                maxlength="500">
+                        </div>
+                        <div class="form-text">A brief summary that appears in article previews</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="body" class="form-label">Article Content</label>
+                        <textarea 
+                            class="form-control" 
+                            id="body" 
+                            name="body" 
+                            required 
+                            rows="12"
+                            placeholder="You have to believe in yourself. That's the secret to life.">{{ article.body | default(value='') }}</textarea>
+                        <div class="form-text">Write your article content here. Markdown is supported for formatting.</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="tags" class="form-label">Tags</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-tags"></i>
+                            </span>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="tags" 
+                                name="tags" 
+                                placeholder="rust, programming, tutorial"
+                                value="{{ article.tag_list | default(value=[]) | join(sep=', ') }}">
+                        </div>
+                        <div class="form-text">Separate tags with commas. Tags help readers discover your content.</div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="/" class="btn btn-outline-secondary btn-lg me-md-2">
+                            <i class="fas fa-times me-2"></i>
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="fas fa-paper-plane me-2"></i>
+                            <span id="submitText">{% if is_edit %}Update Article{% else %}Publish Article{% endif %}</span>
+                            <span id="loadingText" class="d-none">
+                                <i class="fas fa-spinner fa-spin me-2"></i>
+                                {% if is_edit %}Updating...{% else %}Publishing...{% endif %}
+                            </span>
+                        </button>
+                    </div>
+                </form>
+
+                {% if article %}
+                <hr class="my-4">
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Last updated: {{ article.updated_at | date(format="%B %d, %Y at %I:%M %p") }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewModalLabel">Article Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent">
+                    <!-- Preview content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="publishFromPreview()">Publish Article</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle form submission
+    const articleForm = document.getElementById('articleForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitText = document.getElementById('submitText');
+    const loadingText = document.getElementById('loadingText');
+
+    articleForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitText.classList.add('d-none');
+        loadingText.classList.remove('d-none');
+
+        const formData = new FormData(this);
+        
+        // Parse tags
+        const tagsInput = formData.get('tags');
+        const tagList = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : [];
+
+        const articleData = {
+            article: {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                body: formData.get('body'),
+                tagList: tagList
+            }
+        };
+
+        try {
+            // Get auth token from localStorage or cookies
+            const token = localStorage.getItem('authToken') || getAuthTokenFromCookies();
+            
+            if (!token) {
+                showError('You must be logged in to publish articles.');
+                resetSubmitButton();
+                return;
+            }
+
+            const isEditMode = articleForm.getAttribute('data-edit-mode') === 'true';
+            const articleSlug = articleForm.getAttribute('data-article-slug');
+            
+            const url = isEditMode ? `/api/articles/${articleSlug}` : '/api/articles';
+            const method = isEditMode ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(articleData)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Show success message
+                const successMessage = isEditMode ? 'Article updated successfully!' : 'Article published successfully!';
+                showSuccess(successMessage);
+                
+                // Redirect to the article page after a short delay
+                setTimeout(() => {
+                    window.location.href = `/articles/${data.article.slug}`;
+                }, 1500);
+            } else {
+                const errorData = await response.json();
+                const errorMessage = isEditMode ? 'Failed to update article. Please try again.' : 'Failed to publish article. Please try again.';
+                showError(errorData.message || errorMessage);
+                resetSubmitButton();
+            }
+        } catch (error) {
+            showError('Network error. Please check your connection and try again.');
+            resetSubmitButton();
+        }
+    });
+
+    function resetSubmitButton() {
+        submitBtn.disabled = false;
+        submitText.classList.remove('d-none');
+        loadingText.classList.add('d-none');
+    }
+
+    function getAuthTokenFromCookies() {
+        // Simple cookie parsing - in production you might want to use a library
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'authToken') {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+
+    function showError(message) {
+        showAlert(message, 'danger');
+    }
+
+    function showSuccess(message) {
+        showAlert(message, 'success');
+    }
+
+    function showAlert(message, type) {
+        // Remove existing alerts
+        const existingAlert = document.querySelector('.alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+
+        // Create new alert
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.innerHTML = `
+            <i class="fas fa-${type === 'danger' ? 'exclamation-triangle' : 'check-circle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        // Insert before form
+        const form = document.getElementById('articleForm');
+        form.parentNode.insertBefore(alert, form);
+
+        // Auto-dismiss success messages after 3 seconds
+        if (type === 'success') {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            }, 3000);
+        }
+    }
+
+    // Character counter for title and description
+    const titleInput = document.getElementById('title');
+    const descriptionInput = document.getElementById('description');
+
+    function addCharacterCounter(input, maxLength) {
+        const counter = document.createElement('div');
+        counter.className = 'form-text text-end';
+        counter.style.marginTop = '0.25rem';
+        
+        function updateCounter() {
+            const remaining = maxLength - input.value.length;
+            counter.textContent = `${remaining} characters remaining`;
+            counter.classList.toggle('text-danger', remaining < 10);
+        }
+        
+        input.addEventListener('input', updateCounter);
+        updateCounter();
+        
+        input.parentNode.appendChild(counter);
+    }
+
+    addCharacterCounter(titleInput, 200);
+    addCharacterCounter(descriptionInput, 500);
+});
+
+// Function to be called from preview modal
+function publishFromPreview() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
+    modal.hide();
+    document.getElementById('articleForm').dispatchEvent(new Event('submit'));
+}
+</script>
+{% endblock %}

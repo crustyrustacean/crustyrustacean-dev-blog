@@ -3,9 +3,10 @@
 // dependencies
 use crate::config::AppConfig;
 use crate::routes::{
-    follow_user, get_current_user, get_index, get_login_page, get_profile, get_profile_page,
-    get_register_page, handle_404_simple, health_check, login_user, register_user, unfollow_user,
-    update_current_user,
+    create_article, delete_article, follow_user, get_admin_dashboard, get_article, get_article_page, 
+    get_articles_list_page, get_current_user, get_edit_article_page, get_editor_page, get_index, 
+    get_login_page, get_profile, get_profile_page, get_register_page, handle_404_simple, health_check, 
+    list_articles, login_user, register_user, unfollow_user, update_article, update_current_user,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -58,6 +59,11 @@ impl App {
             .route("/login", get(get_login_page))
             .route("/register", get(get_register_page))
             .route("/profiles/{username}", get(get_profile_page))
+            .route("/editor", get(get_editor_page))
+            .route("/editor/{slug}", get(get_edit_article_page))
+            .route("/articles", get(get_articles_list_page))
+            .route("/articles/{slug}", get(get_article_page))
+            .route("/admin", get(get_admin_dashboard))
             // API routes
             .route("/api/users", post(register_user))
             .route("/api/users/login", post(login_user))
@@ -67,6 +73,8 @@ impl App {
                 "/api/profiles/{username}/follow",
                 post(follow_user).delete(unfollow_user),
             )
+            .route("/api/articles", post(create_article).get(list_articles))
+            .route("/api/articles/{slug}", get(get_article).put(update_article).delete(delete_article))
             .nest_service("/static", ServeDir::new("static"))
             .fallback(handle_404_simple)
             .with_state(state)

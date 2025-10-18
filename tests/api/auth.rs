@@ -410,3 +410,105 @@ async fn test_token_contains_valid_claims() {
         assert!(!part.is_empty(), "JWT parts should not be empty");
     }
 }
+
+#[tokio::test]
+async fn test_protected_endpoint_with_cookie() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register and get a token
+    let user_data = json!({
+        "user": {
+            "username": "cookieuser",
+            "email": "cookie@example.com",
+            "password": "securepassword123"
+        }
+    });
+
+    let registration_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&user_data)
+        .send()
+        .await
+        .expect("Failed to register user");
+
+    let registration_body: Value = registration_response
+        .json()
+        .await
+        .expect("Failed to parse registration response");
+
+    let token = registration_body["user"]["token"].as_str().unwrap();
+
+    // Act - Access protected endpoint with cookie instead of Authorization header
+    let response = app
+        .client
+        .get(format!("{}/api/user", &app.address))
+        .header("Cookie", format!("authToken={}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response_body: Value = response
+        .json()
+        .await
+        .expect("Failed to parse response body");
+
+    assert_eq!(response_body["user"]["email"], "cookie@example.com");
+    assert_eq!(response_body["user"]["username"], "cookieuser");
+}
+
+#[tokio::test]
+async fn test_cookie_takes_precedence_over_missing_header() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register and get a token
+    let user_data = json!({
+        "user": {
+            "username": "precedenceuser",
+            "email": "precedence@example.com",
+            "password": "securepassword123"
+        }
+    });
+
+    let registration_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&user_data)
+        .send()
+        .await
+        .expect("Failed to register user");
+
+    let registration_body: Value = registration_response
+        .json()
+        .await
+        .expect("Failed to parse registration response");
+
+    let token = registration_body["user"]["token"].as_str().unwrap();
+
+    // Act - Access protected endpoint with only cookie (no Authorization header)
+    let response = app
+        .client
+        .get(format!("{}/api/user", &app.address))
+        .header("Cookie", format!("authToken={}; other=value", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should work with cookie even without Authorization header
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response_body: Value = response
+        .json()
+        .await
+        .expect("Failed to parse response body");
+
+    assert_eq!(response_body["user"]["email"], "precedence@example.com");
+    assert_eq!(response_body["user"]["username"], "precedenceuser");
+}

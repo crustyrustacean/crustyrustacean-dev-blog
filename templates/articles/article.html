@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <article class="mb-5">
+                <!-- Article Header -->
+                <header class="mb-4">
+                    <h1 class="display-4 mb-3">{{ article.title }}</h1>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3">
+                            {% if article.author.image %}
+                                <img src="{{ article.author.image }}" alt="{{ article.author.username }}" 
+                                     class="rounded-circle" width="48" height="48">
+                            {% else %}
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
+                                     style="width: 48px; height: 48px;">
+                                    <span class="text-white fw-bold fs-5">{{ article.author.username[0] | upper }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="fw-bold">{{ article.author.username }}</div>
+                            <div class="text-muted small">
+                                Published on {{ article.createdAt | date(format="%B %d, %Y") }}
+                                {% if article.createdAt != article.updatedAt %}
+                                    • Updated {{ article.updatedAt | date(format="%B %d, %Y") }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Article Description -->
+                    <p class="lead text-muted">{{ article.description }}</p>
+
+                    <!-- Tags -->
+                    {% if article.tagList and article.tagList|length > 0 %}
+                        <div class="mb-3">
+                            {% for tag in article.tagList %}
+                                <span class="badge bg-secondary me-1">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Article Stats -->
+                    <div class="d-flex align-items-center text-muted small">
+                        <span class="me-3">
+                            <i class="fas fa-heart me-1"></i>
+                            {{ article.favoritesCount }} likes
+                        </span>
+                    </div>
+                </header>
+
+                <!-- Article Content -->
+                <div class="article-content">
+                    <div class="mb-4" style="white-space: pre-wrap; line-height: 1.7;">{{ article.body }}</div>
+                </div>
+
+                <!-- Article Footer -->
+                <footer class="border-top pt-4 mt-5">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    {% if article.author.image %}
+                                        <img src="{{ article.author.image }}" alt="{{ article.author.username }}" 
+                                             class="rounded-circle" width="64" height="64">
+                                    {% else %}
+                                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
+                                             style="width: 64px; height: 64px;">
+                                            <span class="text-white fw-bold fs-4">{{ article.author.username[0] | upper }}</span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h5 class="mb-1">{{ article.author.username }}</h5>
+                                    {% if article.author.bio %}
+                                        <p class="text-muted mb-0">{{ article.author.bio }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            {% if user and user.username == article.author.username %}
+                                <div class="mt-3 mt-md-0">
+                                    <a href="/editor/{{ article.slug }}" class="btn btn-outline-primary me-2">
+                                        <i class="fas fa-edit me-1"></i>
+                                        Edit Article
+                                    </a>
+                                    <button type="button" class="btn btn-outline-danger" onclick="confirmDeleteArticle()">
+                                        <i class="fas fa-trash me-1"></i>
+                                        Delete
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </footer>
+            </article>
+
+            <!-- Back to Articles -->
+            <div class="text-center mb-5">
+                <a href="/" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Back to Articles
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if user and user.username == article.author.username %}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Delete Article</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning!</strong> This action cannot be undone.
+                </div>
+                <p>Are you sure you want to delete "<strong>{{ article.title }}</strong>"?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-2"></i>
+                    Delete Article
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if user and user.username == article.author.username %}
+function confirmDeleteArticle() {
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', async function() {
+            const token = localStorage.getItem('authToken') || getAuthTokenFromCookies();
+            
+            if (!token) {
+                alert('You must be logged in to delete articles.');
+                return;
+            }
+            
+            try {
+                confirmDeleteBtn.disabled = true;
+                confirmDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
+                
+                const response = await fetch('/api/articles/{{ article.slug }}', {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    // Redirect to home page after successful deletion
+                    window.location.href = '/';
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.errors?.body?.[0] || 'Failed to delete article.');
+                    confirmDeleteBtn.disabled = false;
+                    confirmDeleteBtn.innerHTML = '<i class="fas fa-trash me-2"></i>Delete Article';
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+                confirmDeleteBtn.disabled = false;
+                confirmDeleteBtn.innerHTML = '<i class="fas fa-trash me-2"></i>Delete Article';
+            }
+        });
+    }
+    
+    function getAuthTokenFromCookies() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'authToken') {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

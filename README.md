@@ -15,13 +15,28 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
-- **Static asset serving** and template system setup
+- **Complete blog functionality**:
+  - Dynamic homepage with real article summaries and statistics
+  - Articles listing page with responsive design
+  - Individual article pages with slug-based routing
+  - Full CRUD operations for articles
+  - Admin dashboard for content management
+- **Professional frontend** with Tera templating:
+  - Bootstrap-based responsive design
+  - SEO-friendly URLs and metadata
+  - User-friendly navigation and error handling
+  - Real-time statistics and content updates
+- **Content management system**:
+  - Article creation and editing interface
+  - Tag system for categorization
+  - User favorites and social features
+  - Authorization-protected admin features
 
 ### 🚧 Planned
-- Blog article management (create, read, update, delete)
 - Comments system for articles
-- Tag system for article categorization
-- Frontend UI with Tera templating
+- Advanced search and filtering
+- Rich text editor enhancements
+- Social sharing features
 
 ## Project Structure
 
@@ -42,10 +57,34 @@ src/
     routes/         # HTTP route handlers
       health_check.rs # Health check endpoint
       users.rs      # User authentication routes
-      index.rs      # Template rendering
+      index.rs      # Homepage with dynamic content
+      articles.rs   # Article management and listing
+      auth.rs       # Authentication pages
+      profile.rs    # User profile management
+      error_pages.rs# Error handling pages
       mod.rs        # Routes module
-static/             # Static web assets (CSS, JS, images)
+static/
+  css/
+    styles.css      # Main stylesheet with responsive design
+  js/               # JavaScript for interactive features
+  images/           # Static images and assets
 templates/          # Tera templates for HTML rendering
+  base.html         # Base layout template
+  index.html        # Dynamic homepage
+  articles/
+    list.html       # Articles listing page
+    article.html    # Individual article view
+    editor.html     # Article creation/editing
+    simple.html     # Simplified article view
+  auth/
+    login.html      # User login page
+    register.html   # User registration page
+  admin/
+    dashboard.html  # Admin interface
+  profile/
+    profile.html    # User profile page
+  errors/
+    404.html        # Not found page
 tests/
   api/
     auth.rs         # Authentication integration tests (9 tests)
@@ -90,7 +129,20 @@ shuttle deploy
 
 ## API Endpoints
 
-### Authentication
+### HTML Pages
+```
+GET  /                             # Homepage with dynamic articles
+GET  /articles                     # Articles listing page
+GET  /articles/{slug}              # Individual article view
+GET  /login                        # Login page
+GET  /register                     # Registration page
+GET  /editor                       # Article editor (protected)
+GET  /editor/{slug}                # Edit article (protected)
+GET  /admin                        # Admin dashboard (protected)
+GET  /profiles/{username}          # User profile page
+```
+
+### Authentication API
 ```
 POST /api/users                    # User registration
 POST /api/users/login              # User login
@@ -98,23 +150,48 @@ GET  /api/user                     # Get current user (protected)
 PUT  /api/user                     # Update current user (protected)
 ```
 
-### User Profiles
+### User Profiles API
 ```
 GET    /api/profiles/{username}           # Get user profile
 POST   /api/profiles/{username}/follow    # Follow user (protected)
 DELETE /api/profiles/{username}/follow    # Unfollow user (protected)
 ```
 
+### Articles API
+```
+GET    /api/articles               # List articles (JSON)
+POST   /api/articles               # Create article (protected)
+GET    /api/articles/{slug}        # Get article (JSON)
+PUT    /api/articles/{slug}        # Update article (protected)
+DELETE /api/articles/{slug}        # Delete article (protected)
+```
+
 ### System
 ```
 GET /health_check                  # Health check endpoint
-GET /                             # Index page
 ```
+
+### Blog Features
+
+The application now includes a complete blog system:
+
+1. **Dynamic Homepage**: Real-time article summaries, blog statistics (article count, topics covered, latest post date)
+2. **Articles Listing**: Professional grid layout with filtering options and pagination
+3. **Individual Articles**: Slug-based URLs for SEO-friendly article pages  
+4. **Content Management**: Full CRUD operations with proper authorization
+5. **Admin Interface**: Dashboard for managing articles, users, and content
+6. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
 2. **Login**: `POST /api/users/login` with `{user: {email, password}}`
 3. **Access Protected Endpoints**: Include `Authorization: Bearer <jwt_token>` header
+
+### Content Management Flow
+1. **View Articles**: Browse homepage or `/articles` for all posts
+2. **Create Content**: Login and visit `/editor` to write new articles
+3. **Manage Content**: Use `/admin` dashboard to edit/delete existing articles
+4. **Public Access**: All articles are publicly viewable at `/articles/{slug}`
 
 ## Security Features
 

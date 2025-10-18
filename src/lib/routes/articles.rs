@@ -1,0 +1,1026 @@
+// src/lib/routes/articles.rs
+
+use crate::{
+    AppError, AppState,
+    auth::{AuthenticatedUser, OptionalUser},
+    models::{CreateArticle, UpdateArticle, SingleArticleResponse, ArticleResponse, UserProfile, MultipleArticlesResponse, ArticleQuery},
+};
+use axum::{
+    extract::{Path, State, Query},
+    response::{Json, IntoResponse},
+    http::StatusCode,
+};
+use axum_template::RenderHtml;
+use chrono::{Datelike, Utc};
+use serde_json::{Value, json};
+use uuid::Uuid;
+use validator::Validate;
+use slug::slugify;
+
+pub async fn create_article(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<SingleArticleResponse>, AppError> {
+    let article_data: CreateArticle = serde_json::from_value(
+        payload
+            .get("article")
+            .ok_or_else(|| AppError::BadRequest("Missing article field".to_string()))?
+            .clone(),
+    )
+    .map_err(|_| AppError::BadRequest("Invalid article data".to_string()))?;
+
+    article_data
+        .validate()
+        .map_err(|e| AppError::BadRequest(format!("Validation error: {}", e)))?;
+
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Generate base slug from title
+    let base_slug = slugify(&article_data.title);
+    
+    // Check if slug already exists and generate unique one if needed
+    let mut slug = base_slug.clone();
+    let mut counter = 1;
+    
+    loop {
+        let mut slug_check = conn
+            .query(
+                "SELECT id FROM articles WHERE slug = ?",
+                libsql::params![slug.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if slug_check
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .is_none()
+        {
+            break; // Slug is unique
+        }
+        
+        // Generate a new slug with counter
+        slug = format!("{}-{}", base_slug, counter);
+        counter += 1;
+    }
+
+    let article_id = Uuid::new_v4();
+    let now = Utc::now();
+
+    // Insert the article
+    conn.execute(
+        "INSERT INTO articles (id, slug, title, description, body, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        libsql::params![
+            article_id.to_string(),
+            slug.clone(),
+            article_data.title.clone(),
+            article_data.description.clone(),
+            article_data.body.clone(),
+            user.user_id.to_string(),
+            now.to_rfc3339(),
+            now.to_rfc3339(),
+        ],
+    )
+    .await
+    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Handle tags if provided
+    let mut tag_names = Vec::new();
+    if let Some(tags) = &article_data.tag_list {
+        for tag_name in tags {
+            // Insert tag if it doesn't exist
+            let tag_id = Uuid::new_v4();
+            conn.execute(
+                "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
+                libsql::params![tag_id.to_string(), tag_name.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+            // Get the tag ID (either newly created or existing)
+            let mut tag_rows = conn
+                .query(
+                    "SELECT id FROM tags WHERE name = ?",
+                    libsql::params![tag_name.clone()],
+                )
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+            if let Some(tag_row) = tag_rows
+                .next()
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            {
+                let existing_tag_id: String = tag_row
+                    .get(0)
+                    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+                // Link article to tag
+                conn.execute(
+                    "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
+                    libsql::params![article_id.to_string(), existing_tag_id],
+                )
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+                tag_names.push(tag_name.clone());
+            }
+        }
+    }
+
+    // Get author profile
+    let mut author_rows = conn
+        .query(
+            "SELECT username, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let author_row = author_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::InternalServerError("Author not found".to_string()))?;
+
+    let username: String = author_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let bio: Option<String> = author_row.get(1).ok();
+    let image: Option<String> = author_row.get(2).ok();
+
+    let author = UserProfile {
+        username,
+        bio,
+        image,
+        following: false, // Not relevant for article creation
+    };
+
+    let article_response = ArticleResponse {
+        slug: slug.clone(),
+        title: article_data.title,
+        description: article_data.description,
+        body: article_data.body,
+        tag_list: tag_names,
+        created_at: now,
+        updated_at: now,
+        favorited: false, // New article is not favorited by creator
+        favorites_count: 0,
+        author,
+    };
+
+    let response = SingleArticleResponse {
+        article: article_response,
+    };
+
+    Ok(Json(response))
+}
+
+pub async fn get_article(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+) -> Result<Json<SingleArticleResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Get the article with author information
+    let mut article_rows = conn
+        .query(
+            r#"
+            SELECT 
+                a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
+                u.username, u.bio, u.image
+            FROM articles a
+            JOIN users u ON a.author_id = u.id
+            WHERE a.slug = ?
+            "#,
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let article_row = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Article not found".to_string()))?;
+
+    let article_slug: String = article_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let title: String = article_row
+        .get(1)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let description: String = article_row
+        .get(2)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let body: String = article_row
+        .get(3)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let created_at_str: String = article_row
+        .get(4)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let updated_at_str: String = article_row
+        .get(5)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let _author_id: String = article_row
+        .get(6)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let username: String = article_row
+        .get(7)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let bio: Option<String> = article_row.get(8).ok();
+    let image: Option<String> = article_row.get(9).ok();
+
+    // Parse the timestamps
+    let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+        .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+        .with_timezone(&Utc);
+    let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
+        .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+        .with_timezone(&Utc);
+
+    // Get article ID by slug for tags
+    let mut article_id_rows = conn
+        .query(
+            "SELECT id FROM articles WHERE slug = ?",
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let article_id_row = article_id_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::InternalServerError("Article ID not found".to_string()))?;
+
+    let article_id_str: String = article_id_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Get tags for this article
+    let mut tag_rows = conn
+        .query(
+            r#"
+            SELECT t.name
+            FROM tags t
+            JOIN article_tags at ON t.id = at.tag_id
+            WHERE at.article_id = ?
+            "#,
+            libsql::params![article_id_str.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut tag_names = Vec::new();
+    while let Some(tag_row) = tag_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let tag_name: String = tag_row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        tag_names.push(tag_name);
+    }
+
+    // Get favorites count
+    let mut favorites_rows = conn
+        .query(
+            "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
+            libsql::params![article_id_str],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let favorites_count = if let Some(fav_row) = favorites_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let count: i64 = fav_row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        count as i32
+    } else {
+        0
+    };
+
+    let author = UserProfile {
+        username,
+        bio,
+        image,
+        following: false, // TODO: Implement based on current user if provided
+    };
+
+    let article_response = ArticleResponse {
+        slug: article_slug,
+        title,
+        description,
+        body,
+        tag_list: tag_names,
+        created_at,
+        updated_at,
+        favorited: false, // TODO: Implement based on current user if provided
+        favorites_count,
+        author,
+    };
+
+    let response = SingleArticleResponse {
+        article: article_response,
+    };
+
+    Ok(Json(response))
+}
+
+pub async fn get_editor_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    let context: Value = json!({
+        "title": "Write New Article",
+        "page": "Editor",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info
+    });
+    
+    Ok(RenderHtml("articles/editor.html", state.engine, context))
+}
+
+pub async fn get_edit_article_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(slug): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    // Get the article to edit
+    let article_response = get_article(State(state.clone()), Path(slug.clone())).await?;
+    let article = article_response.0.article;
+
+    // Check if the current user is the author
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut author_check = conn
+        .query(
+            "SELECT author_id FROM articles WHERE slug = ?",
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    if let Some(row) = author_check
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let author_id_str: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let author_id = Uuid::parse_str(&author_id_str)
+            .map_err(|_| AppError::InternalServerError("Invalid author ID".to_string()))?;
+
+        if author_id != user.user_id {
+            return Err(AppError::Forbidden("You can only edit your own articles".to_string()));
+        }
+    } else {
+        return Err(AppError::NotFound("Article not found".to_string()));
+    }
+
+    let context: Value = json!({
+        "title": format!("Edit: {}", article.title),
+        "page": "Editor",
+        "current_year": chrono::Utc::now().year(),
+        "article": {
+            "title": article.title,
+            "description": article.description,
+            "body": article.body,
+            "tag_list": article.tag_list,
+            "updated_at": article.updated_at
+        },
+        "is_edit": true,
+        "article_slug": slug
+    });
+    
+    Ok(RenderHtml("articles/editor.html", state.engine, context))
+}
+
+pub async fn get_admin_dashboard(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Query(query): Query<ArticleQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    tracing::info!("Admin dashboard accessed by user: {}", user.user_id);
+    
+    // Get user info for template context
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| {
+            tracing::error!("Database connection failed: {}", e);
+            AppError::InternalServerError(e.to_string())
+        })?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    // Get all articles for the dashboard
+    tracing::info!("Fetching articles for dashboard");
+    let articles_response = list_articles(State(state.clone()), Query(query)).await?;
+    let articles = articles_response.0.articles;
+    tracing::info!("Found {} articles for dashboard", articles.len());
+
+    let context: Value = json!({
+        "title": "Admin Dashboard",
+        "page": "Admin",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+        "articles": articles
+    });
+    
+    tracing::info!("Rendering admin dashboard template");
+    Ok(RenderHtml("admin/dashboard.html", state.engine, context))
+}
+
+pub async fn update_article(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(slug): Path<String>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<SingleArticleResponse>, AppError> {
+    let article_data: UpdateArticle = serde_json::from_value(
+        payload
+            .get("article")
+            .ok_or_else(|| AppError::BadRequest("Missing article field".to_string()))?
+            .clone(),
+    )
+    .map_err(|_| AppError::BadRequest("Invalid article data".to_string()))?;
+
+    article_data
+        .validate()
+        .map_err(|e| AppError::BadRequest(format!("Validation error: {}", e)))?;
+
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Check if article exists and user is the author
+    let mut article_rows = conn
+        .query(
+            "SELECT id, author_id FROM articles WHERE slug = ?",
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let article_row = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Article not found".to_string()))?;
+
+    let _article_id_str: String = article_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let author_id_str: String = article_row
+        .get(1)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let author_id = Uuid::parse_str(&author_id_str)
+        .map_err(|_| AppError::InternalServerError("Invalid author ID".to_string()))?;
+
+    // Check if the current user is the author
+    if author_id != user.user_id {
+        return Err(AppError::Forbidden("You can only edit your own articles".to_string()));
+    }
+
+    let now = Utc::now();
+    let mut updates = Vec::new();
+    let mut params = Vec::new();
+
+    if let Some(title) = &article_data.title {
+        updates.push("title = ?");
+        params.push(title.clone());
+    }
+    if let Some(description) = &article_data.description {
+        updates.push("description = ?");
+        params.push(description.clone());
+    }
+    if let Some(body) = &article_data.body {
+        updates.push("body = ?");
+        params.push(body.clone());
+    }
+    updates.push("updated_at = ?");
+    params.push(now.to_rfc3339());
+    params.push(slug.clone());
+
+    if !updates.is_empty() {
+        let sql = format!("UPDATE articles SET {} WHERE slug = ?", updates.join(", "));
+        let mut libsql_params = Vec::new();
+        for param in &params {
+            libsql_params.push(libsql::Value::from(param.clone()));
+        }
+        
+        conn.execute(&sql, libsql_params)
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    }
+
+    // Return the updated article
+    get_article(State(state), Path(slug)).await
+}
+
+pub async fn delete_article(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(slug): Path<String>,
+) -> Result<StatusCode, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Check if article exists and user is the author
+    let mut article_rows = conn
+        .query(
+            "SELECT id, author_id FROM articles WHERE slug = ?",
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let article_row = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Article not found".to_string()))?;
+
+    let article_id_str: String = article_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let author_id_str: String = article_row
+        .get(1)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let author_id = Uuid::parse_str(&author_id_str)
+        .map_err(|_| AppError::InternalServerError("Invalid author ID".to_string()))?;
+
+    // Check if the current user is the author
+    if author_id != user.user_id {
+        return Err(AppError::Forbidden("You can only delete your own articles".to_string()));
+    }
+
+    // Delete article tags first (foreign key constraint)
+    conn.execute(
+        "DELETE FROM article_tags WHERE article_id = ?",
+        libsql::params![article_id_str.clone()],
+    )
+    .await
+    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Delete user favorites
+    conn.execute(
+        "DELETE FROM user_favorites WHERE article_id = ?",
+        libsql::params![article_id_str.clone()],
+    )
+    .await
+    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Delete the article
+    conn.execute(
+        "DELETE FROM articles WHERE id = ?",
+        libsql::params![article_id_str],
+    )
+    .await
+    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn list_articles(
+    State(state): State<AppState>,
+    Query(query): Query<ArticleQuery>,
+) -> Result<Json<MultipleArticlesResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let limit = query.limit.unwrap_or(20).min(100) as i32;
+    let offset = query.offset.unwrap_or(0) as i32;
+
+    // Build the query
+    let mut where_clauses = Vec::new();
+    let mut params = Vec::new();
+
+    if let Some(tag) = &query.tag {
+        where_clauses.push("EXISTS (SELECT 1 FROM article_tags at JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id AND t.name = ?)");
+        params.push(libsql::Value::from(tag.clone()));
+    }
+    
+    if let Some(author) = &query.author {
+        where_clauses.push("u.username = ?");
+        params.push(libsql::Value::from(author.clone()));
+    }
+
+    let where_clause = if where_clauses.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", where_clauses.join(" AND "))
+    };
+
+    let sql = format!(
+        r#"
+        SELECT 
+            a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
+            u.username, u.bio, u.image
+        FROM articles a
+        JOIN users u ON a.author_id = u.id
+        {}
+        ORDER BY a.created_at DESC
+        LIMIT ? OFFSET ?
+        "#,
+        where_clause
+    );
+
+    params.push(libsql::Value::from(limit));
+    params.push(libsql::Value::from(offset));
+
+    let mut article_rows = conn
+        .query(&sql, params)
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut articles = Vec::new();
+
+    while let Some(row) = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let article_id: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let slug: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let title: String = row
+            .get(2)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let description: String = row
+            .get(3)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let body: String = row
+            .get(4)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let created_at_str: String = row
+            .get(5)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let updated_at_str: String = row
+            .get(6)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let username: String = row
+            .get(7)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(8).ok();
+        let image: Option<String> = row.get(9).ok();
+
+        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .with_timezone(&Utc);
+        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
+            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .with_timezone(&Utc);
+
+        // Get tags for this article
+        let mut tag_rows = conn
+            .query(
+                r#"
+                SELECT t.name
+                FROM tags t
+                JOIN article_tags at ON t.id = at.tag_id
+                WHERE at.article_id = ?
+                "#,
+                libsql::params![article_id.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut tag_names = Vec::new();
+        while let Some(tag_row) = tag_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let tag_name: String = tag_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            tag_names.push(tag_name);
+        }
+
+        // Get favorites count
+        let mut favorites_rows = conn
+            .query(
+                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
+                libsql::params![article_id],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let favorites_count = if let Some(fav_row) = favorites_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let count: i64 = fav_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            count as i32
+        } else {
+            0
+        };
+
+        let author = UserProfile {
+            username,
+            bio,
+            image,
+            following: false,
+        };
+
+        let article_response = ArticleResponse {
+            slug,
+            title,
+            description,
+            body,
+            tag_list: tag_names,
+            created_at,
+            updated_at,
+            favorited: false,
+            favorites_count,
+            author,
+        };
+
+        articles.push(article_response);
+    }
+
+    let articles_count = articles.len() as i32;
+
+    Ok(Json(MultipleArticlesResponse {
+        articles,
+        articles_count,
+    }))
+}
+
+pub async fn get_article_page(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    optional_user: OptionalUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get the article data using the existing API endpoint
+    let article_response = get_article(State(state.clone()), Path(slug.clone())).await?;
+    let article = article_response.0.article;
+
+    // Get user info if authenticated
+    let user_info = if let Some(auth_user) = optional_user.user {
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut rows = conn
+            .query(
+                "SELECT username, email, bio, image FROM users WHERE id = ?",
+                libsql::params![auth_user.user_id.to_string()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let username: String = row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let email: String = row
+                .get(1)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let bio: Option<String> = row.get(2).ok();
+            let image: Option<String> = row.get(3).ok();
+
+            Some(json!({
+                "username": username,
+                "email": email,
+                "bio": bio,
+                "image": image
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let context: Value = json!({
+        "title": format!("{} - CrustyRustacean Dev Blog", article.title),
+        "page": "Article",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+        "article": article
+    });
+
+    Ok(RenderHtml("articles/simple.html", state.engine, context))
+}
+
+pub async fn get_articles_list_page(
+    State(state): State<AppState>,
+    optional_user: OptionalUser,
+    Query(query): Query<ArticleQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info if authenticated
+    let user_info = if let Some(auth_user) = optional_user.user {
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut rows = conn
+            .query(
+                "SELECT username, email, bio, image FROM users WHERE id = ?",
+                libsql::params![auth_user.user_id.to_string()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let username: String = row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let email: String = row
+                .get(1)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let bio: Option<String> = row.get(2).ok();
+            let image: Option<String> = row.get(3).ok();
+
+            Some(json!({
+                "username": username,
+                "email": email,
+                "bio": bio,
+                "image": image
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Fetch articles with default limit
+    let articles_query = ArticleQuery {
+        tag: query.tag,
+        author: query.author,
+        favorited: query.favorited,
+        limit: Some(query.limit.unwrap_or(20)),
+        offset: query.offset,
+    };
+    
+    let articles = match list_articles(State(state.clone()), Query(articles_query)).await {
+        Ok(articles_response) => articles_response.0.articles,
+        Err(_) => vec![], // If there's an error fetching articles, show empty list
+    };
+    
+    // Convert articles to JSON with formatted dates
+    let articles_json: Vec<Value> = articles.iter().map(|article| {
+        json!({
+            "slug": article.slug,
+            "title": article.title,
+            "description": article.description,
+            "tag_list": article.tag_list,
+            "created_at": article.created_at.format("%b %d, %Y").to_string(),
+            "author": article.author
+        })
+    }).collect();
+
+    // Get additional statistics for the sidebar
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Count unique tags
+    let tags_count = match conn
+        .query("SELECT COUNT(DISTINCT name) FROM tags", libsql::params![])
+        .await
+    {
+        Ok(mut rows) => {
+            if let Ok(Some(row)) = rows.next().await {
+                let count: i64 = row.get(0).unwrap_or(0);
+                count
+            } else {
+                0
+            }
+        }
+        Err(_) => 0,
+    };
+
+    // Get latest post date from the articles we already fetched
+    let latest_post_date = if let Some(latest_article) = articles.first() {
+        latest_article.created_at.format("%b %d, %Y").to_string()
+    } else {
+        "Never".to_string()
+    };
+
+    let context: Value = json!({
+        "title": "All Articles - CrustyRustacean Dev Blog",
+        "page": "Articles",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+        "articles": articles_json,
+        "tags_count": tags_count,
+        "latest_post_date": latest_post_date,
+    });
+
+    Ok(RenderHtml("articles/list.html", state.engine, context))
+}
