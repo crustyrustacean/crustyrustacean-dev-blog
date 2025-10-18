@@ -3,23 +3,24 @@
 // dependencies
 use crate::config::AppConfig;
 use crate::routes::{
-    get_index, health_check, register_user, login_user, get_current_user, update_current_user,
-    get_profile, follow_user, unfollow_user, get_login_page, get_register_page, get_profile_page,
-    handle_404_simple,
+    follow_user, get_current_user, get_index, get_login_page, get_profile, get_profile_page,
+    get_register_page, handle_404_simple, health_check, login_user, register_user, unfollow_user,
+    update_current_user,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use axum::{
     Router,
-    http::HeaderName,
+    http::{header, HeaderName, HeaderValue},
     routing::{get, post},
 };
 use tokio::net::TcpListener;
 use tower_http::{
+    cors::CorsLayer,
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
+    set_header::SetResponseHeaderLayer,
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
-    cors::CorsLayer,
 };
 use tracing::Level;
 
@@ -62,7 +63,10 @@ impl App {
             .route("/api/users/login", post(login_user))
             .route("/api/user", get(get_current_user).put(update_current_user))
             .route("/api/profiles/{username}", get(get_profile))
-            .route("/api/profiles/{username}/follow", post(follow_user).delete(unfollow_user))
+            .route(
+                "/api/profiles/{username}/follow",
+                post(follow_user).delete(unfollow_user),
+            )
             .nest_service("/static", ServeDir::new("static"))
             .fallback(handle_404_simple)
             .with_state(state)
@@ -73,6 +77,18 @@ impl App {
             ))
             .layer(PropagateRequestIdLayer::new(x_request_id))
             .layer(trace_layer)
+            .layer(SetResponseHeaderLayer::if_not_present(
+                header::X_CONTENT_TYPE_OPTIONS,
+                HeaderValue::from_static("nosniff"),
+            ))
+            .layer(SetResponseHeaderLayer::if_not_present(
+                header::X_FRAME_OPTIONS,
+                HeaderValue::from_static("DENY"),
+            ))
+            .layer(SetResponseHeaderLayer::if_not_present(
+                header::STRICT_TRANSPORT_SECURITY,
+                HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+            ))
     }
 
     /// run the application until stopped (utility function to faciliate local integration testing)

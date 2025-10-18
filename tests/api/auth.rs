@@ -2,7 +2,7 @@
 
 use crate::helpers::spawn_app;
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_user_registration_happy_path() {
@@ -266,9 +266,10 @@ async fn test_login_with_invalid_credentials() {
 
         // Assert
         assert!(
-            response.status() == StatusCode::BAD_REQUEST ||
-            response.status() == StatusCode::UNAUTHORIZED,
-            "Expected 400 or 401, got: {}", response.status()
+            response.status() == StatusCode::BAD_REQUEST
+                || response.status() == StatusCode::UNAUTHORIZED,
+            "Expected 400 or 401, got: {}",
+            response.status()
         );
     }
 }
@@ -316,7 +317,8 @@ async fn test_protected_endpoint_with_invalid_token() {
         assert_eq!(
             response.status(),
             StatusCode::UNAUTHORIZED,
-            "Expected 401 for token: {}", invalid_token
+            "Expected 401 for token: {}",
+            invalid_token
         );
     }
 }
@@ -397,7 +399,11 @@ async fn test_token_contains_valid_claims() {
     // Verify token is not empty and appears to be a JWT (has 3 parts separated by dots)
     assert!(!token.is_empty());
     let token_parts: Vec<&str> = token.split('.').collect();
-    assert_eq!(token_parts.len(), 3, "JWT should have 3 parts separated by dots");
+    assert_eq!(
+        token_parts.len(),
+        3,
+        "JWT should have 3 parts separated by dots"
+    );
 
     // Verify each part is base64-encoded (not empty)
     for part in token_parts {

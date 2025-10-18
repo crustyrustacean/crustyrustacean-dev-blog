@@ -1,8 +1,8 @@
 // src/lib/state.rs
 
 // dependencies
-use crate::{AppError, DatabaseConnection, AppConfig};
 use crate::auth::Keys;
+use crate::{AppConfig, AppError, DatabaseConnection};
 use axum_template::engine::Engine;
 use tera::Tera;
 

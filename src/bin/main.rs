@@ -25,7 +25,9 @@ async fn main(
     // Get JWT secret from Shuttle Secrets
     let jwt_secret = secrets
         .get("JWT_SECRET")
-        .unwrap_or_else(|| "development-secret-key-change-in-production".to_string());
+        .ok_or_else(|| CustomError::msg(
+            "JWT_SECRET must be set in Secrets.toml for production deployment"
+        ));
 
     // Initialize database connection
     let db = DatabaseConnection {
@@ -36,7 +38,7 @@ async fn main(
     db.run_migrations().await.map_err(CustomError::new)?;
 
     // Load configuration with JWT secret
-    let app_config = AppConfig::new(jwt_secret);
+    let app_config = AppConfig::new(jwt_secret?);
 
     // Build the application state
     let app_state = AppState::new(db, &app_config).map_err(CustomError::new)?;

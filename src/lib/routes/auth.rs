@@ -37,11 +37,17 @@ pub async fn get_login_page(State(state): State<AppState>) -> Result<impl IntoRe
 
 // handler which renders the register page template
 #[debug_handler]
-pub async fn get_register_page(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+pub async fn get_register_page(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AppError> {
     let register_content = RegisterPageContent {
         title: "Register".to_string(),
         error: None,
     };
 
-    Ok(RenderHtml("auth/register.html", state.engine, register_content))
+    Ok(RenderHtml(
+        "auth/register.html",
+        state.engine,
+        register_content,
+    ))
 }

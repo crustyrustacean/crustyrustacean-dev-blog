@@ -3,12 +3,12 @@
 // types and functions used across all integration tests
 
 // dependencies
-use reqwest::Client;
 use crustyrustacean_dev_blog_lib::config::AppConfig;
 use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
 use crustyrustacean_dev_blog_lib::startup::App;
 use crustyrustacean_dev_blog_lib::state::AppState;
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
+use reqwest::Client;
 use std::env::var;
 use std::io::{sink, stdout};
 use std::sync::LazyLock;
@@ -47,22 +47,31 @@ pub async fn spawn_app() -> TestApp {
     use std::env::temp_dir;
     use std::time::{SystemTime, UNIX_EPOCH};
     let mut temp_db_path = temp_dir();
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
     temp_db_path.push(format!("test_db_{}_{}.db", std::process::id(), timestamp));
-    let test_db = libsql::Builder::new_local(&temp_db_path).build().await.expect("Failed to create test database");
-    let db_connection = DatabaseConnection { db: std::sync::Arc::new(test_db) };
+    let test_db = libsql::Builder::new_local(&temp_db_path)
+        .build()
+        .await
+        .expect("Failed to create test database");
+    let db_connection = DatabaseConnection {
+        db: std::sync::Arc::new(test_db),
+    };
 
     // run migrations for test database
-    db_connection.run_migrations().await.expect("Failed to run migrations");
+    db_connection
+        .run_migrations()
+        .await
+        .expect("Failed to run migrations");
 
     // set up the app state
-    let app_state = AppState::new(db_connection, &app_config).expect("Unable to build the Tera templates");
+    let app_state =
+        AppState::new(db_connection, &app_config).expect("Unable to build the Tera templates");
 
     // create the test application
-    let application = App::new(
-        app_config,
-        app_state,
-    );
+    let application = App::new(app_config, app_state);
 
     // create a listener
     let listener = TcpListener::bind("127.0.0.1:0")

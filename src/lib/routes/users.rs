@@ -1,12 +1,12 @@
 // src/lib/routes/users.rs
 
 use crate::{
-    auth::{generate_token, hash_password, verify_password, AuthenticatedUser},
-    models::{
-        UserData, UserLogin, UserProfile, UserRegistration, UserResponse, UserUpdate,
-        ProfileResponse,
-    },
     AppError, AppState,
+    auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
+    models::{
+        ProfileResponse, UserData, UserLogin, UserProfile, UserRegistration, UserResponse,
+        UserUpdate,
+    },
 };
 use axum::{
     extract::{Path, State},
@@ -46,7 +46,12 @@ pub async fn register_user(
         .await
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
-    if existing_user.next().await.map_err(|e| AppError::InternalServerError(e.to_string()))?.is_some() {
+    if existing_user
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .is_some()
+    {
         return Err(AppError::Conflict(
             "User with this email or username already exists".to_string(),
         ));
@@ -120,10 +125,18 @@ pub async fn login_user(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
         .ok_or_else(|| AppError::Unauthorized("Invalid credentials".to_string()))?;
 
-    let user_id: String = row.get(0).map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let username: String = row.get(1).map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let email: String = row.get(2).map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let password_hash: String = row.get(3).map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let user_id: String = row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let username: String = row
+        .get(1)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let email: String = row
+        .get(2)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let password_hash: String = row
+        .get(3)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let bio: Option<String> = row.get(4).ok();
     let image: Option<String> = row.get(5).ok();
 
@@ -172,8 +185,12 @@ pub async fn get_current_user(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
-    let username: String = row.get(0).map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let email: String = row.get(1).map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let username: String = row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let email: String = row
+        .get(1)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
 
@@ -248,10 +265,7 @@ pub async fn update_current_user(
     values.push(now.to_rfc3339().into());
     values.push(user.user_id.to_string().into());
 
-    let query = format!(
-        "UPDATE users SET {} WHERE id = ?",
-        updates.join(", ")
-    );
+    let query = format!("UPDATE users SET {} WHERE id = ?", updates.join(", "));
 
     conn.execute(&query, libsql::params_from_iter(values))
         .await
@@ -300,8 +314,12 @@ async fn get_profile_internal(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("Profile not found".to_string()))?;
 
-    let profile_id: String = row.get(0).map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let profile_username: String = row.get(1).map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let profile_id: String = row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let profile_username: String = row
+        .get(1)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
 
@@ -312,10 +330,7 @@ async fn get_profile_internal(
         let mut follow_rows = conn
             .query(
                 "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
-                libsql::params![
-                    current_user.user_id.to_string(),
-                    profile_uuid.to_string(),
-                ],
+                libsql::params![current_user.user_id.to_string(), profile_uuid.to_string(),],
             )
             .await
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
@@ -366,17 +381,16 @@ pub async fn follow_user(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
-    let following_id: String = row.get(0).map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let following_id: String = row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let following_uuid = Uuid::parse_str(&following_id)
         .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
 
     // Insert follow relationship (ignore if already exists)
     conn.execute(
         "INSERT OR IGNORE INTO user_follows (follower_id, following_id) VALUES (?, ?)",
-        libsql::params![
-            user.user_id.to_string(),
-            following_uuid.to_string(),
-        ],
+        libsql::params![user.user_id.to_string(), following_uuid.to_string(),],
     )
     .await
     .map_err(|e| AppError::InternalServerError(e.to_string()))?;
@@ -409,17 +423,16 @@ pub async fn unfollow_user(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
-    let following_id: String = row.get(0).map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let following_id: String = row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let following_uuid = Uuid::parse_str(&following_id)
         .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
 
     // Remove follow relationship
     conn.execute(
         "DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?",
-        libsql::params![
-            user.user_id.to_string(),
-            following_uuid.to_string(),
-        ],
+        libsql::params![user.user_id.to_string(), following_uuid.to_string(),],
     )
     .await
     .map_err(|e| AppError::InternalServerError(e.to_string()))?;

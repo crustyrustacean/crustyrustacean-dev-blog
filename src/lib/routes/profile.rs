@@ -5,7 +5,10 @@
 // dependencies
 use crate::errors::AppError;
 use crate::state::AppState;
-use axum::{extract::{State, Path}, response::IntoResponse};
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+};
 use axum_macros::debug_handler;
 use axum_template::RenderHtml;
 use serde::Serialize;
@@ -76,7 +79,8 @@ pub async fn get_profile_page(
         ArticleSummary {
             title: "Getting Started with Axum Web Framework".to_string(),
             slug: "getting-started-with-axum".to_string(),
-            description: "Learn how to build fast and safe web applications using Axum...".to_string(),
+            description: "Learn how to build fast and safe web applications using Axum..."
+                .to_string(),
             created_at: "2024-01-15".to_string(),
             tags: vec!["Rust".to_string(), "WebDev".to_string()],
             favorites_count: 23,
@@ -86,7 +90,8 @@ pub async fn get_profile_page(
         ArticleSummary {
             title: "Building RESTful APIs with Rust".to_string(),
             slug: "restful-apis-with-rust".to_string(),
-            description: "A comprehensive guide to creating robust and performant REST APIs...".to_string(),
+            description: "A comprehensive guide to creating robust and performant REST APIs..."
+                .to_string(),
             created_at: "2024-01-08".to_string(),
             tags: vec!["Rust".to_string(), "API".to_string()],
             favorites_count: 45,
@@ -99,12 +104,16 @@ pub async fn get_profile_page(
         title: format!("{}'s Profile", username),
         profile,
         articles,
-        favorites: vec![], // Empty for now
-        drafts: vec![], // Empty for now
+        favorites: vec![],  // Empty for now
+        drafts: vec![],     // Empty for now
         current_user: None, // Would come from authentication
         current_page: 1,
         total_pages: 1,
     };
 
-    Ok(RenderHtml("profile/profile.html", state.engine, profile_content))
+    Ok(RenderHtml(
+        "profile/profile.html",
+        state.engine,
+        profile_content,
+    ))
 }

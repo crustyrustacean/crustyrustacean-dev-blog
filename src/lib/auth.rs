@@ -1,23 +1,19 @@
 // src/lib/auth.rs
 
+use argon2::password_hash::{SaltString, rand_core::OsRng};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use argon2::password_hash::{rand_core::OsRng, SaltString};
-use axum::{
-    extract::FromRequestParts,
-    http::request::Parts,
-    RequestPartsExt,
-};
+use axum::{RequestPartsExt, extract::FromRequestParts, http::request::Parts};
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
     TypedHeader,
+    headers::{Authorization, authorization::Bearer},
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{AppError, AppConfig};
+use crate::{AppConfig, AppError};
 
 #[derive(Clone)]
 pub struct Keys {
@@ -59,7 +55,6 @@ pub enum AuthError {
     PasswordHashError(String),
 }
 
-
 impl From<AuthError> for AppError {
     fn from(err: AuthError) -> Self {
         match err {
@@ -79,17 +74,28 @@ pub struct AuthenticatedUser {
 impl FromRequestParts<crate::AppState> for AuthenticatedUser {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &crate::AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|_| AuthError::MissingToken)?;
 
-        let token_data = decode::<Claims>(bearer.token(), &state.jwt_keys.decoding, &Validation::default())
-            .map_err(|_| AuthError::InvalidToken)?;
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = true;
+        validation.leeway = 60;
 
-        let user_id = Uuid::parse_str(&token_data.claims.sub)
-            .map_err(|_| AuthError::InvalidToken)?;
+        let token_data = decode::<Claims>(
+            bearer.token(),
+            &state.jwt_keys.decoding,
+            &Validation::default(),
+        )
+        .map_err(|_| AuthError::InvalidToken)?;
+
+        let user_id =
+            Uuid::parse_str(&token_data.claims.sub).map_err(|_| AuthError::InvalidToken)?;
 
         Ok(AuthenticatedUser { user_id })
     }
@@ -105,14 +111,16 @@ pub fn generate_token(user_id: Uuid, keys: &Keys) -> Result<String, AuthError> {
         iat: now.timestamp(),
     };
 
-    encode(&Header::default(), &claims, &keys.encoding)
+    let header = Header::new(Algorithm::HS256);
+
+    encode(&header, &claims, &keys.encoding)
         .map_err(|err| AuthError::PasswordHashError(err.to_string()))
 }
 
 pub fn hash_password(password: &str) -> Result<String, AuthError> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    
+
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)
         .map_err(|err| AuthError::PasswordHashError(err.to_string()))?;
@@ -121,11 +129,11 @@ pub fn hash_password(password: &str) -> Result<String, AuthError> {
 }
 
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, AuthError> {
-    let parsed_hash = PasswordHash::new(hash)
-        .map_err(|err| AuthError::PasswordHashError(err.to_string()))?;
+    let parsed_hash =
+        PasswordHash::new(hash).map_err(|err| AuthError::PasswordHashError(err.to_string()))?;
 
     let argon2 = Argon2::default();
-    
+
     Ok(argon2
         .verify_password(password.as_bytes(), &parsed_hash)
         .is_ok())

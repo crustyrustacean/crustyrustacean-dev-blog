@@ -9,7 +9,7 @@ use axum::{extract::State, response::IntoResponse};
 use axum_macros::debug_handler;
 use axum_template::RenderHtml;
 use chrono::Datelike;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // handler which renders the index page template
 #[debug_handler]

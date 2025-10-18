@@ -33,7 +33,9 @@ pub async fn handle_404(
 }
 
 #[debug_handler]
-pub async fn handle_404_simple(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+pub async fn handle_404_simple(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AppError> {
     let content = NotFoundPageContent {
         title: "Page Not Found".to_string(),
         request_path: None,

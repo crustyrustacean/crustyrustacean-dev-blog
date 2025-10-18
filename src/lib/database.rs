@@ -9,7 +9,6 @@ pub struct DatabaseConnection {
 }
 
 impl DatabaseConnection {
-
     pub fn connect(&self) -> Result<Connection, libsql::Error> {
         self.db.connect()
     }
