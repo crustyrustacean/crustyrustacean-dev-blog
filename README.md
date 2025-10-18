@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 56 integration tests
+- **Comprehensive test suite** with 65 integration tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -48,6 +48,16 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Interactive follow/unfollow with real-time updates
   - Pagination and responsive design
   - Complete API endpoints with authentication
+- **Tags System** (TDD implementation):
+  - GET /api/tags endpoint for retrieving all tags
+  - Alphabetically sorted tag lists
+  - Dynamic tag display on homepage and articles listing
+  - Tag-based article filtering (via query parameters)
+- **RSS Feed**:
+  - Standards-compliant RSS 2.0 feed at /rss
+  - Automatic article syndication (latest 20 articles)
+  - Proper XML escaping for security
+  - RFC 2822 date formatting
 
 ### 🚧 Planned
 - Comments system for articles
@@ -78,6 +88,8 @@ src/
       articles.rs   # Article management and listing
       auth.rs       # Authentication pages
       profile.rs    # User profile management
+      tags.rs       # Tags API endpoint
+      rss.rs        # RSS feed generation
       error_pages.rs# Error handling pages
       mod.rs        # Routes module
 static/
@@ -111,6 +123,8 @@ tests/
     feed.rs         # Feed API integration tests (5 tests)
     feed_page.rs    # Feed page integration tests (2 tests)
     authors.rs      # Authors discovery integration tests (8 tests)
+    tags.rs         # Tags API integration tests (3 tests)
+    rss.rs          # RSS feed integration tests (4 tests)
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
     main.rs         # Test module declarations
@@ -132,11 +146,13 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (56 total)
+cargo test              # Run all tests (65 total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
 cargo test authors      # Run authors discovery tests only
+cargo test tags         # Run tags API tests only
+cargo test rss          # Run RSS feed tests only
 cargo test api::        # Run all API integration tests
 ```
 
@@ -149,6 +165,8 @@ The test suite includes comprehensive testing:
 - ✅ Complete favorites API functionality
 - ✅ Personal feed functionality with following relationships
 - ✅ Authors discovery with search and pagination
+- ✅ Tags API with alphabetical sorting and filtering
+- ✅ RSS feed generation with XML validation
 - ✅ Idempotent operations and multi-user scenarios
 
 ### Deploying with Shuttle
@@ -173,6 +191,7 @@ GET  /profiles/{username}          # User profile page
 GET  /profiles                     # Authors discovery page (protected)
 GET  /feed                         # Personal feed page (protected)
 GET  /favorites                    # User's favorite articles (protected)
+GET  /rss                          # RSS feed (XML)
 ```
 
 ### Authentication API
@@ -208,6 +227,11 @@ DELETE /api/articles/{slug}/favorite   # Unfavorite article (protected)
 GET    /api/articles?favorited={user}  # Get articles favorited by user
 ```
 
+### Tags API
+```
+GET /api/tags                      # Get all tags (alphabetically sorted)
+```
+
 ### System
 ```
 GET /health_check                  # Health check endpoint
@@ -226,7 +250,9 @@ The application now includes a complete blog system:
 7. **Personal Feed**: Curated feed showing articles from authors you follow
 8. **Authors Discovery**: Browse and search for authors to follow with interactive UI
 9. **Social Features**: Complete follow/unfollow system with real-time updates
-10. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+10. **Tags System**: Dynamic tag display with filtering and alphabetical organization
+11. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
+12. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -251,7 +277,8 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 42 integration tests covering happy path and failure scenarios
+- **Comprehensive Testing**: 65 integration tests covering happy path and failure scenarios
+- **Test-Driven Development**: Tags and RSS features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 

@@ -10,3 +10,5 @@ mod feed_page;
 mod health_check;
 mod helpers;
 mod markdown_integration;
+mod rss;
+mod tags;

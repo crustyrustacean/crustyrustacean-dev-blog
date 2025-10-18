@@ -104,6 +104,7 @@ GET  /profiles/{username}               # User profile page
 GET  /profiles                          # Authors discovery page (protected)
 GET  /feed                              # Personal feed page (protected)
 GET  /favorites                         # User's favorite articles (protected)
+GET  /rss                               # RSS feed (XML)
 ```
 
 **API Endpoints:**
@@ -125,6 +126,7 @@ PUT  /api/articles/{slug}               # Update article (protected)
 DELETE /api/articles/{slug}             # Delete article (protected)
 POST /api/articles/{slug}/favorite      # Favorite article (protected)
 DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
+GET  /api/tags                          # Get all tags
 ```
 
 ### Testing Strategy
@@ -150,6 +152,15 @@ DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
   - Search functionality by username and bio
   - Pagination and authentication requirements
   - HTML page rendering and interactive features
+- **Tags API test suite** with complete TDD implementation:
+  - Get all tags endpoint with alphabetical ordering
+  - Empty state handling and unique tag filtering
+  - Frontend integration with dynamic tag display
+- **RSS Feed test suite** with comprehensive coverage:
+  - Valid XML generation and proper content-type headers
+  - Article inclusion with correct formatting and escaping
+  - XML special character escaping for security
+  - Empty feed handling when no articles exist
 - **Test infrastructure** with isolated databases and proper setup
 - **Test helpers** in `tests/api/helpers.rs` for consistent test environments
 - **HTTP client testing** using reqwest for real request/response validation
@@ -166,7 +177,7 @@ DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
 - ✅ **Database Integration**: Turso/libSQL with automated migrations
 - ✅ **Security**: Argon2 password hashing, JWT tokens, input validation
 - ✅ **Error Handling**: Unified error architecture with proper separation of concerns
-- ✅ **Testing**: 56 integration tests covering authentication, favorites, feed, authors discovery, and error scenarios
+- ✅ **Testing**: 65 integration tests covering authentication, favorites, feed, authors discovery, tags, RSS, and error scenarios
 - ✅ **API Endpoints**: User management and profile operations
 - ✅ **Code Quality**: Eliminated error handling duplication, improved maintainability
 - ✅ **Blog Features**: Complete article CRUD operations with slug-based routing
@@ -178,5 +189,7 @@ DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
 - ✅ **Articles Feed System**: Personal feed showing articles from followed users with TDD implementation
 - ✅ **Authors Discovery System**: Browse and search for authors to follow with comprehensive TDD coverage
 - ✅ **Social Features**: Complete follow/unfollow system with real-time updates and interactive UI
+- ✅ **Tags System**: Complete tags endpoint with TDD implementation and dynamic frontend display
+- ✅ **RSS Feed**: Standards-compliant RSS 2.0 feed with proper XML escaping and article syndication
 - ✅ **Production Ready**: Complete blog functionality with user-friendly navigation and social features
 - 🚧 **Advanced Features**: Comments system, advanced filtering, enhanced search (planned)

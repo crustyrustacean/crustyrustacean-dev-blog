@@ -7,9 +7,9 @@ use crate::routes::{
     get_article, get_article_page, get_articles_feed, get_articles_feed_page,
     get_articles_list_page, get_authors_page, get_current_user, get_edit_article_page,
     get_editor_page, get_index, get_login_page, get_my_favorites_page, get_profile,
-    get_profile_page, get_register_page, handle_404_simple, health_check, list_articles,
-    list_profiles, login_user, register_user, unfavorite_article, unfollow_user, update_article,
-    update_current_user,
+    get_profile_page, get_register_page, get_rss_feed, get_tags, handle_404_simple, health_check,
+    list_articles, list_profiles, login_user, register_user, unfavorite_article, unfollow_user,
+    update_article, update_current_user,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -58,6 +58,7 @@ impl App {
         Router::new()
             .route("/health_check", get(health_check))
             .route("/", get(get_index))
+            .route("/rss", get(get_rss_feed))
             // HTML page routes
             .route("/login", get(get_login_page))
             .route("/register", get(get_register_page))
@@ -90,6 +91,7 @@ impl App {
                 "/api/articles/{slug}/favorite",
                 post(favorite_article).delete(unfavorite_article),
             )
+            .route("/api/tags", get(get_tags))
             .nest_service("/static", ServeDir::new("static"))
             .fallback(handle_404_simple)
             .with_state(state)

@@ -82,16 +82,9 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <p class="small text-muted">More filtering options coming soon!</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <span class="badge bg-primary">Rust</span>
-                        <span class="badge bg-secondary">WebDev</span>
-                        <span class="badge bg-success">API</span>
-                        <span class="badge bg-warning">Tutorial</span>
-                        <span class="badge bg-info">DevOps</span>
-                        <span class="badge bg-dark">Systems</span>
-                        <span class="badge bg-danger">Performance</span>
-                        <span class="badge bg-light text-dark">Testing</span>
+                    <p class="small text-muted">Click a tag to filter articles</p>
+                    <div id="filter-tags-container" class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-secondary">Loading...</span>
                     </div>
                 </div>
             </div>
@@ -127,6 +120,26 @@
 <script>
     // Add some interactive features
     document.addEventListener('DOMContentLoaded', function() {
+        // Fetch and display tags from API
+        fetch('/api/tags')
+            .then(response => response.json())
+            .then(data => {
+                const tagsContainer = document.getElementById('filter-tags-container');
+                if (data.tags && data.tags.length > 0) {
+                    const badgeColors = ['primary', 'secondary', 'success', 'warning', 'info', 'dark', 'danger'];
+                    tagsContainer.innerHTML = data.tags.map((tag, index) => {
+                        const color = badgeColors[index % badgeColors.length];
+                        return `<a href="/articles?tag=${encodeURIComponent(tag)}" class="badge bg-${color} text-decoration-none">${tag}</a>`;
+                    }).join('');
+                } else {
+                    tagsContainer.innerHTML = '<span class="text-muted small">No tags yet</span>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching tags:', error);
+                document.getElementById('filter-tags-container').innerHTML = '<span class="text-muted small">Unable to load tags</span>';
+            });
+
         // Animate cards on scroll
         const observerOptions = {
             threshold: 0.1,

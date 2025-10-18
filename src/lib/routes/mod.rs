@@ -7,6 +7,8 @@ pub mod error_pages;
 pub mod health_check;
 pub mod index;
 pub mod profile;
+pub mod rss;
+pub mod tags;
 pub mod users;
 
 // re-exports
@@ -16,4 +18,6 @@ pub use error_pages::*;
 pub use health_check::*;
 pub use index::*;
 pub use profile::*;
+pub use rss::*;
+pub use tags::*;
 pub use users::*;
