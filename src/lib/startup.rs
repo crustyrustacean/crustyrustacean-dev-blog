@@ -4,13 +4,14 @@
 use crate::config::AppConfig;
 use crate::routes::{
     get_index, health_check, register_user, login_user, get_current_user, update_current_user,
-    get_profile, follow_user, unfollow_user,
+    get_profile, follow_user, unfollow_user, get_login_page, get_register_page, get_profile_page,
+    handle_404_simple,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use axum::{
-    Router, 
-    http::HeaderName, 
+    Router,
+    http::HeaderName,
     routing::{get, post},
 };
 use tokio::net::TcpListener;
@@ -52,13 +53,18 @@ impl App {
         Router::new()
             .route("/health_check", get(health_check))
             .route("/", get(get_index))
+            // HTML page routes
+            .route("/login", get(get_login_page))
+            .route("/register", get(get_register_page))
+            .route("/profiles/{username}", get(get_profile_page))
             // API routes
             .route("/api/users", post(register_user))
             .route("/api/users/login", post(login_user))
             .route("/api/user", get(get_current_user).put(update_current_user))
-.route("/api/profiles/{username}", get(get_profile))
-.route("/api/profiles/{username}/follow", post(follow_user).delete(unfollow_user))
-            .fallback_service(ServeDir::new("static"))
+            .route("/api/profiles/{username}", get(get_profile))
+            .route("/api/profiles/{username}/follow", post(follow_user).delete(unfollow_user))
+            .nest_service("/static", ServeDir::new("static"))
+            .fallback(handle_404_simple)
             .with_state(state)
             .layer(CorsLayer::permissive())
             .layer(SetRequestIdLayer::new(

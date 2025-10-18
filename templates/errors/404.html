@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-md-10">
+        <div class="text-center">
+            <!-- Rust-themed 404 illustration -->
+            <div class="mb-4">
+                <div class="display-1 text-warning mb-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h1 class="display-1 fw-bold text-primary mb-0">404</h1>
+                <h2 class="h4 text-muted mb-3">Oops! This page has been dereferenced</h2>
+            </div>
+
+            <!-- Rust-themed error message -->
+            <div class="bg-light border-start border-warning border-4 p-4 mb-4 text-start">
+                <h5 class="text-warning mb-2">
+                    <i class="fas fa-bug me-2"></i>
+                    Compilation Error
+                </h5>
+                <pre class="mb-2 text-dark"><code>error[E0404]: The requested page could not be found
+  --&gt; {{ request_path | default(value="/unknown") }}
+   |
+   | This path does not exist in the current scope
+   |
+   = help: try navigating to an existing page
+   = note: perhaps you meant to visit one of the links below?</code></pre>
+            </div>
+
+            <!-- Helpful suggestions -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-home fa-2x text-primary mb-3"></i>
+                            <h5 class="card-title">Home</h5>
+                            <p class="card-text text-muted">Return to the main page</p>
+                            <a href="/" class="btn btn-primary">Go Home</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-newspaper fa-2x text-success mb-3"></i>
+                            <h5 class="card-title">Articles</h5>
+                            <p class="card-text text-muted">Browse our latest posts</p>
+                            <a href="/articles" class="btn btn-success">Read Articles</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional help -->
+            <div class="alert alert-info" role="alert">
+                <i class="fas fa-lightbulb me-2"></i>
+                <strong>Pro Tip:</strong> If you think this page should exist, please
+                <a href="mailto:contact@crustyrustacean.dev" class="alert-link">let us know</a>
+                and we'll investigate!
+            </div>
+
+            <!-- Fun Rust facts -->
+            <div class="mt-4 p-3 bg-dark text-light rounded">
+                <h6 class="text-warning mb-2">
+                    <i class="fas fa-code me-2"></i>
+                    Did you know?
+                </h6>
+                <p class="mb-0 small">
+                    In Rust, a <code>None</code> value in an <code>Option&lt;T&gt;</code> represents the absence of a value -
+                    just like this missing page! Unlike null pointers in other languages,
+                    Rust's type system prevents you from accidentally accessing missing data.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-4 {
+    border-width: 4px !important;
+}
+
+pre code {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.display-1 {
+    font-size: 6rem;
+    font-weight: 800;
+    background: linear-gradient(45deg, #ff6b35, #f7931e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+@media (max-width: 768px) {
+    .display-1 {
+        font-size: 4rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Add some subtle animation
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        setTimeout(() => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 100);
+        }, index * 200);
+    });
+});
+</script>
+{% endblock %}

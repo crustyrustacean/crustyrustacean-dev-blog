@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}{{ profile.username }}'s Profile - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    {% if profile.image %}
+                        <img src="{{ profile.image }}" alt="{{ profile.username }}" class="rounded-circle" width="100" height="100">
+                    {% else %}
+                        <i class="fas fa-user-circle fa-5x text-muted"></i>
+                    {% endif %}
+                </div>
+                <h4 class="mb-1">{{ profile.username }}</h4>
+                {% if profile.bio %}
+                    <p class="text-muted small">{{ profile.bio }}</p>
+                {% else %}
+                    <p class="text-muted small"><em>No bio available</em></p>
+                {% endif %}
+
+                <div class="row text-center mb-3">
+                    <div class="col-4">
+                        <div class="fw-bold">{{ profile.articles_count | default(value=0) }}</div>
+                        <small class="text-muted">Articles</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fw-bold">{{ profile.followers_count | default(value=0) }}</div>
+                        <small class="text-muted">Followers</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fw-bold">{{ profile.following_count | default(value=0) }}</div>
+                        <small class="text-muted">Following</small>
+                    </div>
+                </div>
+
+                {% if current_user and current_user.username != profile.username %}
+                    <div class="d-grid gap-2">
+                        {% if profile.following %}
+                            <button class="btn btn-outline-primary" id="followBtn" data-username="{{ profile.username }}" data-following="true">
+                                <i class="fas fa-user-minus me-1"></i>
+                                Unfollow
+                            </button>
+                        {% else %}
+                            <button class="btn btn-primary" id="followBtn" data-username="{{ profile.username }}" data-following="false">
+                                <i class="fas fa-user-plus me-1"></i>
+                                Follow
+                            </button>
+                        {% endif %}
+                    </div>
+                {% elif current_user and current_user.username == profile.username %}
+                    <div class="d-grid gap-2">
+                        <a href="/settings" class="btn btn-outline-primary">
+                            <i class="fas fa-cog me-1"></i>
+                            Edit Profile
+                        </a>
+                    </div>
+                {% endif %}
+
+                {% if profile.website or profile.twitter or profile.github %}
+                    <hr>
+                    <div class="social-links">
+                        {% if profile.website %}
+                            <a href="{{ profile.website }}" target="_blank" class="btn btn-outline-secondary btn-sm me-1" title="Website">
+                                <i class="fas fa-globe"></i>
+                            </a>
+                        {% endif %}
+                        {% if profile.twitter %}
+                            <a href="https://twitter.com/{{ profile.twitter }}" target="_blank" class="btn btn-outline-secondary btn-sm me-1" title="Twitter">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                        {% endif %}
+                        {% if profile.github %}
+                            <a href="https://github.com/{{ profile.github }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="GitHub">
+                                <i class="fab fa-github"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if profile.badges %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-award me-2"></i>
+                        Achievements
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for badge in profile.badges %}
+                            <span class="badge bg-warning" title="{{ badge.description }}">
+                                <i class="{{ badge.icon }} me-1"></i>
+                                {{ badge.name }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-8">
+        <ul class="nav nav-tabs mb-4" id="profileTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="articles-tab" data-bs-toggle="tab" data-bs-target="#articles" type="button" role="tab">
+                    <i class="fas fa-newspaper me-1"></i>
+                    Articles ({{ articles | length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="favorites-tab" data-bs-toggle="tab" data-bs-target="#favorites" type="button" role="tab">
+                    <i class="fas fa-heart me-1"></i>
+                    Favorites
+                </button>
+            </li>
+            {% if current_user and current_user.username == profile.username %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="drafts-tab" data-bs-toggle="tab" data-bs-target="#drafts" type="button" role="tab">
+                        <i class="fas fa-edit me-1"></i>
+                        Drafts
+                    </button>
+                </li>
+            {% endif %}
+        </ul>
+
+        <div class="tab-content" id="profileTabsContent">
+            <div class="tab-pane fade show active" id="articles" role="tabpanel">
+                {% if articles %}
+                    {% for article in articles %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for tag in article.tags %}
+                                            <span class="badge bg-secondary">{{ tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <small class="text-muted">{{ article.created_at | date(format="%B %d, %Y") }}</small>
+                                </div>
+
+                                <h5 class="card-title">
+                                    <a href="/articles/{{ article.slug }}" class="text-decoration-none">{{ article.title }}</a>
+                                </h5>
+
+                                <p class="card-text text-muted">{{ article.description }}</p>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-muted small">
+                                        <i class="fas fa-clock me-1"></i>
+                                        {{ article.reading_time | default(value=5) }} min read
+                                    </div>
+                                    <div class="d-flex gap-3 text-muted small">
+                                        <span>
+                                            <i class="fas fa-heart me-1"></i>
+                                            {{ article.favorites_count | default(value=0) }}
+                                        </span>
+                                        <span>
+                                            <i class="fas fa-comment me-1"></i>
+                                            {{ article.comments_count | default(value=0) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+
+                    <!-- Pagination -->
+                    {% if total_pages > 1 %}
+                        <nav aria-label="Articles pagination">
+                            <ul class="pagination justify-content-center">
+                                {% if current_page > 1 %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ current_page - 1 }}">Previous</a>
+                                    </li>
+                                {% endif %}
+
+                                {% if pages %}
+                                    {% for page in pages %}
+                                        {% if page == current_page %}
+                                            <li class="page-item active">
+                                                <span class="page-link">{{ page }}</span>
+                                            </li>
+                                        {% else %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+
+                                {% if current_page < total_pages %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ current_page + 1 }}">Next</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-newspaper fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No articles yet</h5>
+                        {% if current_user and current_user.username == profile.username %}
+                            <p class="text-muted">Start writing your first article!</p>
+                            <a href="/editor" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Write Article
+                            </a>
+                        {% else %}
+                            <p class="text-muted">{{ profile.username }} hasn't published any articles yet.</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="tab-pane fade" id="favorites" role="tabpanel">
+                {% if favorites %}
+                    {% for article in favorites %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <small class="text-muted">
+                                            By <a href="/profiles/{{ article.author.username }}">{{ article.author.username }}</a>
+                                            • {{ article.created_at | date(format="%B %d, %Y") }}
+                                        </small>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for tag in article.tags %}
+                                            <span class="badge bg-secondary">{{ tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <h5 class="card-title">
+                                    <a href="/articles/{{ article.slug }}" class="text-decoration-none">{{ article.title }}</a>
+                                </h5>
+
+                                <p class="card-text text-muted">{{ article.description }}</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-heart fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No favorites yet</h5>
+                        {% if current_user and current_user.username == profile.username %}
+                            <p class="text-muted">Articles you favorite will appear here.</p>
+                        {% else %}
+                            <p class="text-muted">{{ profile.username }} hasn't favorited any articles yet.</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if current_user and current_user.username == profile.username %}
+                <div class="tab-pane fade" id="drafts" role="tabpanel">
+                    {% if drafts %}
+                        {% for draft in drafts %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="badge bg-warning">Draft</span>
+                                        <small class="text-muted">{{ draft.updated_at | date(format="%B %d, %Y") }}</small>
+                                    </div>
+
+                                    <h5 class="card-title">
+                                        {{ draft.title | default(value="Untitled") }}
+                                    </h5>
+
+                                    {% if draft.description %}
+                                        <p class="card-text text-muted">{{ draft.description }}</p>
+                                    {% endif %}
+
+                                    <div class="d-flex gap-2">
+                                        <a href="/editor/{{ draft.id }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-edit me-1"></i>
+                                            Continue Writing
+                                        </a>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteDraft('{{ draft.id }}')">
+                                            <i class="fas fa-trash me-1"></i>
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-edit fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No drafts</h5>
+                            <p class="text-muted">Your draft articles will appear here.</p>
+                            <a href="/editor" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Start Writing
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Follow/Unfollow functionality
+    const followBtn = document.getElementById('followBtn');
+    if (followBtn) {
+        followBtn.addEventListener('click', async function() {
+            const username = this.dataset.username;
+            const isFollowing = this.dataset.following === 'true';
+
+            try {
+                const response = await fetch(`/api/profiles/${username}/follow`, {
+                    method: isFollowing ? 'DELETE' : 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    // Toggle button state
+                    if (isFollowing) {
+                        this.classList.remove('btn-outline-primary');
+                        this.classList.add('btn-primary');
+                        this.innerHTML = '<i class="fas fa-user-plus me-1"></i>Follow';
+                        this.dataset.following = 'false';
+                    } else {
+                        this.classList.remove('btn-primary');
+                        this.classList.add('btn-outline-primary');
+                        this.innerHTML = '<i class="fas fa-user-minus me-1"></i>Unfollow';
+                        this.dataset.following = 'true';
+                    }
+
+                    // Update follower count
+                    const followersElement = document.querySelector('.col-4:nth-child(2) .fw-bold');
+                    if (followersElement) {
+                        const count = parseInt(followersElement.textContent);
+                        followersElement.textContent = isFollowing ? count - 1 : count + 1;
+                    }
+                } else {
+                    console.error('Follow/unfollow failed');
+                }
+            } catch (error) {
+                console.error('Network error:', error);
+            }
+        });
+    }
+});
+
+// Delete draft function
+async function deleteDraft(draftId) {
+    if (confirm('Are you sure you want to delete this draft?')) {
+        try {
+            const response = await fetch(`/api/articles/${draftId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                }
+            });
+
+            if (response.ok) {
+                // Remove the draft element from the page
+                const draftElement = event.target.closest('.card');
+                draftElement.remove();
+
+                // If no more drafts, show empty state
+                const draftsContainer = document.getElementById('drafts');
+                if (draftsContainer.querySelectorAll('.card').length === 0) {
+                    draftsContainer.innerHTML = `
+                        <div class="text-center py-5">
+                            <i class="fas fa-edit fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No drafts</h5>
+                            <p class="text-muted">Your draft articles will appear here.</p>
+                            <a href="/editor" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Start Writing
+                            </a>
+                        </div>
+                    `;
+                }
+            } else {
+                alert('Failed to delete draft');
+            }
+        } catch (error) {
+            console.error('Error deleting draft:', error);
+            alert('Error deleting draft');
+        }
+    }
+}
+</script>
+{% endblock %}

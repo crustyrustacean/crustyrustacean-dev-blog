@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Register - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-user-plus fa-3x text-primary mb-3"></i>
+                    <h2 class="card-title">Join the Community</h2>
+                    <p class="text-muted">Create your account to start reading and commenting</p>
+                </div>
+
+                {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <form id="registerForm" action="/api/users" method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-user"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="username" name="username" required
+                                           pattern="[a-zA-Z0-9_-]{3,20}" title="3-20 characters, letters, numbers, underscore, or dash">
+                                </div>
+                                <div class="form-text">3-20 characters, letters, numbers, underscore, or dash</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-envelope"></i>
+                                    </span>
+                                    <input type="email" class="form-control" id="email" name="email" required autocomplete="email">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="password" name="password" required
+                                   minlength="8" autocomplete="new-password">
+                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Minimum 8 characters</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Confirm Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required
+                                   autocomplete="new-password">
+                            <button class="btn btn-outline-secondary" type="button" id="toggleConfirmPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bio" class="form-label">Bio (Optional)</label>
+                        <textarea class="form-control" id="bio" name="bio" rows="3"
+                                  placeholder="Tell us a bit about yourself..."></textarea>
+                        <div class="form-text">A short bio to display on your profile</div>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="agreeTerms" required>
+                        <label class="form-check-label" for="agreeTerms">
+                            I agree to the <a href="/terms" target="_blank">Terms of Service</a> and
+                            <a href="/privacy" target="_blank">Privacy Policy</a>
+                        </label>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="newsletter" name="newsletter">
+                        <label class="form-check-label" for="newsletter">
+                            Subscribe to our newsletter for updates and new articles
+                        </label>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>
+                            Create Account
+                        </button>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+
+                <div class="text-center">
+                    <p class="mb-0">
+                        Already have an account?
+                        <a href="/login" class="text-decoration-none fw-bold">Sign in here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle password visibility
+    function setupPasswordToggle(toggleId, passwordId) {
+        const toggle = document.getElementById(toggleId);
+        const password = document.getElementById(passwordId);
+
+        toggle.addEventListener('click', function() {
+            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+            password.setAttribute('type', type);
+
+            const icon = this.querySelector('i');
+            icon.classList.toggle('fa-eye');
+            icon.classList.toggle('fa-eye-slash');
+        });
+    }
+
+    setupPasswordToggle('togglePassword', 'password');
+    setupPasswordToggle('toggleConfirmPassword', 'confirmPassword');
+
+    // Password confirmation validation
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirmPassword');
+
+    function validatePasswords() {
+        if (confirmPassword.value && password.value !== confirmPassword.value) {
+            confirmPassword.setCustomValidity('Passwords do not match');
+        } else {
+            confirmPassword.setCustomValidity('');
+        }
+    }
+
+    password.addEventListener('input', validatePasswords);
+    confirmPassword.addEventListener('input', validatePasswords);
+
+    // Handle form submission
+    const registerForm = document.getElementById('registerForm');
+    registerForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const registerData = {
+            username: formData.get('username'),
+            email: formData.get('email'),
+            password: formData.get('password'),
+            bio: formData.get('bio') || null
+        };
+
+        try {
+            const response = await fetch('/api/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(registerData)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Show success message
+                showSuccess('Account created successfully! Please log in.');
+                // Redirect to login page after delay
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+            } else {
+                const errorData = await response.json();
+                showError(errorData.message || 'Registration failed. Please try again.');
+            }
+        } catch (error) {
+            showError('Network error. Please check your connection and try again.');
+        }
+    });
+
+    function showError(message) {
+        showAlert(message, 'danger');
+    }
+
+    function showSuccess(message) {
+        showAlert(message, 'success');
+    }
+
+    function showAlert(message, type) {
+        // Remove existing alerts
+        const existingAlert = document.querySelector('.alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+
+        // Create new alert
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle';
+        alert.innerHTML = `<i class="fas ${icon} me-2"></i>${message}`;
+
+        // Insert before form
+        const form = document.getElementById('registerForm');
+        form.parentNode.insertBefore(alert, form);
+
+        // Auto-dismiss after 5 seconds (except success messages)
+        if (type !== 'success') {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+    }
+
+    // Username availability check (debounced)
+    let usernameTimeout;
+    const usernameInput = document.getElementById('username');
+
+    usernameInput.addEventListener('input', function() {
+        clearTimeout(usernameTimeout);
+        const username = this.value;
+
+        if (username.length >= 3) {
+            usernameTimeout = setTimeout(() => {
+                checkUsernameAvailability(username);
+            }, 500);
+        }
+    });
+
+    async function checkUsernameAvailability(username) {
+        try {
+            const response = await fetch(`/api/users/check-username?username=${encodeURIComponent(username)}`);
+            const data = await response.json();
+
+            const usernameInput = document.getElementById('username');
+            if (data.available) {
+                usernameInput.classList.remove('is-invalid');
+                usernameInput.classList.add('is-valid');
+            } else {
+                usernameInput.classList.remove('is-valid');
+                usernameInput.classList.add('is-invalid');
+            }
+        } catch (error) {
+            // Silently fail username check
+            console.error('Username check failed:', error);
+        }
+    }
+});
+</script>
+{% endblock %}

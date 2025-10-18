@@ -8,24 +8,23 @@ use crate::state::AppState;
 use axum::{extract::State, response::IntoResponse};
 use axum_macros::debug_handler;
 use axum_template::RenderHtml;
-use serde::Serialize;
-
-// struct type to represent page content
-#[derive(Debug, Serialize)]
-struct IndexContent {
-    title: String,
-    page: String,
-    message: String,
-}
+use chrono::Datelike;
+use serde_json::{json, Value};
 
 // handler which renders the index page template
 #[debug_handler]
 pub async fn get_index(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
-    let index_content = IndexContent {
-        title: "Shuttle Template Axum Tera".to_string(),
-        page: "Home".to_string(),
-        message: "Hello, world!".to_string(),
-    };
+    // Create a complete context with all variables that base.html might expect
+    let current_year = chrono::Utc::now().year();
+    let context: Value = json!({
+        "title": "CrustyRustacean Dev Blog",
+        "page": "Home",
+        "message": "Welcome to CrustyRustacean Dev Blog",
+        "user": null,
+        "flash_message": null,
+        "flash_type": null,
+        "current_year": current_year
+    });
 
-    Ok(RenderHtml("index.html", state.engine, index_content))
+    Ok(RenderHtml("index.html", state.engine, context))
 }
