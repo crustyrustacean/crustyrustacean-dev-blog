@@ -4,7 +4,7 @@ use crate::{
     AppError, AppState,
     auth::{AuthenticatedUser, OptionalUser},
     models::{
-        ArticleQuery, ArticleResponse, CreateArticle, MultipleArticlesResponse,
+        ArticleQuery, ArticleResponse, CreateArticle, FeedQuery, MultipleArticlesResponse,
         SingleArticleResponse, UpdateArticle, UserProfile,
     },
 };
@@ -1284,4 +1284,282 @@ async fn get_article_with_user_context(
     };
 
     Ok(Json(response))
+}
+
+pub async fn get_articles_feed(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Query(query): Query<FeedQuery>,
+) -> Result<Json<MultipleArticlesResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let limit = query.limit.unwrap_or(20).min(100);
+    let offset = query.offset.unwrap_or(0);
+
+    // Get articles from users that the current user follows
+    let sql = r#"
+        SELECT 
+            a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
+            u.username, u.bio, u.image
+        FROM articles a
+        JOIN users u ON a.author_id = u.id
+        JOIN user_follows uf ON a.author_id = uf.following_id
+        WHERE uf.follower_id = ?
+        ORDER BY a.created_at DESC
+        LIMIT ? OFFSET ?
+        "#;
+
+    let params = libsql::params![
+        user.user_id.to_string(),
+        limit,
+        offset
+    ];
+
+    let mut article_rows = conn
+        .query(sql, params)
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut articles = Vec::new();
+
+    while let Some(row) = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let article_id: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let slug: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let title: String = row
+            .get(2)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let description: String = row
+            .get(3)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let body: String = row
+            .get(4)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let created_at_str: String = row
+            .get(5)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let updated_at_str: String = row
+            .get(6)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let username: String = row
+            .get(7)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(8).ok();
+        let image: Option<String> = row.get(9).ok();
+
+        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .with_timezone(&Utc);
+        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
+            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .with_timezone(&Utc);
+
+        // Get tags for this article
+        let mut tag_rows = conn
+            .query(
+                r#"
+                SELECT t.name
+                FROM tags t
+                JOIN article_tags at ON t.id = at.tag_id
+                WHERE at.article_id = ?
+                "#,
+                libsql::params![article_id.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut tag_names = Vec::new();
+        while let Some(tag_row) = tag_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let tag_name: String = tag_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            tag_names.push(tag_name);
+        }
+
+        // Get favorites count
+        let mut favorites_rows = conn
+            .query(
+                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
+                libsql::params![article_id.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let favorites_count = if let Some(fav_row) = favorites_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let count: i64 = fav_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            count as i32
+        } else {
+            0
+        };
+
+        // Check if current user has favorited this article
+        let mut user_fav_rows = conn
+            .query(
+                "SELECT 1 FROM user_favorites WHERE user_id = ? AND article_id = ?",
+                libsql::params![user.user_id.to_string(), article_id],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let favorited = user_fav_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .is_some();
+
+        let author = UserProfile {
+            username,
+            bio,
+            image,
+            following: true, // By definition, we're following authors in the feed
+        };
+
+        let article_response = ArticleResponse {
+            slug,
+            title,
+            description,
+            body,
+            tag_list: tag_names,
+            created_at,
+            updated_at,
+            favorited,
+            favorites_count,
+            author,
+        };
+
+        articles.push(article_response);
+    }
+
+    let articles_count = articles.len() as i32;
+
+    Ok(Json(MultipleArticlesResponse {
+        articles,
+        articles_count,
+    }))
+}
+
+pub async fn get_articles_feed_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Query(query): Query<FeedQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    // Get articles for the feed
+    let articles_response = get_articles_feed(State(state.clone()), user.clone(), Query(query)).await?;
+    let articles = articles_response.0.articles;
+
+    // Convert articles to JSON with formatted dates for template
+    let articles_json: Vec<Value> = articles
+        .iter()
+        .map(|article| {
+            json!({
+                "slug": article.slug,
+                "title": article.title,
+                "description": article.description,
+                "tagList": article.tag_list,
+                "createdAt": article.created_at,
+                "favoritesCount": article.favorites_count,
+                "favorited": article.favorited,
+                "author": article.author
+            })
+        })
+        .collect();
+
+    // Get following count
+    let mut following_rows = conn
+        .query(
+            "SELECT COUNT(*) FROM user_follows WHERE follower_id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let following_count = if let Some(row) = following_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let count: i64 = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        count
+    } else {
+        0
+    };
+
+    // Get latest post date from the articles
+    let latest_post_date = if let Some(latest_article) = articles.first() {
+        latest_article.created_at.format("%b %d, %Y").to_string()
+    } else {
+        "Never".to_string()
+    };
+
+    let context: Value = json!({
+        "title": "Your Feed - CrustyRustacean Dev Blog",
+        "page": "Feed",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+        "articles": articles_json,
+        "following_count": following_count,
+        "latest_post_date": latest_post_date,
+    });
+
+    Ok(RenderHtml("articles/feed.html", state.engine, context))
 }

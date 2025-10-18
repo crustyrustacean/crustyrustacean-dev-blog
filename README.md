@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 42 integration tests
+- **Comprehensive test suite** with 56 integration tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -36,6 +36,17 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Personal favorites page for logged-in users
   - Favorites count display and filtering
   - Interactive frontend with JavaScript integration
+  - Complete API endpoints with authentication
+- **Articles Feed System** (TDD implementation):
+  - Personal feed showing articles from followed users
+  - Feed page with responsive design and real-time updates
+  - Pagination and empty state handling
+  - Complete API endpoints with authentication
+- **Authors Discovery System** (TDD implementation):
+  - Browse and discover authors to follow
+  - Search functionality by username or bio
+  - Interactive follow/unfollow with real-time updates
+  - Pagination and responsive design
   - Complete API endpoints with authentication
 
 ### 🚧 Planned
@@ -90,12 +101,16 @@ templates/          # Tera templates for HTML rendering
   profile/
     profile.html    # User profile page
     favorites.html  # User favorites page
+    authors.html    # Authors discovery page
   errors/
     404.html        # Not found page
 tests/
   api/
     auth.rs         # Authentication integration tests
     favorites.rs    # Favorites API integration tests (11 tests)
+    feed.rs         # Feed API integration tests (5 tests)
+    feed_page.rs    # Feed page integration tests (2 tests)
+    authors.rs      # Authors discovery integration tests (8 tests)
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
     main.rs         # Test module declarations
@@ -117,9 +132,11 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (42 total)
+cargo test              # Run all tests (56 total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
+cargo test feed         # Run feed API tests only
+cargo test authors      # Run authors discovery tests only
 cargo test api::        # Run all API integration tests
 ```
 
@@ -130,6 +147,8 @@ The test suite includes comprehensive testing:
 - ✅ Input validation and error handling
 - ✅ Edge cases and malformed requests
 - ✅ Complete favorites API functionality
+- ✅ Personal feed functionality with following relationships
+- ✅ Authors discovery with search and pagination
 - ✅ Idempotent operations and multi-user scenarios
 
 ### Deploying with Shuttle
@@ -151,6 +170,8 @@ GET  /editor                       # Article editor (protected)
 GET  /editor/{slug}                # Edit article (protected)
 GET  /admin                        # Admin dashboard (protected)
 GET  /profiles/{username}          # User profile page
+GET  /profiles                     # Authors discovery page (protected)
+GET  /feed                         # Personal feed page (protected)
 GET  /favorites                    # User's favorite articles (protected)
 ```
 
@@ -164,6 +185,7 @@ PUT  /api/user                     # Update current user (protected)
 
 ### User Profiles API
 ```
+GET    /api/profiles                      # List all users/authors with follow status (protected)
 GET    /api/profiles/{username}           # Get user profile
 POST   /api/profiles/{username}/follow    # Follow user (protected)
 DELETE /api/profiles/{username}/follow    # Unfollow user (protected)
@@ -172,6 +194,7 @@ DELETE /api/profiles/{username}/follow    # Unfollow user (protected)
 ### Articles API
 ```
 GET    /api/articles               # List articles (JSON)
+GET    /api/articles/feed          # Get personal feed (protected)
 POST   /api/articles               # Create article (protected)
 GET    /api/articles/{slug}        # Get article (JSON)
 PUT    /api/articles/{slug}        # Update article (protected)
@@ -200,7 +223,10 @@ The application now includes a complete blog system:
 4. **Content Management**: Full CRUD operations with proper authorization
 5. **Admin Interface**: Dashboard for managing articles, users, and content
 6. **Favorites System**: Interactive favorite/unfavorite with personal favorites page
-7. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+7. **Personal Feed**: Curated feed showing articles from authors you follow
+8. **Authors Discovery**: Browse and search for authors to follow with interactive UI
+9. **Social Features**: Complete follow/unfollow system with real-time updates
+10. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`

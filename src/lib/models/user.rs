@@ -72,3 +72,17 @@ pub struct UserData {
 pub struct ProfileResponse {
     pub profile: UserProfile,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfilesResponse {
+    pub profiles: Vec<UserProfile>,
+    pub profiles_count: i32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ProfilesQuery {
+    pub search: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}

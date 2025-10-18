@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Find Authors - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">
+                <i class="fas fa-users text-primary me-2"></i>
+                Find Authors to Follow
+            </h1>
+            <div class="d-flex gap-2">
+                <a href="/feed" class="btn btn-outline-warning">
+                    <i class="fas fa-rss me-1"></i>
+                    My Feed
+                </a>
+                <a href="/articles" class="btn btn-outline-secondary">
+                    <i class="fas fa-globe me-1"></i>
+                    All Articles
+                </a>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="row mb-4">
+            <div class="col-md-8 mx-auto">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="searchInput"
+                                placeholder="Search authors by username or bio..."
+                                value="{{ search_query or '' }}"
+                            >
+                            <button class="btn btn-primary" type="button" onclick="performSearch()">
+                                Search
+                            </button>
+                            {% if search_query %}
+                                <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                                    Clear
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if search_query %}
+            <div class="alert alert-info">
+                <i class="fas fa-search me-2"></i>
+                Showing results for "<strong>{{ search_query }}</strong>"
+            </div>
+        {% endif %}
+
+        {% if profiles and profiles|length > 0 %}
+            <div class="row">
+                {% for profile in profiles %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 author-card">
+                            <div class="card-body text-center">
+                                <div class="mb-3">
+                                    {% if profile.image %}
+                                        <img src="{{ profile.image }}" alt="{{ profile.username }}" class="rounded-circle" width="80" height="80">
+                                    {% else %}
+                                        <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px; font-size: 24px;">
+                                            {{ profile.username | slice(end=1) | upper }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <h5 class="card-title mb-2">
+                                    <a href="/profiles/{{ profile.username }}" class="text-decoration-none">
+                                        {{ profile.username }}
+                                    </a>
+                                </h5>
+                                
+                                {% if profile.bio %}
+                                    <p class="card-text text-muted small">{{ profile.bio | truncate(length=100) }}</p>
+                                {% else %}
+                                    <p class="card-text text-muted small fst-italic">No bio available</p>
+                                {% endif %}
+
+                                <div class="d-flex justify-content-center gap-2 mt-3">
+                                    <a href="/profiles/{{ profile.username }}" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-user me-1"></i>
+                                        View Profile
+                                    </a>
+                                    
+                                    {% if profile.following %}
+                                        <button 
+                                            class="btn btn-success btn-sm follow-btn" 
+                                            data-username="{{ profile.username }}"
+                                            data-following="true"
+                                            onclick="toggleFollow(this)"
+                                        >
+                                            <i class="fas fa-user-check me-1"></i>
+                                            Following
+                                        </button>
+                                    {% else %}
+                                        <button 
+                                            class="btn btn-outline-primary btn-sm follow-btn" 
+                                            data-username="{{ profile.username }}"
+                                            data-following="false"
+                                            onclick="toggleFollow(this)"
+                                        >
+                                            <i class="fas fa-user-plus me-1"></i>
+                                            Follow
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if profiles|length >= 20 %}
+                <div class="text-center mt-4">
+                    <button class="btn btn-outline-primary" onclick="loadMore()">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Load More Authors
+                    </button>
+                </div>
+            {% endif %}
+
+        {% else %}
+            <div class="text-center py-5">
+                {% if search_query %}
+                    <i class="fas fa-search fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No Authors Found</h4>
+                    <p class="text-muted mb-4">No authors match your search criteria "{{ search_query }}"</p>
+                    <button class="btn btn-primary" onclick="clearSearch()">
+                        <i class="fas fa-times me-2"></i>
+                        Clear Search
+                    </button>
+                {% else %}
+                    <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No Authors Available</h4>
+                    <p class="text-muted mb-4">Be the first to join the community!</p>
+                    <a href="/register" class="btn btn-primary">
+                        <i class="fas fa-user-plus me-2"></i>
+                        Join the Community
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentOffset = {{ profiles | length }};
+    let currentSearch = "{{ search_query or '' }}";
+
+    // Handle search functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        
+        // Search on Enter key
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Animate cards on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.author-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(card);
+        });
+    });
+
+    function performSearch() {
+        const searchInput = document.getElementById('searchInput');
+        const searchTerm = searchInput.value.trim();
+        
+        if (searchTerm) {
+            window.location.href = `/profiles?search=${encodeURIComponent(searchTerm)}`;
+        } else {
+            window.location.href = '/profiles';
+        }
+    }
+
+    function clearSearch() {
+        window.location.href = '/profiles';
+    }
+
+    async function toggleFollow(btn) {
+        const username = btn.getAttribute('data-username');
+        const isFollowing = btn.getAttribute('data-following') === 'true';
+        const method = isFollowing ? 'DELETE' : 'POST';
+        const url = `/api/profiles/${username}/follow`;
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Working...';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const newFollowing = data.profile.following;
+                
+                // Update button state
+                btn.setAttribute('data-following', newFollowing.toString());
+                
+                if (newFollowing) {
+                    btn.className = 'btn btn-success btn-sm follow-btn';
+                    btn.innerHTML = '<i class="fas fa-user-check me-1"></i>Following';
+                } else {
+                    btn.className = 'btn btn-outline-primary btn-sm follow-btn';
+                    btn.innerHTML = '<i class="fas fa-user-plus me-1"></i>Follow';
+                }
+            } else {
+                // Handle error
+                console.error('Follow/unfollow failed');
+                btn.innerHTML = isFollowing ? 
+                    '<i class="fas fa-user-check me-1"></i>Following' : 
+                    '<i class="fas fa-user-plus me-1"></i>Follow';
+            }
+        } catch (error) {
+            console.error('Error toggling follow:', error);
+            btn.innerHTML = isFollowing ? 
+                '<i class="fas fa-user-check me-1"></i>Following' : 
+                '<i class="fas fa-user-plus me-1"></i>Follow';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function loadMore() {
+        try {
+            let url = `/api/profiles?offset=${currentOffset}`;
+            if (currentSearch) {
+                url += `&search=${encodeURIComponent(currentSearch)}`;
+            }
+
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                // TODO: Implement append new profiles to the page
+                console.log('More profiles:', data.profiles);
+                currentOffset += data.profiles.length;
+            }
+        } catch (error) {
+            console.error('Error loading more profiles:', error);
+        }
+    }
+</script>
+{% endblock %}

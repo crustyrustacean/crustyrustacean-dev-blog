@@ -3,10 +3,10 @@
 // route handlers for profile pages
 
 // dependencies
-use crate::{auth::AuthenticatedUser, errors::AppError, state::AppState};
+use crate::{auth::AuthenticatedUser, errors::AppError, state::AppState, models::ProfilesQuery};
 use chrono::Datelike;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
 };
 use axum_macros::debug_handler;
@@ -183,4 +183,76 @@ pub async fn get_my_favorites_page(
     });
 
     Ok(RenderHtml("profile/favorites.html", state.engine, context))
+}
+
+pub async fn get_authors_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Query(query): Query<ProfilesQuery>,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state.db.connect().map_err(|e| {
+        tracing::error!("Database connection failed: {}", e);
+        AppError::InternalServerError(e.to_string())
+    })?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(serde_json::json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    // Get profiles using the existing list_profiles function
+    let profiles_response = crate::routes::list_profiles(State(state.clone()), user, Query(query.clone())).await?;
+    let profiles = profiles_response.0.profiles;
+
+    // Convert profiles to JSON for template
+    let profiles_json: Vec<serde_json::Value> = profiles
+        .iter()
+        .map(|profile| {
+            serde_json::json!({
+                "username": profile.username,
+                "bio": profile.bio,
+                "image": profile.image,
+                "following": profile.following
+            })
+        })
+        .collect();
+
+    let context: serde_json::Value = serde_json::json!({
+        "title": "Find Authors - CrustyRustacean Dev Blog",
+        "page": "Authors",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+        "profiles": profiles_json,
+        "search_query": query.search
+    });
+
+    Ok(RenderHtml("profile/authors.html", state.engine, context))
 }

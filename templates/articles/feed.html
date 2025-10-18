@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Your Feed - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">
+                <i class="fas fa-rss text-warning me-2"></i>
+                Your Personal Feed
+            </h1>
+            <div class="d-flex gap-2">
+                <a href="/articles" class="btn btn-outline-secondary">
+                    <i class="fas fa-globe me-1"></i>
+                    Global Feed
+                </a>
+                {% if user %}
+                    <a href="/editor" class="btn btn-primary">
+                        <i class="fas fa-pen-fancy me-1"></i>
+                        Write Article
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if articles and articles|length > 0 %}
+            <div class="row">
+                {% for article in articles %}
+                    <div class="col-md-12 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="d-flex gap-2">
+                                        {% if article.tagList and article.tagList | length > 0 %}
+                                            {% for tag in article.tagList %}
+                                                {% if loop.index <= 2 %}
+                                                    <span class="badge bg-primary">{{ tag }}</span>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% if article.tagList | length > 2 %}
+                                                <span class="badge bg-light text-dark">+{{ article.tagList | length - 2 }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">Article</span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">{{ article.createdAt | date(format="%b %d, %Y") }}</small>
+                                </div>
+                                
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="me-3">
+                                        {% if article.author.image %}
+                                            <img src="{{ article.author.image }}" alt="{{ article.author.username }}" class="rounded-circle" width="32" height="32">
+                                        {% else %}
+                                            <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px;">
+                                                {{ article.author.username | slice(end=1) | upper }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">
+                                            <a href="/profiles/{{ article.author.username }}" class="text-decoration-none">
+                                                {{ article.author.username }}
+                                            </a>
+                                        </h6>
+                                        <small class="text-muted">{{ article.createdAt | date(format="%b %d, %Y") }}</small>
+                                    </div>
+                                    <div class="ms-auto">
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-user-check me-1"></i>
+                                            Following
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <h5 class="card-title">{{ article.title }}</h5>
+                                <p class="card-text">{{ article.description }}</p>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="/articles/{{ article.slug }}" class="btn btn-outline-primary">Read More</a>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-heart text-danger me-1"></i>
+                                            {{ article.favoritesCount }} favorites
+                                        </small>
+                                        <button class="btn btn-sm btn-outline-danger favorite-btn" 
+                                                data-slug="{{ article.slug }}" 
+                                                data-favorited="{{ article.favorited | lower }}">
+                                            {% if article.favorited %}
+                                                <i class="fas fa-heart"></i>
+                                            {% else %}
+                                                <i class="far fa-heart"></i>
+                                            {% endif %}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if articles|length == 20 %}
+                <div class="text-center mt-4">
+                    <button class="btn btn-outline-primary" onclick="loadMore()">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Load More Articles
+                    </button>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-user-friends fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">Your Feed is Empty</h4>
+                <p class="text-muted mb-4">Follow other users to see their articles in your personal feed!</p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="/articles" class="btn btn-primary">
+                        <i class="fas fa-globe me-2"></i>
+                        Explore All Articles
+                    </a>
+                    <a href="/profiles" class="btn btn-outline-primary">
+                        <i class="fas fa-users me-2"></i>
+                        Find Authors to Follow
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="sidebar">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-rss me-2"></i>
+                        Feed Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Your personalized feed shows articles from authors you follow.</p>
+                    <div class="d-grid gap-2">
+                        <a href="/articles" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-globe me-1"></i>
+                            Global Feed
+                        </a>
+                        <a href="/favorites" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-heart me-1"></i>
+                            My Favorites
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Feed Stats
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <small class="text-muted">Articles in Feed:</small>
+                        <small class="fw-bold">{{ articles | length }}</small>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <small class="text-muted">Authors Following:</small>
+                        <small class="fw-bold">{{ following_count or 0 }}</small>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">Last Updated:</small>
+                        <small class="fw-bold">{{ latest_post_date or 'Never' }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentOffset = {{ articles | length }};
+    
+    // Handle favorite/unfavorite functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle favorite buttons
+        document.querySelectorAll('.favorite-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                toggleFavorite(this);
+            });
+        });
+
+        // Animate cards on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(card);
+        });
+    });
+
+    async function toggleFavorite(btn) {
+        const slug = btn.getAttribute('data-slug');
+        const favorited = btn.getAttribute('data-favorited') === 'true';
+        const method = favorited ? 'DELETE' : 'POST';
+        
+        try {
+            const response = await fetch(`/api/articles/${slug}/favorite`, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const article = data.article;
+                
+                // Update button state
+                const icon = btn.querySelector('i');
+                if (article.favorited) {
+                    icon.className = 'fas fa-heart';
+                    btn.setAttribute('data-favorited', 'true');
+                } else {
+                    icon.className = 'far fa-heart';
+                    btn.setAttribute('data-favorited', 'false');
+                }
+                
+                // Update favorites count
+                const countSpan = btn.closest('.d-flex').querySelector('.text-muted');
+                countSpan.innerHTML = `<i class="fas fa-heart text-danger me-1"></i>${article.favoritesCount} favorites`;
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+        }
+    }
+
+    async function loadMore() {
+        try {
+            const response = await fetch(`/api/articles/feed?offset=${currentOffset}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                // TODO: Implement append new articles to the page
+                console.log('More articles:', data.articles);
+                currentOffset += data.articles.length;
+            }
+        } catch (error) {
+            console.error('Error loading more articles:', error);
+        }
+    }
+</script>
+{% endblock %}

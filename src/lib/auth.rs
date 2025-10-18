@@ -67,6 +67,7 @@ impl From<AuthError> for AppError {
     }
 }
 
+#[derive(Clone)]
 pub struct AuthenticatedUser {
     pub user_id: Uuid,
 }

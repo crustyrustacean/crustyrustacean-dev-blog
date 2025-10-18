@@ -4,9 +4,9 @@
 use crate::config::AppConfig;
 use crate::routes::{
     create_article, delete_article, favorite_article, follow_user, get_admin_dashboard, get_article,
-    get_article_page, get_articles_list_page, get_current_user, get_edit_article_page,
+    get_article_page, get_articles_feed, get_articles_feed_page, get_articles_list_page, get_authors_page, get_current_user, get_edit_article_page,
     get_editor_page, get_index, get_login_page, get_my_favorites_page, get_profile, get_profile_page, get_register_page,
-    handle_404_simple, health_check, list_articles, login_user, register_user, unfavorite_article, unfollow_user,
+    handle_404_simple, health_check, list_articles, list_profiles, login_user, register_user, unfavorite_article, unfollow_user,
     update_article, update_current_user,
 };
 use crate::state::AppState;
@@ -60,7 +60,9 @@ impl App {
             .route("/login", get(get_login_page))
             .route("/register", get(get_register_page))
             .route("/profiles/{username}", get(get_profile_page))
+            .route("/profiles", get(get_authors_page))
             .route("/favorites", get(get_my_favorites_page))
+            .route("/feed", get(get_articles_feed_page))
             .route("/editor", get(get_editor_page))
             .route("/editor/{slug}", get(get_edit_article_page))
             .route("/articles", get(get_articles_list_page))
@@ -70,12 +72,14 @@ impl App {
             .route("/api/users", post(register_user))
             .route("/api/users/login", post(login_user))
             .route("/api/user", get(get_current_user).put(update_current_user))
+            .route("/api/profiles", get(list_profiles))
             .route("/api/profiles/{username}", get(get_profile))
             .route(
                 "/api/profiles/{username}/follow",
                 post(follow_user).delete(unfollow_user),
             )
             .route("/api/articles", post(create_article).get(list_articles))
+            .route("/api/articles/feed", get(get_articles_feed))
             .route(
                 "/api/articles/{slug}",
                 get(get_article).put(update_article).delete(delete_article),

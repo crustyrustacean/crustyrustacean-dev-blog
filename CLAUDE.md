@@ -76,9 +76,11 @@ The application uses Turso/libSQL with the following main tables:
   - `templates/articles/list.html` - Articles listing page
   - `templates/articles/article.html` - Individual article view
   - `templates/articles/editor.html` - Article creation/editing
+  - `templates/articles/feed.html` - Personal feed page
   - `templates/auth/login.html` - User login
   - `templates/auth/register.html` - User registration
   - `templates/admin/dashboard.html` - Admin interface
+  - `templates/profile/authors.html` - Authors discovery page
 - **Static assets** served from `static/` directory (CSS, JS, images)
 - **Production-ready features**: SEO-friendly URLs, responsive design, accessibility
 
@@ -99,7 +101,9 @@ GET  /editor                            # Article editor (protected)
 GET  /editor/{slug}                     # Edit existing article (protected)
 GET  /admin                             # Admin dashboard (protected)
 GET  /profiles/{username}               # User profile page
-GET  /favorites                          # User's favorite articles (protected)
+GET  /profiles                          # Authors discovery page (protected)
+GET  /feed                              # Personal feed page (protected)
+GET  /favorites                         # User's favorite articles (protected)
 ```
 
 **API Endpoints:**
@@ -109,10 +113,12 @@ POST /api/users                         # User registration
 POST /api/users/login                   # User login
 GET  /api/user                          # Get current user
 PUT  /api/user                          # Update current user
+GET  /api/profiles                      # List all users/authors with follow status (protected)
 GET  /api/profiles/{username}           # Get user profile
 POST /api/profiles/{username}/follow    # Follow user
 DELETE /api/profiles/{username}/follow  # Unfollow user
 GET  /api/articles                      # List articles (JSON)
+GET  /api/articles/feed                 # Get personal feed (protected)
 POST /api/articles                      # Create article (protected)
 GET  /api/articles/{slug}               # Get article (JSON)
 PUT  /api/articles/{slug}               # Update article (protected)
@@ -134,6 +140,16 @@ DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
   - Idempotent behavior and edge cases
   - Multi-user scenarios and favorites counting
   - Query filtering by favorited user
+- **Feed API test suite** with complete TDD implementation:
+  - Personal feed from followed users only
+  - Authentication requirements and empty state handling
+  - Pagination functionality and follow-based filtering
+  - Multi-user scenarios and following relationships
+- **Authors Discovery test suite** with full TDD coverage:
+  - Authors listing with follow status accuracy
+  - Search functionality by username and bio
+  - Pagination and authentication requirements
+  - HTML page rendering and interactive features
 - **Test infrastructure** with isolated databases and proper setup
 - **Test helpers** in `tests/api/helpers.rs` for consistent test environments
 - **HTTP client testing** using reqwest for real request/response validation
@@ -150,7 +166,7 @@ DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
 - ✅ **Database Integration**: Turso/libSQL with automated migrations
 - ✅ **Security**: Argon2 password hashing, JWT tokens, input validation
 - ✅ **Error Handling**: Unified error architecture with proper separation of concerns
-- ✅ **Testing**: 42 integration tests covering authentication flows, favorites API, and error scenarios
+- ✅ **Testing**: 56 integration tests covering authentication, favorites, feed, authors discovery, and error scenarios
 - ✅ **API Endpoints**: User management and profile operations
 - ✅ **Code Quality**: Eliminated error handling duplication, improved maintainability
 - ✅ **Blog Features**: Complete article CRUD operations with slug-based routing
@@ -159,5 +175,8 @@ DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
 - ✅ **Articles System**: Full listing page, individual article views, admin interface
 - ✅ **Content Management**: Article creation, editing, deletion with proper authorization
 - ✅ **Favorites System**: Complete TDD implementation with frontend and backend integration
-- ✅ **Production Ready**: Complete blog functionality with user-friendly navigation
-- 🚧 **Advanced Features**: Comments system, advanced filtering, search (planned)
+- ✅ **Articles Feed System**: Personal feed showing articles from followed users with TDD implementation
+- ✅ **Authors Discovery System**: Browse and search for authors to follow with comprehensive TDD coverage
+- ✅ **Social Features**: Complete follow/unfollow system with real-time updates and interactive UI
+- ✅ **Production Ready**: Complete blog functionality with user-friendly navigation and social features
+- 🚧 **Advanced Features**: Comments system, advanced filtering, enhanced search (planned)

@@ -4,12 +4,12 @@ use crate::{
     AppError, AppState,
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
     models::{
-        ProfileResponse, UserData, UserLogin, UserProfile, UserRegistration, UserResponse,
-        UserUpdate,
+        ProfileResponse, ProfilesQuery, ProfilesResponse, UserData, UserLogin, UserProfile, 
+        UserRegistration, UserResponse, UserUpdate,
     },
 };
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::Json,
 };
 use chrono::Utc;
@@ -438,4 +438,103 @@ pub async fn unfollow_user(
     .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
     get_profile_internal(state, username, Some(user)).await
+}
+
+pub async fn list_profiles(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Query(query): Query<ProfilesQuery>,
+) -> Result<Json<ProfilesResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let limit = query.limit.unwrap_or(20).min(100);
+    let offset = query.offset.unwrap_or(0);
+
+    // Build the query with optional search
+    let (sql, params) = if let Some(search) = &query.search {
+        let search_pattern = format!("%{}%", search);
+        (
+            "SELECT id, username, bio, image FROM users WHERE username LIKE ? OR bio LIKE ? ORDER BY username LIMIT ? OFFSET ?".to_string(),
+            vec![
+                libsql::Value::from(search_pattern.clone()),
+                libsql::Value::from(search_pattern),
+                libsql::Value::from(limit),
+                libsql::Value::from(offset),
+            ]
+        )
+    } else {
+        (
+            "SELECT id, username, bio, image FROM users ORDER BY username LIMIT ? OFFSET ?".to_string(),
+            vec![
+                libsql::Value::from(limit),
+                libsql::Value::from(offset),
+            ]
+        )
+    };
+
+    let mut rows = conn
+        .query(&sql, params)
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut profiles = Vec::new();
+
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let profile_id: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let username: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        // Skip the current user from the results
+        let profile_uuid = Uuid::parse_str(&profile_id)
+            .map_err(|_| AppError::InternalServerError("Invalid profile ID".to_string()))?;
+        
+        if profile_uuid == user.user_id {
+            continue;
+        }
+
+        // Check if current user is following this profile
+        let mut follow_rows = conn
+            .query(
+                "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
+                libsql::params![user.user_id.to_string(), profile_id],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let following = follow_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .is_some();
+
+        let profile = UserProfile {
+            username,
+            bio,
+            image,
+            following,
+        };
+
+        profiles.push(profile);
+    }
+
+    let profiles_count = profiles.len() as i32;
+
+    let response = ProfilesResponse {
+        profiles,
+        profiles_count,
+    };
+
+    Ok(Json(response))
 }
