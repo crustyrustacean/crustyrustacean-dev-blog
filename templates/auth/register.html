@@ -164,10 +164,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const formData = new FormData(this);
         const registerData = {
-            username: formData.get('username'),
-            email: formData.get('email'),
-            password: formData.get('password'),
-            bio: formData.get('bio') || null
+            user: {
+                username: formData.get('username'),
+                email: formData.get('email'),
+                password: formData.get('password')
+            }
         };
 
         try {

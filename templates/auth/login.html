@@ -99,8 +99,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const formData = new FormData(this);
         const loginData = {
-            email: formData.get('email'),
-            password: formData.get('password')
+            user: {
+                email: formData.get('email'),
+                password: formData.get('password')
+            }
         };
 
         try {
