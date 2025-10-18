@@ -5,7 +5,7 @@ use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::{RequestPartsExt, extract::FromRequestParts, http::request::Parts};
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, authorization::Bearer, Cookie},
+    headers::{Authorization, Cookie, authorization::Bearer},
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -84,15 +84,11 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         state: &crate::AppState,
     ) -> Result<Self, Self::Rejection> {
         // Try to get token from Authorization header first
-        let token = if let Ok(TypedHeader(Authorization(bearer))) = parts
-            .extract::<TypedHeader<Authorization<Bearer>>>()
-            .await
+        let token = if let Ok(TypedHeader(Authorization(bearer))) =
+            parts.extract::<TypedHeader<Authorization<Bearer>>>().await
         {
             bearer.token().to_string()
-        } else if let Ok(TypedHeader(cookie)) = parts
-            .extract::<TypedHeader<Cookie>>()
-            .await
-        {
+        } else if let Ok(TypedHeader(cookie)) = parts.extract::<TypedHeader<Cookie>>().await {
             // Fall back to cookie
             cookie
                 .get("authToken")
@@ -106,12 +102,8 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         validation.validate_exp = true;
         validation.leeway = 60;
 
-        let token_data = decode::<Claims>(
-            &token,
-            &state.jwt_keys.decoding,
-            &validation,
-        )
-        .map_err(|_| AuthError::InvalidToken)?;
+        let token_data = decode::<Claims>(&token, &state.jwt_keys.decoding, &validation)
+            .map_err(|_| AuthError::InvalidToken)?;
 
         let user_id =
             Uuid::parse_str(&token_data.claims.sub).map_err(|_| AuthError::InvalidToken)?;

@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 async fn test_create_article_happy_path() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // First, register and get a token
     let user_data = json!({
         "user": {
@@ -17,7 +17,7 @@ async fn test_create_article_happy_path() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -26,14 +26,14 @@ async fn test_create_article_happy_path() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Prepare article data
     let article_data = json!({
         "article": {
@@ -43,7 +43,7 @@ async fn test_create_article_happy_path() {
             "tagList": ["dragons", "training"]
         }
     });
-    
+
     // Act - Create article
     let response = app
         .client
@@ -54,30 +54,45 @@ async fn test_create_article_happy_path() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     let status = response.status();
     if status != StatusCode::OK {
         let error_body = response.text().await.expect("Failed to get error text");
         panic!("Expected 200 OK, got {}: {}", status, error_body);
     }
-    
+
     let response_body: Value = response
         .json()
         .await
         .expect("Failed to parse response body");
-    
+
     // Verify response structure
     assert!(response_body["article"].is_object());
-    assert_eq!(response_body["article"]["title"], "How to Train Your Dragon");
+    assert_eq!(
+        response_body["article"]["title"],
+        "How to Train Your Dragon"
+    );
     assert_eq!(response_body["article"]["description"], "Ever wonder how?");
-    assert_eq!(response_body["article"]["body"], "You have to believe in yourself. That's the secret to life.");
+    assert_eq!(
+        response_body["article"]["body"],
+        "You have to believe in yourself. That's the secret to life."
+    );
     assert_eq!(response_body["article"]["slug"], "how-to-train-your-dragon");
-    assert_eq!(response_body["article"]["tagList"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        response_body["article"]["tagList"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     assert_eq!(response_body["article"]["favorited"], false);
     assert_eq!(response_body["article"]["favoritesCount"], 0);
     assert!(response_body["article"]["author"].is_object());
-    assert_eq!(response_body["article"]["author"]["username"], "articleauthor");
+    assert_eq!(
+        response_body["article"]["author"]["username"],
+        "articleauthor"
+    );
     assert!(response_body["article"]["createdAt"].is_string());
     assert!(response_body["article"]["updatedAt"].is_string());
 }
@@ -86,7 +101,7 @@ async fn test_create_article_happy_path() {
 async fn test_create_article_without_auth() {
     // Arrange
     let app = spawn_app().await;
-    
+
     let article_data = json!({
         "article": {
             "title": "Unauthorized Article",
@@ -94,7 +109,7 @@ async fn test_create_article_without_auth() {
             "body": "No token provided"
         }
     });
-    
+
     // Act
     let response = app
         .client
@@ -104,7 +119,7 @@ async fn test_create_article_without_auth() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
@@ -113,7 +128,7 @@ async fn test_create_article_without_auth() {
 async fn test_create_article_with_invalid_data() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -122,7 +137,7 @@ async fn test_create_article_with_invalid_data() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -131,14 +146,14 @@ async fn test_create_article_with_invalid_data() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     let test_cases = vec![
         // Empty title
         json!({
@@ -171,7 +186,7 @@ async fn test_create_article_with_invalid_data() {
             "body": "Body"
         }),
     ];
-    
+
     for invalid_data in test_cases {
         // Act
         let response = app
@@ -183,7 +198,7 @@ async fn test_create_article_with_invalid_data() {
             .send()
             .await
             .expect("Failed to execute request");
-        
+
         // Assert
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
@@ -193,7 +208,7 @@ async fn test_create_article_with_invalid_data() {
 async fn test_get_article_happy_path() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -202,7 +217,7 @@ async fn test_get_article_happy_path() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -211,14 +226,14 @@ async fn test_get_article_happy_path() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Create an article first
     let article_data = json!({
         "article": {
@@ -228,7 +243,7 @@ async fn test_get_article_happy_path() {
             "tagList": ["test", "reading"]
         }
     });
-    
+
     let create_response = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -238,14 +253,14 @@ async fn test_get_article_happy_path() {
         .send()
         .await
         .expect("Failed to create article");
-    
+
     let create_body: Value = create_response
         .json()
         .await
         .expect("Failed to parse create response");
-    
+
     let slug = create_body["article"]["slug"].as_str().unwrap();
-    
+
     // Act - Get the article
     let response = app
         .client
@@ -253,32 +268,50 @@ async fn test_get_article_happy_path() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let response_body: Value = response
         .json()
         .await
         .expect("Failed to parse response body");
-    
+
     assert!(response_body["article"].is_object());
-    assert_eq!(response_body["article"]["title"], "Test Article for Reading");
-    assert_eq!(response_body["article"]["description"], "This is a test article");
-    assert_eq!(response_body["article"]["body"], "Content of the test article");
+    assert_eq!(
+        response_body["article"]["title"],
+        "Test Article for Reading"
+    );
+    assert_eq!(
+        response_body["article"]["description"],
+        "This is a test article"
+    );
+    assert_eq!(
+        response_body["article"]["body"],
+        "Content of the test article"
+    );
     assert_eq!(response_body["article"]["slug"], "test-article-for-reading");
-    assert_eq!(response_body["article"]["tagList"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        response_body["article"]["tagList"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     assert_eq!(response_body["article"]["favorited"], false);
     assert_eq!(response_body["article"]["favoritesCount"], 0);
     assert!(response_body["article"]["author"].is_object());
-    assert_eq!(response_body["article"]["author"]["username"], "articlereader");
+    assert_eq!(
+        response_body["article"]["author"]["username"],
+        "articlereader"
+    );
 }
 
 #[tokio::test]
 async fn test_get_nonexistent_article() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Act - Try to get a non-existent article
     let response = app
         .client
@@ -286,7 +319,7 @@ async fn test_get_nonexistent_article() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
@@ -295,7 +328,7 @@ async fn test_get_nonexistent_article() {
 async fn test_article_page_route() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -304,7 +337,7 @@ async fn test_article_page_route() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -313,14 +346,14 @@ async fn test_article_page_route() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Create an article first
     let create_data = json!({
         "article": {
@@ -330,7 +363,7 @@ async fn test_article_page_route() {
             "tagList": ["test", "page"]
         }
     });
-    
+
     let create_response = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -340,14 +373,14 @@ async fn test_article_page_route() {
         .send()
         .await
         .expect("Failed to create article");
-    
+
     let create_body: Value = create_response
         .json()
         .await
         .expect("Failed to parse create response");
-    
+
     let slug = create_body["article"]["slug"].as_str().unwrap();
-    
+
     // Act - Access the article page (HTML route)
     let response = app
         .client
@@ -355,20 +388,20 @@ async fn test_article_page_route() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert - Should return HTML page (200 OK)
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     // Check that it returns HTML content
     let content_type = response
         .headers()
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    
+
     // Should be HTML, not JSON
     assert!(content_type.contains("text/html") || content_type.is_empty()); // Some test servers might not set content-type
-    
+
     // Check that the response body contains HTML
     let body = response.text().await.expect("Failed to get response body");
     assert!(body.contains("<html") || body.contains("<!DOCTYPE html"));
@@ -379,7 +412,7 @@ async fn test_article_page_route() {
 async fn test_create_article_generates_unique_slugs() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -388,7 +421,7 @@ async fn test_create_article_generates_unique_slugs() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -397,14 +430,14 @@ async fn test_create_article_generates_unique_slugs() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Create first article
     let article_data1 = json!({
         "article": {
@@ -413,7 +446,7 @@ async fn test_create_article_generates_unique_slugs() {
             "body": "This is the first article with duplicate title"
         }
     });
-    
+
     let response1 = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -423,12 +456,12 @@ async fn test_create_article_generates_unique_slugs() {
         .send()
         .await
         .expect("Failed to create first article");
-    
+
     assert_eq!(response1.status(), StatusCode::OK);
-    
+
     let body1: Value = response1.json().await.expect("Failed to parse response");
     let slug1 = body1["article"]["slug"].as_str().unwrap();
-    
+
     // Create second article with same title
     let article_data2 = json!({
         "article": {
@@ -437,7 +470,7 @@ async fn test_create_article_generates_unique_slugs() {
             "body": "This is the second article with duplicate title"
         }
     });
-    
+
     let response2 = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -447,12 +480,12 @@ async fn test_create_article_generates_unique_slugs() {
         .send()
         .await
         .expect("Failed to create second article");
-    
+
     assert_eq!(response2.status(), StatusCode::OK);
-    
+
     let body2: Value = response2.json().await.expect("Failed to parse response");
     let slug2 = body2["article"]["slug"].as_str().unwrap();
-    
+
     // Assert - Slugs should be different
     assert_ne!(slug1, slug2);
     assert_eq!(slug1, "duplicate-title");
@@ -465,7 +498,7 @@ async fn test_create_article_generates_unique_slugs() {
 async fn test_update_article_happy_path() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -474,7 +507,7 @@ async fn test_update_article_happy_path() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -483,14 +516,14 @@ async fn test_update_article_happy_path() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Create an article first
     let create_data = json!({
         "article": {
@@ -500,7 +533,7 @@ async fn test_update_article_happy_path() {
             "tagList": ["original"]
         }
     });
-    
+
     let create_response = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -510,14 +543,14 @@ async fn test_update_article_happy_path() {
         .send()
         .await
         .expect("Failed to create article");
-    
+
     let create_body: Value = create_response
         .json()
         .await
         .expect("Failed to parse create response");
-    
+
     let slug = create_body["article"]["slug"].as_str().unwrap();
-    
+
     // Prepare update data
     let update_data = json!({
         "article": {
@@ -526,7 +559,7 @@ async fn test_update_article_happy_path() {
             "body": "Updated body content"
         }
     });
-    
+
     // Act - Update the article
     let response = app
         .client
@@ -537,18 +570,21 @@ async fn test_update_article_happy_path() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let response_body: Value = response
         .json()
         .await
         .expect("Failed to parse response body");
-    
+
     assert!(response_body["article"].is_object());
     assert_eq!(response_body["article"]["title"], "Updated Title");
-    assert_eq!(response_body["article"]["description"], "Updated description");
+    assert_eq!(
+        response_body["article"]["description"],
+        "Updated description"
+    );
     assert_eq!(response_body["article"]["body"], "Updated body content");
     assert_eq!(response_body["article"]["slug"], slug); // Slug should remain the same
     assert!(response_body["article"]["author"].is_object());
@@ -559,7 +595,7 @@ async fn test_update_article_happy_path() {
 async fn test_update_article_unauthorized() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register first user and create article
     let user1_data = json!({
         "user": {
@@ -568,7 +604,7 @@ async fn test_update_article_unauthorized() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration1_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -577,14 +613,14 @@ async fn test_update_article_unauthorized() {
         .send()
         .await
         .expect("Failed to register user1");
-    
+
     let registration1_body: Value = registration1_response
         .json()
         .await
         .expect("Failed to parse registration1 response");
-    
+
     let token1 = registration1_body["user"]["token"].as_str().unwrap();
-    
+
     // Create article with user1
     let create_data = json!({
         "article": {
@@ -593,7 +629,7 @@ async fn test_update_article_unauthorized() {
             "body": "Content by user1"
         }
     });
-    
+
     let create_response = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -603,14 +639,14 @@ async fn test_update_article_unauthorized() {
         .send()
         .await
         .expect("Failed to create article");
-    
+
     let create_body: Value = create_response
         .json()
         .await
         .expect("Failed to parse create response");
-    
+
     let slug = create_body["article"]["slug"].as_str().unwrap();
-    
+
     // Register second user
     let user2_data = json!({
         "user": {
@@ -619,7 +655,7 @@ async fn test_update_article_unauthorized() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration2_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -628,21 +664,21 @@ async fn test_update_article_unauthorized() {
         .send()
         .await
         .expect("Failed to register user2");
-    
+
     let registration2_body: Value = registration2_response
         .json()
         .await
         .expect("Failed to parse registration2 response");
-    
+
     let token2 = registration2_body["user"]["token"].as_str().unwrap();
-    
+
     // Try to update user1's article with user2's token
     let update_data = json!({
         "article": {
             "title": "Hacked Title"
         }
     });
-    
+
     // Act
     let response = app
         .client
@@ -653,7 +689,7 @@ async fn test_update_article_unauthorized() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
@@ -662,7 +698,7 @@ async fn test_update_article_unauthorized() {
 async fn test_delete_article_happy_path() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -671,7 +707,7 @@ async fn test_delete_article_happy_path() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -680,14 +716,14 @@ async fn test_delete_article_happy_path() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Create an article first
     let create_data = json!({
         "article": {
@@ -697,7 +733,7 @@ async fn test_delete_article_happy_path() {
             "tagList": ["delete", "test"]
         }
     });
-    
+
     let create_response = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -707,14 +743,14 @@ async fn test_delete_article_happy_path() {
         .send()
         .await
         .expect("Failed to create article");
-    
+
     let create_body: Value = create_response
         .json()
         .await
         .expect("Failed to parse create response");
-    
+
     let slug = create_body["article"]["slug"].as_str().unwrap();
-    
+
     // Act - Delete the article
     let response = app
         .client
@@ -723,10 +759,10 @@ async fn test_delete_article_happy_path() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
-    
+
     // Verify article is actually deleted
     let get_response = app
         .client
@@ -734,7 +770,7 @@ async fn test_delete_article_happy_path() {
         .send()
         .await
         .expect("Failed to execute get request");
-    
+
     assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
 }
 
@@ -742,7 +778,7 @@ async fn test_delete_article_happy_path() {
 async fn test_delete_article_unauthorized() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register first user and create article
     let user1_data = json!({
         "user": {
@@ -751,7 +787,7 @@ async fn test_delete_article_unauthorized() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration1_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -760,14 +796,14 @@ async fn test_delete_article_unauthorized() {
         .send()
         .await
         .expect("Failed to register owner");
-    
+
     let registration1_body: Value = registration1_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token1 = registration1_body["user"]["token"].as_str().unwrap();
-    
+
     // Create article
     let create_data = json!({
         "article": {
@@ -776,7 +812,7 @@ async fn test_delete_article_unauthorized() {
             "body": "This is protected"
         }
     });
-    
+
     let create_response = app
         .client
         .post(format!("{}/api/articles", &app.address))
@@ -786,14 +822,14 @@ async fn test_delete_article_unauthorized() {
         .send()
         .await
         .expect("Failed to create article");
-    
+
     let create_body: Value = create_response
         .json()
         .await
         .expect("Failed to parse create response");
-    
+
     let slug = create_body["article"]["slug"].as_str().unwrap();
-    
+
     // Register second user
     let user2_data = json!({
         "user": {
@@ -802,7 +838,7 @@ async fn test_delete_article_unauthorized() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration2_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -811,14 +847,14 @@ async fn test_delete_article_unauthorized() {
         .send()
         .await
         .expect("Failed to register hacker");
-    
+
     let registration2_body: Value = registration2_response
         .json()
         .await
         .expect("Failed to parse registration2 response");
-    
+
     let token2 = registration2_body["user"]["token"].as_str().unwrap();
-    
+
     // Act - Try to delete with wrong user
     let response = app
         .client
@@ -827,10 +863,10 @@ async fn test_delete_article_unauthorized() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    
+
     // Verify article still exists
     let get_response = app
         .client
@@ -838,7 +874,7 @@ async fn test_delete_article_unauthorized() {
         .send()
         .await
         .expect("Failed to execute get request");
-    
+
     assert_eq!(get_response.status(), StatusCode::OK);
 }
 
@@ -846,7 +882,7 @@ async fn test_delete_article_unauthorized() {
 async fn test_list_articles_happy_path() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -855,7 +891,7 @@ async fn test_list_articles_happy_path() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -864,14 +900,14 @@ async fn test_list_articles_happy_path() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Create multiple articles
     let articles = vec![
         json!({
@@ -891,7 +927,7 @@ async fn test_list_articles_happy_path() {
             }
         }),
     ];
-    
+
     for article_data in &articles {
         app.client
             .post(format!("{}/api/articles", &app.address))
@@ -902,7 +938,7 @@ async fn test_list_articles_happy_path() {
             .await
             .expect("Failed to create article");
     }
-    
+
     // Act - List articles
     let response = app
         .client
@@ -910,21 +946,21 @@ async fn test_list_articles_happy_path() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let response_body: Value = response
         .json()
         .await
         .expect("Failed to parse response body");
-    
+
     assert!(response_body["articles"].is_array());
     assert_eq!(response_body["articlesCount"], 2);
-    
+
     let articles_array = response_body["articles"].as_array().unwrap();
     assert_eq!(articles_array.len(), 2);
-    
+
     // Verify article structure
     for article in articles_array {
         assert!(article["title"].is_string());
@@ -943,7 +979,7 @@ async fn test_list_articles_happy_path() {
 async fn test_list_articles_with_filters() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register users
     let user1_data = json!({
         "user": {
@@ -952,7 +988,7 @@ async fn test_list_articles_with_filters() {
             "password": "securepassword123"
         }
     });
-    
+
     let user2_data = json!({
         "user": {
             "username": "author2",
@@ -960,7 +996,7 @@ async fn test_list_articles_with_filters() {
             "password": "securepassword123"
         }
     });
-    
+
     let reg1_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -969,7 +1005,7 @@ async fn test_list_articles_with_filters() {
         .send()
         .await
         .expect("Failed to register user1");
-    
+
     let reg2_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -978,7 +1014,7 @@ async fn test_list_articles_with_filters() {
         .send()
         .await
         .expect("Failed to register user2");
-    
+
     let reg1_body: Value = reg1_response
         .json()
         .await
@@ -987,10 +1023,10 @@ async fn test_list_articles_with_filters() {
         .json()
         .await
         .expect("Failed to parse reg2 response");
-    
+
     let token1 = reg1_body["user"]["token"].as_str().unwrap();
     let token2 = reg2_body["user"]["token"].as_str().unwrap();
-    
+
     // Create articles with different tags and authors
     let article1 = json!({
         "article": {
@@ -1000,7 +1036,7 @@ async fn test_list_articles_with_filters() {
             "tagList": ["rust", "programming"]
         }
     });
-    
+
     let article2 = json!({
         "article": {
             "title": "Python Article",
@@ -1009,7 +1045,7 @@ async fn test_list_articles_with_filters() {
             "tagList": ["python", "programming"]
         }
     });
-    
+
     // Create articles by different authors
     app.client
         .post(format!("{}/api/articles", &app.address))
@@ -1019,7 +1055,7 @@ async fn test_list_articles_with_filters() {
         .send()
         .await
         .expect("Failed to create article1");
-    
+
     app.client
         .post(format!("{}/api/articles", &app.address))
         .header("Content-Type", "application/json")
@@ -1028,7 +1064,7 @@ async fn test_list_articles_with_filters() {
         .send()
         .await
         .expect("Failed to create article2");
-    
+
     // Act & Assert - Filter by author
     let response = app
         .client
@@ -1036,17 +1072,20 @@ async fn test_list_articles_with_filters() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let response_body: Value = response
         .json()
         .await
         .expect("Failed to parse response body");
-    
+
     assert_eq!(response_body["articlesCount"], 1);
-    assert_eq!(response_body["articles"][0]["author"]["username"], "author1");
-    
+    assert_eq!(
+        response_body["articles"][0]["author"]["username"],
+        "author1"
+    );
+
     // Act & Assert - Filter by tag
     let response = app
         .client
@@ -1054,14 +1093,14 @@ async fn test_list_articles_with_filters() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let response_body: Value = response
         .json()
         .await
         .expect("Failed to parse response body");
-    
+
     assert_eq!(response_body["articlesCount"], 1);
     let tag_list = response_body["articles"][0]["tagList"].as_array().unwrap();
     assert!(tag_list.contains(&json!("rust")));
@@ -1071,7 +1110,7 @@ async fn test_list_articles_with_filters() {
 async fn test_update_nonexistent_article() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -1080,7 +1119,7 @@ async fn test_update_nonexistent_article() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -1089,20 +1128,20 @@ async fn test_update_nonexistent_article() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     let update_data = json!({
         "article": {
             "title": "Updated Title"
         }
     });
-    
+
     // Act - Try to update non-existent article
     let response = app
         .client
@@ -1113,7 +1152,7 @@ async fn test_update_nonexistent_article() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
@@ -1122,7 +1161,7 @@ async fn test_update_nonexistent_article() {
 async fn test_delete_nonexistent_article() {
     // Arrange
     let app = spawn_app().await;
-    
+
     // Register user and get token
     let user_data = json!({
         "user": {
@@ -1131,7 +1170,7 @@ async fn test_delete_nonexistent_article() {
             "password": "securepassword123"
         }
     });
-    
+
     let registration_response = app
         .client
         .post(format!("{}/api/users", &app.address))
@@ -1140,14 +1179,14 @@ async fn test_delete_nonexistent_article() {
         .send()
         .await
         .expect("Failed to register user");
-    
+
     let registration_body: Value = registration_response
         .json()
         .await
         .expect("Failed to parse registration response");
-    
+
     let token = registration_body["user"]["token"].as_str().unwrap();
-    
+
     // Act - Try to delete non-existent article
     let response = app
         .client
@@ -1156,7 +1195,7 @@ async fn test_delete_nonexistent_article() {
         .send()
         .await
         .expect("Failed to execute request");
-    
+
     // Assert
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }

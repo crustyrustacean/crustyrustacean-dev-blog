@@ -3,15 +3,15 @@
 // route handlers for authentication pages
 
 // dependencies
-use crate::errors::AppError;
 use crate::auth::OptionalUser;
+use crate::errors::AppError;
 use crate::state::AppState;
 use axum::{extract::State, response::IntoResponse};
 use axum_macros::debug_handler;
 use axum_template::RenderHtml;
+use chrono::{Datelike, Utc};
 use serde::Serialize;
 use serde_json::{Value, json};
-use chrono::{Utc, Datelike};
 
 // struct type to represent register page content
 #[derive(Debug, Serialize)]

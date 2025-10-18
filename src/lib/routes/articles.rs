@@ -3,19 +3,22 @@
 use crate::{
     AppError, AppState,
     auth::{AuthenticatedUser, OptionalUser},
-    models::{CreateArticle, UpdateArticle, SingleArticleResponse, ArticleResponse, UserProfile, MultipleArticlesResponse, ArticleQuery},
+    models::{
+        ArticleQuery, ArticleResponse, CreateArticle, MultipleArticlesResponse,
+        SingleArticleResponse, UpdateArticle, UserProfile,
+    },
 };
 use axum::{
-    extract::{Path, State, Query},
-    response::{Json, IntoResponse},
+    extract::{Path, Query, State},
     http::StatusCode,
+    response::{IntoResponse, Json},
 };
 use axum_template::RenderHtml;
 use chrono::{Datelike, Utc};
 use serde_json::{Value, json};
+use slug::slugify;
 use uuid::Uuid;
 use validator::Validate;
-use slug::slugify;
 
 pub async fn create_article(
     State(state): State<AppState>,
@@ -41,11 +44,11 @@ pub async fn create_article(
 
     // Generate base slug from title
     let base_slug = slugify(&article_data.title);
-    
+
     // Check if slug already exists and generate unique one if needed
     let mut slug = base_slug.clone();
     let mut counter = 1;
-    
+
     loop {
         let mut slug_check = conn
             .query(
@@ -63,7 +66,7 @@ pub async fn create_article(
         {
             break; // Slug is unique
         }
-        
+
         // Generate a new slug with counter
         slug = format!("{}-{}", base_slug, counter);
         counter += 1;
@@ -389,7 +392,7 @@ pub async fn get_editor_page(
         "current_year": chrono::Utc::now().year(),
         "user": user_info
     });
-    
+
     Ok(RenderHtml("articles/editor.html", state.engine, context))
 }
 
@@ -428,7 +431,9 @@ pub async fn get_edit_article_page(
             .map_err(|_| AppError::InternalServerError("Invalid author ID".to_string()))?;
 
         if author_id != user.user_id {
-            return Err(AppError::Forbidden("You can only edit your own articles".to_string()));
+            return Err(AppError::Forbidden(
+                "You can only edit your own articles".to_string(),
+            ));
         }
     } else {
         return Err(AppError::NotFound("Article not found".to_string()));
@@ -448,7 +453,7 @@ pub async fn get_edit_article_page(
         "is_edit": true,
         "article_slug": slug
     });
-    
+
     Ok(RenderHtml("articles/editor.html", state.engine, context))
 }
 
@@ -458,15 +463,12 @@ pub async fn get_admin_dashboard(
     Query(query): Query<ArticleQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     tracing::info!("Admin dashboard accessed by user: {}", user.user_id);
-    
+
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| {
-            tracing::error!("Database connection failed: {}", e);
-            AppError::InternalServerError(e.to_string())
-        })?;
+    let conn = state.db.connect().map_err(|e| {
+        tracing::error!("Database connection failed: {}", e);
+        AppError::InternalServerError(e.to_string())
+    })?;
 
     let mut user_rows = conn
         .query(
@@ -513,7 +515,7 @@ pub async fn get_admin_dashboard(
         "user": user_info,
         "articles": articles
     });
-    
+
     tracing::info!("Rendering admin dashboard template");
     Ok(RenderHtml("admin/dashboard.html", state.engine, context))
 }
@@ -568,7 +570,9 @@ pub async fn update_article(
 
     // Check if the current user is the author
     if author_id != user.user_id {
-        return Err(AppError::Forbidden("You can only edit your own articles".to_string()));
+        return Err(AppError::Forbidden(
+            "You can only edit your own articles".to_string(),
+        ));
     }
 
     let now = Utc::now();
@@ -597,7 +601,7 @@ pub async fn update_article(
         for param in &params {
             libsql_params.push(libsql::Value::from(param.clone()));
         }
-        
+
         conn.execute(&sql, libsql_params)
             .await
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
@@ -644,7 +648,9 @@ pub async fn delete_article(
 
     // Check if the current user is the author
     if author_id != user.user_id {
-        return Err(AppError::Forbidden("You can only delete your own articles".to_string()));
+        return Err(AppError::Forbidden(
+            "You can only delete your own articles".to_string(),
+        ));
     }
 
     // Delete article tags first (foreign key constraint)
@@ -683,8 +689,8 @@ pub async fn list_articles(
         .connect()
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
-    let limit = query.limit.unwrap_or(20).min(100) as i32;
-    let offset = query.offset.unwrap_or(0) as i32;
+    let limit = query.limit.unwrap_or(20).min(100);
+    let offset = query.offset.unwrap_or(0);
 
     // Build the query
     let mut where_clauses = Vec::new();
@@ -694,7 +700,7 @@ pub async fn list_articles(
         where_clauses.push("EXISTS (SELECT 1 FROM article_tags at JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id AND t.name = ?)");
         params.push(libsql::Value::from(tag.clone()));
     }
-    
+
     if let Some(author) = &query.author {
         where_clauses.push("u.username = ?");
         params.push(libsql::Value::from(author.clone()));
@@ -965,23 +971,26 @@ pub async fn get_articles_list_page(
         limit: Some(query.limit.unwrap_or(20)),
         offset: query.offset,
     };
-    
+
     let articles = match list_articles(State(state.clone()), Query(articles_query)).await {
         Ok(articles_response) => articles_response.0.articles,
         Err(_) => vec![], // If there's an error fetching articles, show empty list
     };
-    
+
     // Convert articles to JSON with formatted dates
-    let articles_json: Vec<Value> = articles.iter().map(|article| {
-        json!({
-            "slug": article.slug,
-            "title": article.title,
-            "description": article.description,
-            "tag_list": article.tag_list,
-            "created_at": article.created_at.format("%b %d, %Y").to_string(),
-            "author": article.author
+    let articles_json: Vec<Value> = articles
+        .iter()
+        .map(|article| {
+            json!({
+                "slug": article.slug,
+                "title": article.title,
+                "description": article.description,
+                "tag_list": article.tag_list,
+                "created_at": article.created_at.format("%b %d, %Y").to_string(),
+                "author": article.author
+            })
         })
-    }).collect();
+        .collect();
 
     // Get additional statistics for the sidebar
     let conn = state

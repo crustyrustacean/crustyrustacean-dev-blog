@@ -1,6 +1,6 @@
 // src/main.rs
 
-use shuttle_runtime::{CustomError, Secrets, SecretStore};
+use shuttle_runtime::{CustomError, SecretStore, Secrets};
 // dependencies
 use crustyrustacean_dev_blog_lib::config::AppConfig;
 use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
@@ -19,15 +19,17 @@ async fn main(
     #[Secrets] secrets: SecretStore,
 ) -> shuttle_axum::ShuttleAxum {
     // initialize tracing
-    let subscriber = get_subscriber("crustyrustacean-dev-blog".into(), "info".into(), std::io::stdout);
+    let subscriber = get_subscriber(
+        "crustyrustacean-dev-blog".into(),
+        "info".into(),
+        std::io::stdout,
+    );
     init_subscriber(subscriber);
 
     // Get JWT secret from Shuttle Secrets
-    let jwt_secret = secrets
-        .get("JWT_SECRET")
-        .ok_or_else(|| CustomError::msg(
-            "JWT_SECRET must be set in Secrets.toml for production deployment"
-        ));
+    let jwt_secret = secrets.get("JWT_SECRET").ok_or_else(|| {
+        CustomError::msg("JWT_SECRET must be set in Secrets.toml for production deployment")
+    });
 
     // Initialize database connection
     let db = DatabaseConnection {

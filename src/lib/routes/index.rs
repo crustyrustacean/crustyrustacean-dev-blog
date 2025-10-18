@@ -3,12 +3,15 @@
 // route to serve the home page template
 
 // dependencies
-use crate::errors::AppError;
 use crate::auth::OptionalUser;
-use crate::state::AppState;
+use crate::errors::AppError;
 use crate::models::ArticleQuery;
 use crate::routes::articles::list_articles;
-use axum::{extract::{State, Query}, response::IntoResponse};
+use crate::state::AppState;
+use axum::{
+    extract::{Query, State},
+    response::IntoResponse,
+};
 use axum_macros::debug_handler;
 use axum_template::RenderHtml;
 use chrono::Datelike;
@@ -21,7 +24,7 @@ pub async fn get_index(
     optional_user: OptionalUser,
 ) -> Result<impl IntoResponse, AppError> {
     let current_year = chrono::Utc::now().year();
-    
+
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
         // Fetch user details from database
@@ -73,23 +76,26 @@ pub async fn get_index(
         limit: Some(4), // Show only 4 recent articles on homepage
         offset: Some(0),
     };
-    
+
     let articles = match list_articles(State(state.clone()), Query(articles_query)).await {
         Ok(articles_response) => articles_response.0.articles,
         Err(_) => vec![], // If there's an error fetching articles, show empty list
     };
-    
+
     // Convert articles to JSON with formatted dates
-    let articles_json: Vec<Value> = articles.iter().map(|article| {
-        json!({
-            "slug": article.slug,
-            "title": article.title,
-            "description": article.description,
-            "tag_list": article.tag_list,
-            "created_at": article.created_at.format("%b %d, %Y").to_string(),
-            "author": article.author
+    let articles_json: Vec<Value> = articles
+        .iter()
+        .map(|article| {
+            json!({
+                "slug": article.slug,
+                "title": article.title,
+                "description": article.description,
+                "tag_list": article.tag_list,
+                "created_at": article.created_at.format("%b %d, %Y").to_string(),
+                "author": article.author
+            })
         })
-    }).collect();
+        .collect();
 
     // Get additional statistics for the homepage summary
     let conn = state
