@@ -191,7 +191,7 @@ async fn test_get_authors_with_search() {
         .expect("Failed to parse response body");
 
     let profiles = response_body["profiles"].as_array().unwrap();
-    assert!(profiles.len() >= 1);
+    assert!(!profiles.is_empty());
 
     // Should contain rustguru
     let usernames: Vec<&str> = profiles
