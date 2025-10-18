@@ -14,7 +14,11 @@
                 <strong>Created:</strong> {{ article.createdAt | date(format="%Y-%m-%d") }}
             </div>
             <div class="article-body">
-                {{ article.body }}
+                {% if article.rendered_body %}
+                    {{ article.rendered_body | safe }}
+                {% else %}
+                    <div style="white-space: pre-wrap;">{{ article.body }}</div>
+                {% endif %}
             </div>
             
             {% if article.tagList %}

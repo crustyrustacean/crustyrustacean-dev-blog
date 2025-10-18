@@ -388,6 +388,234 @@ footer .social-links a:hover {
     top: 6px;
 }
 
+/* Markdown Content Styles */
+.article-content, .article-body {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #333;
+}
+
+.article-content h1, .article-body h1 { 
+    font-size: 2.5rem;
+    margin-top: 2.5rem; 
+    margin-bottom: 1.5rem; 
+    font-weight: 700;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+}
+
+.article-content h1:first-child, .article-body h1:first-child {
+    margin-top: 0;
+}
+
+.article-content h2, .article-body h2 { 
+    font-size: 2rem;
+    margin-top: 2rem; 
+    margin-bottom: 1rem; 
+    font-weight: 600;
+    color: var(--secondary-color);
+}
+
+.article-content h3, .article-body h3 { 
+    font-size: 1.5rem;
+    margin-top: 1.75rem; 
+    margin-bottom: 0.75rem; 
+    font-weight: 600;
+    color: var(--secondary-color);
+}
+
+.article-content h4, .article-body h4, 
+.article-content h5, .article-body h5, 
+.article-content h6, .article-body h6 { 
+    margin-top: 1.5rem; 
+    margin-bottom: 0.5rem; 
+    font-weight: 600;
+    color: var(--secondary-color);
+}
+
+.article-content p, .article-body p { 
+    margin-bottom: 1.25rem;
+    text-align: justify;
+}
+
+.article-content ul, .article-body ul, 
+.article-content ol, .article-body ol { 
+    margin-bottom: 1.25rem; 
+    padding-left: 2rem; 
+}
+
+.article-content li, .article-body li { 
+    margin-bottom: 0.5rem; 
+    line-height: 1.6;
+}
+
+.article-content li p, .article-body li p {
+    margin-bottom: 0.5rem;
+}
+
+.article-content pre, .article-body pre { 
+    background-color: #f8f9fa; 
+    border: 1px solid #e9ecef; 
+    border-radius: var(--border-radius); 
+    padding: 1.5rem; 
+    overflow-x: auto; 
+    margin: 1.5rem 0; 
+    box-shadow: var(--shadow);
+    position: relative;
+}
+
+.article-content code, .article-body code { 
+    background-color: #f1f3f4; 
+    padding: 0.2rem 0.4rem; 
+    border-radius: 4px; 
+    font-size: 0.9em; 
+    color: #d73a49;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.article-content pre code, .article-body pre code { 
+    background-color: transparent; 
+    padding: 0; 
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.article-content table, .article-body table { 
+    width: 100%; 
+    margin: 1.5rem 0; 
+    border-collapse: collapse; 
+    box-shadow: var(--shadow);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.article-content th, .article-body th, 
+.article-content td, .article-body td { 
+    padding: 0.75rem 1rem; 
+    border: 1px solid #dee2e6;
+    text-align: left;
+}
+
+.article-content th, .article-body th { 
+    background-color: var(--primary-color); 
+    color: white;
+    font-weight: 600; 
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.article-content tr:nth-child(even), .article-body tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.article-content blockquote, .article-body blockquote { 
+    border-left: 4px solid var(--primary-color); 
+    padding: 1rem 1.5rem; 
+    margin: 1.5rem 0; 
+    font-style: italic; 
+    background-color: #f8f9fa;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    box-shadow: var(--shadow);
+}
+
+.article-content blockquote p, .article-body blockquote p {
+    margin-bottom: 0;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+.article-content hr, .article-body hr { 
+    margin: 3rem 0; 
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+}
+
+.article-content a, .article-body a { 
+    color: var(--primary-color); 
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-bottom: 1px solid transparent;
+}
+
+.article-content a:hover, .article-body a:hover { 
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+
+.article-content img, .article-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    margin: 1.5rem 0;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Task list styles */
+.article-content ul.task-list, .article-body ul.task-list {
+    list-style: none;
+    padding-left: 1.5rem;
+}
+
+.article-content .task-list-item, .article-body .task-list-item {
+    margin-bottom: 0.5rem;
+}
+
+.article-content .task-list-item input[type="checkbox"], 
+.article-body .task-list-item input[type="checkbox"] {
+    margin-right: 0.5rem;
+    transform: scale(1.2);
+}
+
+/* Dark mode support for markdown */
+@media (prefers-color-scheme: dark) {
+    .article-content, .article-body {
+        color: #e2e8f0;
+    }
+
+    .article-content h1, .article-body h1,
+    .article-content h2, .article-body h2,
+    .article-content h3, .article-body h3,
+    .article-content h4, .article-body h4,
+    .article-content h5, .article-body h5,
+    .article-content h6, .article-body h6 {
+        color: #f7fafc;
+    }
+
+    .article-content h1, .article-body h1 {
+        border-bottom-color: #4a5568;
+    }
+
+    .article-content pre, .article-body pre {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+
+    .article-content pre code, .article-body pre code {
+        color: #e2e8f0;
+    }
+
+    .article-content code, .article-body code {
+        background-color: #4a5568;
+        color: #f56565;
+    }
+
+    .article-content blockquote, .article-body blockquote {
+        background-color: #2d3748;
+    }
+
+    .article-content th, .article-body th {
+        background-color: var(--secondary-color);
+    }
+
+    .article-content tr:nth-child(even), .article-body tr:nth-child(even) {
+        background-color: #2d3748;
+    }
+}
+
 /* Print styles */
 @media print {
     .navbar,
@@ -409,5 +637,15 @@ footer .social-links a:hover {
 
     h1, h2, h3, h4, h5, h6 {
         page-break-after: avoid;
+    }
+
+    .article-content, .article-body {
+        font-size: 11pt;
+        line-height: 1.4;
+    }
+
+    .article-content pre, .article-body pre {
+        border: 1px solid #ccc;
+        background-color: #f5f5f5;
     }
 }

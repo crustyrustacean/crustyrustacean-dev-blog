@@ -25,6 +25,8 @@ pub struct ArticleResponse {
     pub title: String,
     pub description: String,
     pub body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rendered_body: Option<String>,
     #[serde(rename = "tagList")]
     pub tag_list: Vec<String>,
     pub created_at: DateTime<Utc>,

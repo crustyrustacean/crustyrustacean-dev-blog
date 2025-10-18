@@ -3,6 +3,7 @@
 use crate::{
     AppError, AppState,
     auth::{AuthenticatedUser, OptionalUser},
+    markdown::markdown_to_html,
     models::{
         ArticleQuery, ArticleResponse, CreateArticle, FeedQuery, MultipleArticlesResponse,
         SingleArticleResponse, UpdateArticle, UserProfile,
@@ -164,11 +165,14 @@ pub async fn create_article(
         following: false, // Not relevant for article creation
     };
 
+    let rendered_body = markdown_to_html(&article_data.body);
+
     let article_response = ArticleResponse {
         slug: slug.clone(),
         title: article_data.title,
         description: article_data.description,
         body: article_data.body,
+        rendered_body: Some(rendered_body),
         tag_list: tag_names,
         created_at: now,
         updated_at: now,
@@ -324,11 +328,14 @@ pub async fn get_article(
         following: false, // TODO: Implement based on current user if provided
     };
 
+    let rendered_body = markdown_to_html(&body);
+
     let article_response = ArticleResponse {
         slug: article_slug,
         title,
         description,
         body,
+        rendered_body: Some(rendered_body),
         tag_list: tag_names,
         created_at,
         updated_at,
@@ -835,11 +842,14 @@ pub async fn list_articles(
             following: false,
         };
 
+        let rendered_body = markdown_to_html(&body);
+
         let article_response = ArticleResponse {
             slug,
             title,
             description,
             body,
+            rendered_body: Some(rendered_body),
             tag_list: tag_names,
             created_at,
             updated_at,
@@ -1266,11 +1276,14 @@ async fn get_article_with_user_context(
         following: false, // TODO: Implement based on current user if provided
     };
 
+    let rendered_body = markdown_to_html(&body);
+
     let article_response = ArticleResponse {
         slug: article_slug,
         title,
         description,
         body,
+        rendered_body: Some(rendered_body),
         tag_list: tag_names,
         created_at,
         updated_at,
@@ -1430,11 +1443,14 @@ pub async fn get_articles_feed(
             following: true, // By definition, we're following authors in the feed
         };
 
+        let rendered_body = markdown_to_html(&body);
+
         let article_response = ArticleResponse {
             slug,
             title,
             description,
             body,
+            rendered_body: Some(rendered_body),
             tag_list: tag_names,
             created_at,
             updated_at,

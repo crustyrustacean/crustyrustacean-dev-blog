@@ -57,7 +57,11 @@
 
                 <!-- Article Content -->
                 <div class="article-content">
-                    <div class="mb-4" style="white-space: pre-wrap; line-height: 1.7;">{{ article.body }}</div>
+                    {% if article.rendered_body %}
+                        <div class="mb-4" style="line-height: 1.7;">{{ article.rendered_body | safe }}</div>
+                    {% else %}
+                        <div class="mb-4" style="white-space: pre-wrap; line-height: 1.7;">{{ article.body }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- Article Footer -->
