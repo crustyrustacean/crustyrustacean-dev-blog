@@ -11,7 +11,7 @@ async fn rss_feed_returns_valid_xml() {
     // Act
     let response = app
         .client
-        .get(&format!("{}/rss", &app.address))
+        .get(format!("{}/rss", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -55,7 +55,7 @@ async fn rss_feed_includes_articles() {
 
     let register_response = app
         .client
-        .post(&format!("{}/api/users", &app.address))
+        .post(format!("{}/api/users", &app.address))
         .json(&register_body)
         .send()
         .await
@@ -81,7 +81,7 @@ async fn rss_feed_includes_articles() {
     });
 
     app.client
-        .post(&format!("{}/api/articles", &app.address))
+        .post(format!("{}/api/articles", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&article_body)
         .send()
@@ -91,7 +91,7 @@ async fn rss_feed_includes_articles() {
     // Act - Get RSS feed
     let response = app
         .client
-        .get(&format!("{}/rss", &app.address))
+        .get(format!("{}/rss", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -128,7 +128,7 @@ async fn rss_feed_escapes_xml_special_characters() {
 
     let register_response = app
         .client
-        .post(&format!("{}/api/users", &app.address))
+        .post(format!("{}/api/users", &app.address))
         .json(&register_body)
         .send()
         .await
@@ -154,7 +154,7 @@ async fn rss_feed_escapes_xml_special_characters() {
     });
 
     app.client
-        .post(&format!("{}/api/articles", &app.address))
+        .post(format!("{}/api/articles", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&article_body)
         .send()
@@ -164,7 +164,7 @@ async fn rss_feed_escapes_xml_special_characters() {
     // Act
     let response = app
         .client
-        .get(&format!("{}/rss", &app.address))
+        .get(format!("{}/rss", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -187,7 +187,7 @@ async fn rss_feed_returns_empty_feed_when_no_articles() {
     // Act
     let response = app
         .client
-        .get(&format!("{}/rss", &app.address))
+        .get(format!("{}/rss", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");

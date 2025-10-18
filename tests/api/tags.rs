@@ -11,7 +11,7 @@ async fn get_tags_returns_empty_list_when_no_tags_exist() {
     // Act
     let response = app
         .client
-        .get(&format!("{}/api/tags", &app.address))
+        .get(format!("{}/api/tags", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -43,7 +43,7 @@ async fn get_tags_returns_all_unique_tags() {
 
     let register_response = app
         .client
-        .post(&format!("{}/api/users", &app.address))
+        .post(format!("{}/api/users", &app.address))
         .json(&register_body)
         .send()
         .await
@@ -69,7 +69,7 @@ async fn get_tags_returns_all_unique_tags() {
     });
 
     app.client
-        .post(&format!("{}/api/articles", &app.address))
+        .post(format!("{}/api/articles", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&article1_body)
         .send()
@@ -87,7 +87,7 @@ async fn get_tags_returns_all_unique_tags() {
     });
 
     app.client
-        .post(&format!("{}/api/articles", &app.address))
+        .post(format!("{}/api/articles", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&article2_body)
         .send()
@@ -97,7 +97,7 @@ async fn get_tags_returns_all_unique_tags() {
     // Act
     let response = app
         .client
-        .get(&format!("{}/api/tags", &app.address))
+        .get(format!("{}/api/tags", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -142,7 +142,7 @@ async fn get_tags_returns_tags_in_alphabetical_order() {
 
     let register_response = app
         .client
-        .post(&format!("{}/api/users", &app.address))
+        .post(format!("{}/api/users", &app.address))
         .json(&register_body)
         .send()
         .await
@@ -168,7 +168,7 @@ async fn get_tags_returns_tags_in_alphabetical_order() {
     });
 
     app.client
-        .post(&format!("{}/api/articles", &app.address))
+        .post(format!("{}/api/articles", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&article_body)
         .send()
@@ -178,7 +178,7 @@ async fn get_tags_returns_tags_in_alphabetical_order() {
     // Act
     let response = app
         .client
-        .get(&format!("{}/api/tags", &app.address))
+        .get(format!("{}/api/tags", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");
