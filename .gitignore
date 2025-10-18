@@ -1,0 +1,14 @@
+# Ignore build outputs and sensitive files
+
+## VS Code
+.vscode/
+
+# Build outputs
+/target
+
+# Shuttle specific
+.shuttle*
+Secrets*.toml
+
+# Local database
+*.db
