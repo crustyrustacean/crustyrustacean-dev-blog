@@ -27,6 +27,24 @@
             {% endif %}
             
             <div class="mt-4">
+                <div class="d-flex align-items-center mb-3">
+                    {% if user %}
+                        <button id="favoriteBtn" class="btn btn-outline-danger me-3" 
+                                data-slug="{{ article.slug }}" 
+                                data-favorited="{{ article.favorited }}"
+                                onclick="toggleFavorite()">
+                            <i class="fas fa-heart{% if not article.favorited %}-o{% endif %}"></i>
+                            <span id="favoriteText">{% if article.favorited %}Unfavorite{% else %}Favorite{% endif %}</span>
+                            <span class="badge bg-danger ms-1" id="favoriteCount">{{ article.favoritesCount }}</span>
+                        </button>
+                    {% else %}
+                        <span class="text-muted me-3">
+                            <i class="fas fa-heart"></i>
+                            <span class="ms-1">{{ article.favoritesCount }}</span>
+                        </span>
+                    {% endif %}
+                </div>
+                
                 <a href="/" class="btn btn-secondary">Back to Home</a>
                 {% if user and user.username == article.author.username %}
                     <a href="/editor/{{ article.slug }}" class="btn btn-primary">Edit</a>
@@ -35,4 +53,75 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if user %}
+<script>
+function toggleFavorite() {
+    const btn = document.getElementById('favoriteBtn');
+    const text = document.getElementById('favoriteText');
+    const countEl = document.getElementById('favoriteCount');
+    const icon = btn.querySelector('i');
+    const slug = btn.dataset.slug;
+    const isFavorited = btn.dataset.favorited === 'true';
+    
+    // Disable button during request
+    btn.disabled = true;
+    
+    const method = isFavorited ? 'DELETE' : 'POST';
+    const url = `/api/articles/${slug}/favorite`;
+    
+    // Get auth token from cookie or localStorage if you have it
+    const authToken = getCookie('authToken') || localStorage.getItem('authToken');
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        throw new Error('Network response was not ok');
+    })
+    .then(data => {
+        const article = data.article;
+        const newFavorited = article.favorited;
+        const newCount = article.favoritesCount;
+        
+        // Update button state
+        btn.dataset.favorited = newFavorited.toString();
+        text.textContent = newFavorited ? 'Unfavorite' : 'Favorite';
+        countEl.textContent = newCount;
+        
+        // Update icon
+        if (newFavorited) {
+            icon.className = 'fas fa-heart';
+            btn.className = 'btn btn-danger me-3';
+        } else {
+            icon.className = 'fas fa-heart-o';
+            btn.className = 'btn btn-outline-danger me-3';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating favorite status. Please try again.');
+    })
+    .finally(() => {
+        btn.disabled = false;
+    });
+}
+
+// Helper function to get cookie value
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+</script>
+{% endif %}
 {% endblock %}

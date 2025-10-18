@@ -20,6 +20,7 @@ shuttle deploy        # Deploy to Shuttle platform
 cargo test            # Run unit and integration tests
 cargo test api::      # Run only API integration tests
 cargo test auth       # Run only authentication tests
+cargo test favorites  # Run only favorites API tests
 ```
 
 ## Architecture Overview
@@ -98,6 +99,7 @@ GET  /editor                            # Article editor (protected)
 GET  /editor/{slug}                     # Edit existing article (protected)
 GET  /admin                             # Admin dashboard (protected)
 GET  /profiles/{username}               # User profile page
+GET  /favorites                          # User's favorite articles (protected)
 ```
 
 **API Endpoints:**
@@ -115,6 +117,8 @@ POST /api/articles                      # Create article (protected)
 GET  /api/articles/{slug}               # Get article (JSON)
 PUT  /api/articles/{slug}               # Update article (protected)
 DELETE /api/articles/{slug}             # Delete article (protected)
+POST /api/articles/{slug}/favorite      # Favorite article (protected)
+DELETE /api/articles/{slug}/favorite    # Unfavorite article (protected)
 ```
 
 ### Testing Strategy
@@ -124,6 +128,12 @@ DELETE /api/articles/{slug}             # Delete article (protected)
   - JWT token validation and protected endpoints
   - Input validation and error handling
   - Security edge cases and malformed requests
+- **Favorites API test suite** with comprehensive TDD coverage:
+  - Favorite/unfavorite article operations
+  - Authentication requirements and error handling
+  - Idempotent behavior and edge cases
+  - Multi-user scenarios and favorites counting
+  - Query filtering by favorited user
 - **Test infrastructure** with isolated databases and proper setup
 - **Test helpers** in `tests/api/helpers.rs` for consistent test environments
 - **HTTP client testing** using reqwest for real request/response validation
@@ -140,7 +150,7 @@ DELETE /api/articles/{slug}             # Delete article (protected)
 - ✅ **Database Integration**: Turso/libSQL with automated migrations
 - ✅ **Security**: Argon2 password hashing, JWT tokens, input validation
 - ✅ **Error Handling**: Unified error architecture with proper separation of concerns
-- ✅ **Testing**: 10 integration tests covering authentication flows and error scenarios
+- ✅ **Testing**: 42 integration tests covering authentication flows, favorites API, and error scenarios
 - ✅ **API Endpoints**: User management and profile operations
 - ✅ **Code Quality**: Eliminated error handling duplication, improved maintainability
 - ✅ **Blog Features**: Complete article CRUD operations with slug-based routing
@@ -148,5 +158,6 @@ DELETE /api/articles/{slug}             # Delete article (protected)
 - ✅ **Homepage**: Dynamic article summaries, blog statistics, responsive design
 - ✅ **Articles System**: Full listing page, individual article views, admin interface
 - ✅ **Content Management**: Article creation, editing, deletion with proper authorization
+- ✅ **Favorites System**: Complete TDD implementation with frontend and backend integration
 - ✅ **Production Ready**: Complete blog functionality with user-friendly navigation
 - 🚧 **Advanced Features**: Comments system, advanced filtering, search (planned)

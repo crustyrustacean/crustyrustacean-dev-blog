@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 10 integration tests
+- **Comprehensive test suite** with 42 integration tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -29,8 +29,14 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Content management system**:
   - Article creation and editing interface
   - Tag system for categorization
-  - User favorites and social features
+  - Complete user favorites system with interactive UI
   - Authorization-protected admin features
+- **Favorites System** (TDD implementation):
+  - Favorite/unfavorite articles with real-time updates
+  - Personal favorites page for logged-in users
+  - Favorites count display and filtering
+  - Interactive frontend with JavaScript integration
+  - Complete API endpoints with authentication
 
 ### 🚧 Planned
 - Comments system for articles
@@ -83,11 +89,13 @@ templates/          # Tera templates for HTML rendering
     dashboard.html  # Admin interface
   profile/
     profile.html    # User profile page
+    favorites.html  # User favorites page
   errors/
     404.html        # Not found page
 tests/
   api/
-    auth.rs         # Authentication integration tests (9 tests)
+    auth.rs         # Authentication integration tests
+    favorites.rs    # Favorites API integration tests (11 tests)
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
     main.rs         # Test module declarations
@@ -109,17 +117,20 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (10 total)
+cargo test              # Run all tests (42 total)
 cargo test auth         # Run authentication tests only
+cargo test favorites    # Run favorites API tests only
 cargo test api::        # Run all API integration tests
 ```
 
-The test suite includes comprehensive authentication testing:
+The test suite includes comprehensive testing:
 - ✅ User registration and login flows
 - ✅ JWT token validation and security
 - ✅ Protected endpoint access control
 - ✅ Input validation and error handling
 - ✅ Edge cases and malformed requests
+- ✅ Complete favorites API functionality
+- ✅ Idempotent operations and multi-user scenarios
 
 ### Deploying with Shuttle
 
@@ -140,6 +151,7 @@ GET  /editor                       # Article editor (protected)
 GET  /editor/{slug}                # Edit article (protected)
 GET  /admin                        # Admin dashboard (protected)
 GET  /profiles/{username}          # User profile page
+GET  /favorites                    # User's favorite articles (protected)
 ```
 
 ### Authentication API
@@ -166,6 +178,13 @@ PUT    /api/articles/{slug}        # Update article (protected)
 DELETE /api/articles/{slug}        # Delete article (protected)
 ```
 
+### Favorites API
+```
+POST   /api/articles/{slug}/favorite   # Favorite article (protected)
+DELETE /api/articles/{slug}/favorite   # Unfavorite article (protected)
+GET    /api/articles?favorited={user}  # Get articles favorited by user
+```
+
 ### System
 ```
 GET /health_check                  # Health check endpoint
@@ -180,7 +199,8 @@ The application now includes a complete blog system:
 3. **Individual Articles**: Slug-based URLs for SEO-friendly article pages  
 4. **Content Management**: Full CRUD operations with proper authorization
 5. **Admin Interface**: Dashboard for managing articles, users, and content
-6. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+6. **Favorites System**: Interactive favorite/unfavorite with personal favorites page
+7. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -205,7 +225,7 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 10 integration tests covering happy path and failure scenarios
+- **Comprehensive Testing**: 42 integration tests covering happy path and failure scenarios
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 

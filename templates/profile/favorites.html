@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}My Favorites - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">
+                <i class="fas fa-heart text-danger me-2"></i>
+                My Favorite Articles
+            </h1>
+            <a href="/articles" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>
+                All Articles
+            </a>
+        </div>
+
+        {% if articles and articles|length > 0 %}
+            <div class="row">
+                {% for article in articles %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    {% if article.tagList and article.tagList | length > 0 %}
+                                        <span class="badge bg-primary">{{ article.tagList.0 }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Article</span>
+                                    {% endif %}
+                                    <small class="text-muted">{{ article.createdAt | date(format="%b %d, %Y") }}</small>
+                                </div>
+                                <h5 class="card-title">{{ article.title }}</h5>
+                                <p class="card-text">{{ article.description }}</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="/articles/{{ article.slug }}" class="btn btn-outline-primary">Read More</a>
+                                    <div class="text-end">
+                                        <small class="text-muted d-block">
+                                            <i class="fas fa-user me-1"></i>
+                                            {{ article.author.username }}
+                                        </small>
+                                        <small class="text-danger">
+                                            <i class="fas fa-heart me-1"></i>
+                                            {{ article.favoritesCount }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-heart-broken fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No Favorites Yet</h4>
+                <p class="text-muted mb-4">Start exploring and favorite articles you love!</p>
+                <a href="/articles" class="btn btn-primary">
+                    <i class="fas fa-search me-2"></i>
+                    Browse Articles
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add some interactive features
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animate cards on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(card);
+        });
+    });
+</script>
+{% endblock %}

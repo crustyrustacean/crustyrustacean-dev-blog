@@ -3,8 +3,8 @@
 // route handlers for profile pages
 
 // dependencies
-use crate::errors::AppError;
-use crate::state::AppState;
+use crate::{auth::AuthenticatedUser, errors::AppError, state::AppState};
+use chrono::Datelike;
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
@@ -111,9 +111,76 @@ pub async fn get_profile_page(
         total_pages: 1,
     };
 
-    Ok(RenderHtml(
-        "profile/profile.html",
-        state.engine,
-        profile_content,
-    ))
+    Ok(RenderHtml("profile/profile.html", state.engine, profile_content))
+}
+
+pub async fn get_my_favorites_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state.db.connect().map_err(|e| {
+        tracing::error!("Database connection failed: {}", e);
+        AppError::InternalServerError(e.to_string())
+    })?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(serde_json::json!({
+            "username": username.clone(),
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    // Get the user's favorited articles using the existing list_articles function
+    use crate::models::ArticleQuery;
+    use axum::extract::Query;
+    
+    let username = user_info.as_ref().unwrap()["username"].as_str().unwrap();
+    let favorites_query = ArticleQuery {
+        tag: None,
+        author: None,
+        favorited: Some(username.to_string()),
+        limit: Some(50), // Show up to 50 favorites
+        offset: Some(0),
+    };
+
+    let articles = match crate::routes::list_articles(State(state.clone()), Query(favorites_query)).await {
+        Ok(articles_response) => articles_response.0.articles,
+        Err(_) => vec![], // If there's an error fetching articles, show empty list
+    };
+
+    let context: serde_json::Value = serde_json::json!({
+        "title": "My Favorites - CrustyRustacean Dev Blog",
+        "page": "Favorites",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+        "articles": articles
+    });
+
+    Ok(RenderHtml("profile/favorites.html", state.engine, context))
 }

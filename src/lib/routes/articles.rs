@@ -706,6 +706,11 @@ pub async fn list_articles(
         params.push(libsql::Value::from(author.clone()));
     }
 
+    if let Some(favorited_user) = &query.favorited {
+        where_clauses.push("EXISTS (SELECT 1 FROM user_favorites uf JOIN users fu ON uf.user_id = fu.id WHERE uf.article_id = a.id AND fu.username = ?)");
+        params.push(libsql::Value::from(favorited_user.clone()));
+    }
+
     let where_clause = if where_clauses.is_empty() {
         String::new()
     } else {
@@ -1032,4 +1037,251 @@ pub async fn get_articles_list_page(
     });
 
     Ok(RenderHtml("articles/list.html", state.engine, context))
+}
+
+pub async fn favorite_article(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(slug): Path<String>,
+) -> Result<Json<SingleArticleResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Get the article ID by slug
+    let mut article_rows = conn
+        .query(
+            "SELECT id FROM articles WHERE slug = ?",
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let article_row = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Article not found".to_string()))?;
+
+    let article_id: String = article_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Insert favorite (ignore if already exists - idempotent)
+    conn.execute(
+        "INSERT OR IGNORE INTO user_favorites (user_id, article_id) VALUES (?, ?)",
+        libsql::params![user.user_id.to_string(), article_id],
+    )
+    .await
+    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Return the article with updated favorite status
+    get_article_with_user_context(State(state), Path(slug), Some(user)).await
+}
+
+pub async fn unfavorite_article(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(slug): Path<String>,
+) -> Result<Json<SingleArticleResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Get the article ID by slug
+    let mut article_rows = conn
+        .query(
+            "SELECT id FROM articles WHERE slug = ?",
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let article_row = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Article not found".to_string()))?;
+
+    let article_id: String = article_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Remove favorite (ignore if doesn't exist - idempotent)
+    conn.execute(
+        "DELETE FROM user_favorites WHERE user_id = ? AND article_id = ?",
+        libsql::params![user.user_id.to_string(), article_id],
+    )
+    .await
+    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Return the article with updated favorite status
+    get_article_with_user_context(State(state), Path(slug), Some(user)).await
+}
+
+// Helper function to get article with user context for favorite status
+async fn get_article_with_user_context(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    user: Option<AuthenticatedUser>,
+) -> Result<Json<SingleArticleResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Get the article with author information
+    let mut article_rows = conn
+        .query(
+            r#"
+            SELECT 
+                a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
+                u.username, u.bio, u.image
+            FROM articles a
+            JOIN users u ON a.author_id = u.id
+            WHERE a.slug = ?
+            "#,
+            libsql::params![slug.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let article_row = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Article not found".to_string()))?;
+
+    let article_id: String = article_row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let article_slug: String = article_row
+        .get(1)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let title: String = article_row
+        .get(2)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let description: String = article_row
+        .get(3)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let body: String = article_row
+        .get(4)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let created_at_str: String = article_row
+        .get(5)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let updated_at_str: String = article_row
+        .get(6)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let _author_id: String = article_row
+        .get(7)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let username: String = article_row
+        .get(8)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let bio: Option<String> = article_row.get(9).ok();
+    let image: Option<String> = article_row.get(10).ok();
+
+    // Parse the timestamps
+    let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+        .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+        .with_timezone(&Utc);
+    let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
+        .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+        .with_timezone(&Utc);
+
+    // Get tags for this article
+    let mut tag_rows = conn
+        .query(
+            r#"
+            SELECT t.name
+            FROM tags t
+            JOIN article_tags at ON t.id = at.tag_id
+            WHERE at.article_id = ?
+            "#,
+            libsql::params![article_id.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut tag_names = Vec::new();
+    while let Some(tag_row) = tag_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let tag_name: String = tag_row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        tag_names.push(tag_name);
+    }
+
+    // Get favorites count
+    let mut favorites_rows = conn
+        .query(
+            "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
+            libsql::params![article_id.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let favorites_count = if let Some(fav_row) = favorites_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let count: i64 = fav_row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        count as i32
+    } else {
+        0
+    };
+
+    // Check if user has favorited this article
+    let favorited = if let Some(ref auth_user) = user {
+        let mut user_fav_rows = conn
+            .query(
+                "SELECT 1 FROM user_favorites WHERE user_id = ? AND article_id = ?",
+                libsql::params![auth_user.user_id.to_string(), article_id],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        user_fav_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .is_some()
+    } else {
+        false
+    };
+
+    let author = UserProfile {
+        username,
+        bio,
+        image,
+        following: false, // TODO: Implement based on current user if provided
+    };
+
+    let article_response = ArticleResponse {
+        slug: article_slug,
+        title,
+        description,
+        body,
+        tag_list: tag_names,
+        created_at,
+        updated_at,
+        favorited,
+        favorites_count,
+        author,
+    };
+
+    let response = SingleArticleResponse {
+        article: article_response,
+    };
+
+    Ok(Json(response))
 }
