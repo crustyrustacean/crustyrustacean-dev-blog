@@ -3,14 +3,14 @@
 // route handlers for profile pages
 
 // dependencies
-use crate::{auth::AuthenticatedUser, errors::AppError, state::AppState, models::ProfilesQuery};
-use chrono::Datelike;
+use crate::{auth::AuthenticatedUser, errors::AppError, models::ProfilesQuery, state::AppState};
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
 };
 use axum_macros::debug_handler;
 use axum_template::RenderHtml;
+use chrono::Datelike;
 use serde::Serialize;
 
 // struct type to represent a basic user profile
@@ -111,7 +111,11 @@ pub async fn get_profile_page(
         total_pages: 1,
     };
 
-    Ok(RenderHtml("profile/profile.html", state.engine, profile_content))
+    Ok(RenderHtml(
+        "profile/profile.html",
+        state.engine,
+        profile_content,
+    ))
 }
 
 pub async fn get_my_favorites_page(
@@ -159,7 +163,7 @@ pub async fn get_my_favorites_page(
     // Get the user's favorited articles using the existing list_articles function
     use crate::models::ArticleQuery;
     use axum::extract::Query;
-    
+
     let username = user_info.as_ref().unwrap()["username"].as_str().unwrap();
     let favorites_query = ArticleQuery {
         tag: None,
@@ -169,10 +173,11 @@ pub async fn get_my_favorites_page(
         offset: Some(0),
     };
 
-    let articles = match crate::routes::list_articles(State(state.clone()), Query(favorites_query)).await {
-        Ok(articles_response) => articles_response.0.articles,
-        Err(_) => vec![], // If there's an error fetching articles, show empty list
-    };
+    let articles =
+        match crate::routes::list_articles(State(state.clone()), Query(favorites_query)).await {
+            Ok(articles_response) => articles_response.0.articles,
+            Err(_) => vec![], // If there's an error fetching articles, show empty list
+        };
 
     let context: serde_json::Value = serde_json::json!({
         "title": "My Favorites - CrustyRustacean Dev Blog",
@@ -229,7 +234,8 @@ pub async fn get_authors_page(
     };
 
     // Get profiles using the existing list_profiles function
-    let profiles_response = crate::routes::list_profiles(State(state.clone()), user, Query(query.clone())).await?;
+    let profiles_response =
+        crate::routes::list_profiles(State(state.clone()), user, Query(query.clone())).await?;
     let profiles = profiles_response.0.profiles;
 
     // Convert profiles to JSON for template

@@ -161,7 +161,10 @@ async fn test_favorite_nonexistent_article() {
     // Act - Try to favorite non-existent article
     let response = app
         .client
-        .post(format!("{}/api/articles/non-existent-slug/favorite", &app.address))
+        .post(format!(
+            "{}/api/articles/non-existent-slug/favorite",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -335,7 +338,10 @@ async fn test_unfavorite_nonexistent_article() {
     // Act - Try to unfavorite non-existent article
     let response = app
         .client
-        .delete(format!("{}/api/articles/non-existent-slug/favorite", &app.address))
+        .delete(format!(
+            "{}/api/articles/non-existent-slug/favorite",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -470,15 +476,9 @@ async fn test_multiple_users_favorite_same_article() {
     assert_eq!(response1.status(), StatusCode::OK);
     assert_eq!(response2.status(), StatusCode::OK);
 
-    let body1: Value = response1
-        .json()
-        .await
-        .expect("Failed to parse response1");
+    let body1: Value = response1.json().await.expect("Failed to parse response1");
 
-    let body2: Value = response2
-        .json()
-        .await
-        .expect("Failed to parse response2");
+    let body2: Value = response2.json().await.expect("Failed to parse response2");
 
     // Both should show favorited=true for their respective requests
     assert_eq!(body1["article"]["favorited"], true);
@@ -704,7 +704,7 @@ async fn test_unfavorite_not_favorited_article() {
         .await
         .expect("Failed to execute request");
 
-    // Assert - Should still work (idempotent) 
+    // Assert - Should still work (idempotent)
     assert_eq!(response.status(), StatusCode::OK);
 
     let response_body: Value = response
@@ -758,7 +758,7 @@ async fn test_get_articles_favorited_by_user() {
 
     let article2_data = json!({
         "article": {
-            "title": "Second Article", 
+            "title": "Second Article",
             "description": "Second article description",
             "body": "Second article content",
             "tagList": ["second"]
@@ -864,7 +864,10 @@ async fn test_get_articles_favorited_by_nonexistent_user() {
     // Act - Try to get articles favorited by non-existent user
     let response = app
         .client
-        .get(format!("{}/api/articles?favorited=nonexistentuser", &app.address))
+        .get(format!(
+            "{}/api/articles?favorited=nonexistentuser",
+            &app.address
+        ))
         .send()
         .await
         .expect("Failed to execute request");

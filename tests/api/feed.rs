@@ -44,8 +44,14 @@ async fn test_get_feed_happy_path() {
         .await
         .expect("Failed to register author");
 
-    let reg1_body: Value = reg1_response.json().await.expect("Failed to parse reg1 response");
-    let reg2_body: Value = reg2_response.json().await.expect("Failed to parse reg2 response");
+    let reg1_body: Value = reg1_response
+        .json()
+        .await
+        .expect("Failed to parse reg1 response");
+    let reg2_body: Value = reg2_response
+        .json()
+        .await
+        .expect("Failed to parse reg2 response");
 
     let follower_token = reg1_body["user"]["token"].as_str().unwrap();
     let author_token = reg2_body["user"]["token"].as_str().unwrap();
@@ -211,15 +217,24 @@ async fn test_get_feed_with_pagination() {
         .await
         .expect("Failed to register author");
 
-    let follower_body: Value = follower_response.json().await.expect("Failed to parse follower response");
-    let author_body: Value = author_response.json().await.expect("Failed to parse author response");
+    let follower_body: Value = follower_response
+        .json()
+        .await
+        .expect("Failed to parse follower response");
+    let author_body: Value = author_response
+        .json()
+        .await
+        .expect("Failed to parse author response");
 
     let follower_token = follower_body["user"]["token"].as_str().unwrap();
     let author_token = author_body["user"]["token"].as_str().unwrap();
 
     // Follower follows author
     app.client
-        .post(format!("{}/api/profiles/prolificwriter/follow", &app.address))
+        .post(format!(
+            "{}/api/profiles/prolificwriter/follow",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", follower_token))
         .send()
         .await
@@ -265,10 +280,10 @@ async fn test_get_feed_with_pagination() {
 
     assert!(response_body["articles"].is_array());
     assert_eq!(response_body["articlesCount"], 2); // Limited to 2
-    
+
     let articles = response_body["articles"].as_array().unwrap();
     assert_eq!(articles.len(), 2);
-    
+
     // Should be in reverse chronological order (newest first)
     assert_eq!(articles[0]["title"], "Feed Article 3");
     assert_eq!(articles[1]["title"], "Feed Article 2");
@@ -331,9 +346,18 @@ async fn test_get_feed_excludes_unfollowed_authors() {
         .await
         .expect("Failed to register unfollowed author");
 
-    let follower_body: Value = follower_response.json().await.expect("Failed to parse follower response");
-    let followed_body: Value = followed_response.json().await.expect("Failed to parse followed response");
-    let unfollowed_body: Value = unfollowed_response.json().await.expect("Failed to parse unfollowed response");
+    let follower_body: Value = follower_response
+        .json()
+        .await
+        .expect("Failed to parse follower response");
+    let followed_body: Value = followed_response
+        .json()
+        .await
+        .expect("Failed to parse followed response");
+    let unfollowed_body: Value = unfollowed_response
+        .json()
+        .await
+        .expect("Failed to parse unfollowed response");
 
     let follower_token = follower_body["user"]["token"].as_str().unwrap();
     let followed_token = followed_body["user"]["token"].as_str().unwrap();
@@ -341,7 +365,10 @@ async fn test_get_feed_excludes_unfollowed_authors() {
 
     // Follower follows only one author
     app.client
-        .post(format!("{}/api/profiles/followedauthor/follow", &app.address))
+        .post(format!(
+            "{}/api/profiles/followedauthor/follow",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", follower_token))
         .send()
         .await
@@ -401,7 +428,7 @@ async fn test_get_feed_excludes_unfollowed_authors() {
 
     assert!(response_body["articles"].is_array());
     assert_eq!(response_body["articlesCount"], 1); // Only one article from followed user
-    
+
     let articles = response_body["articles"].as_array().unwrap();
     assert_eq!(articles[0]["title"], "Should Appear in Feed");
     assert_eq!(articles[0]["author"]["username"], "followedauthor");

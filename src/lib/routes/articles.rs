@@ -1312,11 +1312,7 @@ pub async fn get_articles_feed(
         LIMIT ? OFFSET ?
         "#;
 
-    let params = libsql::params![
-        user.user_id.to_string(),
-        limit,
-        offset
-    ];
+    let params = libsql::params![user.user_id.to_string(), limit, offset];
 
     let mut article_rows = conn
         .query(sql, params)
@@ -1502,7 +1498,8 @@ pub async fn get_articles_feed_page(
     };
 
     // Get articles for the feed
-    let articles_response = get_articles_feed(State(state.clone()), user.clone(), Query(query)).await?;
+    let articles_response =
+        get_articles_feed(State(state.clone()), user.clone(), Query(query)).await?;
     let articles = articles_response.0.articles;
 
     // Convert articles to JSON with formatted dates for template

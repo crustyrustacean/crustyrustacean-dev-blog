@@ -3,11 +3,13 @@
 // dependencies
 use crate::config::AppConfig;
 use crate::routes::{
-    create_article, delete_article, favorite_article, follow_user, get_admin_dashboard, get_article,
-    get_article_page, get_articles_feed, get_articles_feed_page, get_articles_list_page, get_authors_page, get_current_user, get_edit_article_page,
-    get_editor_page, get_index, get_login_page, get_my_favorites_page, get_profile, get_profile_page, get_register_page,
-    handle_404_simple, health_check, list_articles, list_profiles, login_user, register_user, unfavorite_article, unfollow_user,
-    update_article, update_current_user,
+    create_article, delete_article, favorite_article, follow_user, get_admin_dashboard,
+    get_article, get_article_page, get_articles_feed, get_articles_feed_page,
+    get_articles_list_page, get_authors_page, get_current_user, get_edit_article_page,
+    get_editor_page, get_index, get_login_page, get_my_favorites_page, get_profile,
+    get_profile_page, get_register_page, handle_404_simple, health_check, list_articles,
+    list_profiles, login_user, register_user, unfavorite_article, unfollow_user, update_article,
+    update_current_user,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;

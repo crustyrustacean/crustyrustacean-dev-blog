@@ -44,7 +44,10 @@ async fn test_get_authors_happy_path() {
         .await
         .expect("Failed to register current user");
 
-    let current_user_body: Value = current_user_response.json().await.expect("Failed to parse current user response");
+    let current_user_body: Value = current_user_response
+        .json()
+        .await
+        .expect("Failed to parse current user response");
     let current_user_token = current_user_body["user"]["token"].as_str().unwrap();
 
     // Register other users to find
@@ -52,7 +55,7 @@ async fn test_get_authors_happy_path() {
         json!({
             "user": {
                 "username": "author1",
-                "email": "author1@example.com", 
+                "email": "author1@example.com",
                 "password": "securepassword123"
             }
         }),
@@ -94,10 +97,10 @@ async fn test_get_authors_happy_path() {
 
     assert!(response_body["profiles"].is_array());
     let profiles = response_body["profiles"].as_array().unwrap();
-    
+
     // Should contain at least the 2 authors (excluding current user)
     assert!(profiles.len() >= 2);
-    
+
     // Check profile structure
     for profile in profiles {
         assert!(profile["username"].is_string());
@@ -108,7 +111,7 @@ async fn test_get_authors_happy_path() {
 
 #[tokio::test]
 async fn test_get_authors_with_search() {
-    // Arrange  
+    // Arrange
     let app = spawn_app().await;
 
     // Register user
@@ -129,7 +132,10 @@ async fn test_get_authors_with_search() {
         .await
         .expect("Failed to register user");
 
-    let user_body: Value = user_response.json().await.expect("Failed to parse user response");
+    let user_body: Value = user_response
+        .json()
+        .await
+        .expect("Failed to parse user response");
     let token = user_body["user"]["token"].as_str().unwrap();
 
     // Register searchable authors
@@ -144,7 +150,7 @@ async fn test_get_authors_with_search() {
         json!({
             "user": {
                 "username": "webdev",
-                "email": "webdev@example.com", 
+                "email": "webdev@example.com",
                 "password": "securepassword123"
             }
         }),
@@ -186,7 +192,7 @@ async fn test_get_authors_with_search() {
 
     let profiles = response_body["profiles"].as_array().unwrap();
     assert!(profiles.len() >= 1);
-    
+
     // Should contain rustguru
     let usernames: Vec<&str> = profiles
         .iter()
@@ -218,7 +224,10 @@ async fn test_get_authors_with_pagination() {
         .await
         .expect("Failed to register user");
 
-    let user_body: Value = user_response.json().await.expect("Failed to parse user response");
+    let user_body: Value = user_response
+        .json()
+        .await
+        .expect("Failed to parse user response");
     let token = user_body["user"]["token"].as_str().unwrap();
 
     // Register multiple authors
@@ -285,7 +294,10 @@ async fn test_get_authors_shows_follow_status() {
         .await
         .expect("Failed to register current user");
 
-    let current_user_body: Value = current_user_response.json().await.expect("Failed to parse current user response");
+    let current_user_body: Value = current_user_response
+        .json()
+        .await
+        .expect("Failed to parse current user response");
     let current_user_token = current_user_body["user"]["token"].as_str().unwrap();
 
     // Register author to follow
@@ -331,13 +343,13 @@ async fn test_get_authors_shows_follow_status() {
         .expect("Failed to parse response body");
 
     let profiles = response_body["profiles"].as_array().unwrap();
-    
+
     // Find the followed author
     let followed_author = profiles
         .iter()
         .find(|p| p["username"] == "followme")
         .expect("Should find followed author");
-    
+
     assert_eq!(followed_author["following"], true);
 }
 
@@ -358,7 +370,7 @@ async fn test_authors_page_requires_authentication() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
-#[tokio::test]  
+#[tokio::test]
 async fn test_authors_page_with_authentication() {
     // Arrange
     let app = spawn_app().await;

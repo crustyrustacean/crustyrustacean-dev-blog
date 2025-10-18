@@ -4,7 +4,7 @@ use crate::{
     AppError, AppState,
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
     models::{
-        ProfileResponse, ProfilesQuery, ProfilesResponse, UserData, UserLogin, UserProfile, 
+        ProfileResponse, ProfilesQuery, ProfilesResponse, UserData, UserLogin, UserProfile,
         UserRegistration, UserResponse, UserUpdate,
     },
 };
@@ -467,11 +467,9 @@ pub async fn list_profiles(
         )
     } else {
         (
-            "SELECT id, username, bio, image FROM users ORDER BY username LIMIT ? OFFSET ?".to_string(),
-            vec![
-                libsql::Value::from(limit),
-                libsql::Value::from(offset),
-            ]
+            "SELECT id, username, bio, image FROM users ORDER BY username LIMIT ? OFFSET ?"
+                .to_string(),
+            vec![libsql::Value::from(limit), libsql::Value::from(offset)],
         )
     };
 
@@ -499,7 +497,7 @@ pub async fn list_profiles(
         // Skip the current user from the results
         let profile_uuid = Uuid::parse_str(&profile_id)
             .map_err(|_| AppError::InternalServerError("Invalid profile ID".to_string()))?;
-        
+
         if profile_uuid == user.user_id {
             continue;
         }
