@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}About - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<!-- Hero Image Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="overflow-hidden rounded">
+            <img src="/static/hero.jpg" class="w-100" alt="CrustyRustacean Hero" style="object-fit: cover; height: 400px;">
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <h1 class="mb-4">About CrustyRustacean</h1>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="h4 mb-3">Welcome to My Blog</h2>
+                <p class="lead">
+                    This is a space where I share my journey through Rust programming, systems development, 
+                    and the art of building reliable software.
+                </p>
+                <p>
+                    CrustyRustacean is more than just a blog—it's a learning journal, a technical diary, 
+                    and a collection of insights gained from working with Rust and modern development practices.
+                </p>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="h4 mb-3">What You'll Find Here</h2>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        Deep dives into Rust programming concepts
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        Systems programming tutorials and insights
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        Web development with modern frameworks
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        Best practices and design patterns
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        Real-world project experiences
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="h4 mb-3">Get in Touch</h2>
+                <p>
+                    I'm always excited to connect with fellow developers and Rust enthusiasts. 
+                    Feel free to reach out through any of the social links in the footer, or leave 
+                    comments on the articles.
+                </p>
+                <div class="d-flex gap-3 mt-3">
+                    <a href="https://github.com/crustyrustacean" class="btn btn-outline-dark">
+                        <i class="fab fa-github me-2"></i>
+                        GitHub
+                    </a>
+                    <a href="https://x.com/crustyrustacean" class="btn btn-outline-info">
+                        <i class="fab fa-twitter me-2"></i>
+                        Twitter
+                    </a>
+                    <a href="/rss" class="btn btn-outline-warning">
+                        <i class="fas fa-rss me-2"></i>
+                        RSS Feed
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-5 mb-4">
+            <a href="/articles" class="btn btn-primary btn-lg">
+                <i class="fas fa-newspaper me-2"></i>
+                Read Articles
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

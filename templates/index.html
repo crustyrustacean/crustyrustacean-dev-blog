@@ -3,15 +3,17 @@
 {% block title %}{{ title }} - CrustyRustacean Dev Blog{% endblock %}
 
 {% block content %}
+<!-- Hero Image Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="overflow-hidden rounded">
+            <img src="/static/hero.jpg" class="w-100" alt="CrustyRustacean Hero" style="object-fit: cover; height: 400px;">
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-lg-8">
-        <div class="hero-section bg-gradient text-white p-5 rounded mb-5">
-            <div class="container">
-                <h1 class="display-4 fw-bold">Welcome to CrustyRustacean</h1>
-                <p class="lead">A developer's journey through Rust, systems programming, and modern web development.</p>
-                <a href="/articles" class="btn btn-light btn-lg">Read Articles</a>
-            </div>
-        </div>
 
         <!-- Blog Summary Section -->
         <section class="blog-summary mb-5">
@@ -109,14 +111,11 @@
                     <h6>CrustyRustacean</h6>
                     <p class="small text-muted">Passionate Rust developer sharing insights on systems programming, web development, and software craftsmanship.</p>
                     <div class="social-links">
-                        <a href="#" class="btn btn-outline-secondary btn-sm me-1">
+                        <a href="https://github.com/crustyrustacean" class="btn btn-outline-secondary btn-sm me-1">
                             <i class="fab fa-github"></i>
                         </a>
-                        <a href="#" class="btn btn-outline-secondary btn-sm me-1">
+                        <a href="https://x.com/crustyrustacean" class="btn btn-outline-secondary btn-sm me-1">
                             <i class="fab fa-twitter"></i>
-                        </a>
-                        <a href="#" class="btn btn-outline-secondary btn-sm">
-                            <i class="fab fa-linkedin"></i>
                         </a>
                     </div>
                 </div>

@@ -141,3 +141,183 @@ pub async fn get_index(
 
     Ok(RenderHtml("index.html", state.engine, context))
 }
+
+// handler which renders the about page template
+#[debug_handler]
+pub async fn get_about(
+    State(state): State<AppState>,
+    optional_user: OptionalUser,
+) -> Result<impl IntoResponse, AppError> {
+    let current_year = chrono::Utc::now().year();
+
+    // Get user info if authenticated
+    let user_info = if let Some(auth_user) = optional_user.user {
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut rows = conn
+            .query(
+                "SELECT username, email, bio, image FROM users WHERE id = ?",
+                libsql::params![auth_user.user_id.to_string()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let username: String = row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let email: String = row
+                .get(1)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let bio: Option<String> = row.get(2).ok();
+            let image: Option<String> = row.get(3).ok();
+
+            Some(json!({
+                "username": username,
+                "email": email,
+                "bio": bio,
+                "image": image
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let context: Value = json!({
+        "title": "About - CrustyRustacean Dev Blog",
+        "page": "About",
+        "user": user_info,
+        "current_year": current_year
+    });
+
+    Ok(RenderHtml("about.html", state.engine, context))
+}
+
+// handler which renders the privacy policy page template
+#[debug_handler]
+pub async fn get_privacy(
+    State(state): State<AppState>,
+    optional_user: OptionalUser,
+) -> Result<impl IntoResponse, AppError> {
+    let current_year = chrono::Utc::now().year();
+
+    // Get user info if authenticated
+    let user_info = if let Some(auth_user) = optional_user.user {
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut rows = conn
+            .query(
+                "SELECT username, email, bio, image FROM users WHERE id = ?",
+                libsql::params![auth_user.user_id.to_string()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let username: String = row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let email: String = row
+                .get(1)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let bio: Option<String> = row.get(2).ok();
+            let image: Option<String> = row.get(3).ok();
+
+            Some(json!({
+                "username": username,
+                "email": email,
+                "bio": bio,
+                "image": image
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let context: Value = json!({
+        "title": "Privacy Policy - CrustyRustacean Dev Blog",
+        "page": "Privacy",
+        "user": user_info,
+        "current_year": current_year
+    });
+
+    Ok(RenderHtml("privacy.html", state.engine, context))
+}
+
+// handler which renders the terms of service page template
+#[debug_handler]
+pub async fn get_terms(
+    State(state): State<AppState>,
+    optional_user: OptionalUser,
+) -> Result<impl IntoResponse, AppError> {
+    let current_year = chrono::Utc::now().year();
+
+    // Get user info if authenticated
+    let user_info = if let Some(auth_user) = optional_user.user {
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut rows = conn
+            .query(
+                "SELECT username, email, bio, image FROM users WHERE id = ?",
+                libsql::params![auth_user.user_id.to_string()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let username: String = row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let email: String = row
+                .get(1)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let bio: Option<String> = row.get(2).ok();
+            let image: Option<String> = row.get(3).ok();
+
+            Some(json!({
+                "username": username,
+                "email": email,
+                "bio": bio,
+                "image": image
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let context: Value = json!({
+        "title": "Terms of Service - CrustyRustacean Dev Blog",
+        "page": "Terms",
+        "user": user_info,
+        "current_year": current_year
+    });
+
+    Ok(RenderHtml("terms.html", state.engine, context))
+}
