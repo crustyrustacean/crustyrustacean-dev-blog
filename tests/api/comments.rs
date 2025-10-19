@@ -2,7 +2,7 @@
 
 use crate::helpers::spawn_app;
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_add_comment_to_article_happy_path() {
@@ -234,7 +234,10 @@ async fn test_add_comment_to_nonexistent_article() {
 
     let response = app
         .client
-        .post(format!("{}/api/articles/non-existent-slug/comments", &app.address))
+        .post(format!(
+            "{}/api/articles/non-existent-slug/comments",
+            &app.address
+        ))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", token))
         .json(&comment_data)
@@ -304,7 +307,7 @@ async fn test_get_comments_from_article_happy_path() {
 
     // Add multiple comments
     let comments = vec!["First comment", "Second comment", "Third comment"];
-    
+
     for comment_text in &comments {
         let comment_data = json!({
             "comment": {
@@ -361,7 +364,10 @@ async fn test_get_comments_from_nonexistent_article() {
     // Act - Try to get comments from non-existent article
     let response = app
         .client
-        .get(format!("{}/api/articles/non-existent-slug/comments", &app.address))
+        .get(format!(
+            "{}/api/articles/non-existent-slug/comments",
+            &app.address
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -530,7 +536,10 @@ async fn test_delete_comment_happy_path() {
     // Act - Delete comment
     let response = app
         .client
-        .delete(format!("{}/api/articles/{}/comments/{}", &app.address, slug, comment_id))
+        .delete(format!(
+            "{}/api/articles/{}/comments/{}",
+            &app.address, slug, comment_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -547,10 +556,7 @@ async fn test_delete_comment_happy_path() {
         .await
         .expect("Failed to get comments");
 
-    let get_body: Value = get_response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let get_body: Value = get_response.json().await.expect("Failed to parse response");
 
     let comments_array = get_body["comments"].as_array().unwrap();
     assert_eq!(comments_array.len(), 0);
@@ -564,7 +570,10 @@ async fn test_delete_comment_without_auth() {
     // Act - Try to delete comment without authentication
     let response = app
         .client
-        .delete(format!("{}/api/articles/some-slug/comments/some-id", &app.address))
+        .delete(format!(
+            "{}/api/articles/some-slug/comments/some-id",
+            &app.address
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -681,7 +690,10 @@ async fn test_delete_comment_unauthorized_user() {
     // Act - Try to delete comment with different user
     let response = app
         .client
-        .delete(format!("{}/api/articles/{}/comments/{}", &app.address, slug, comment_id))
+        .delete(format!(
+            "{}/api/articles/{}/comments/{}",
+            &app.address, slug, comment_id
+        ))
         .header("Authorization", format!("Bearer {}", token2))
         .send()
         .await
@@ -698,10 +710,7 @@ async fn test_delete_comment_unauthorized_user() {
         .await
         .expect("Failed to get comments");
 
-    let get_body: Value = get_response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let get_body: Value = get_response.json().await.expect("Failed to parse response");
 
     let comments_array = get_body["comments"].as_array().unwrap();
     assert_eq!(comments_array.len(), 1);
@@ -766,7 +775,10 @@ async fn test_delete_nonexistent_comment() {
     // Act - Try to delete non-existent comment
     let response = app
         .client
-        .delete(format!("{}/api/articles/{}/comments/non-existent-id", &app.address, slug))
+        .delete(format!(
+            "{}/api/articles/{}/comments/non-existent-id",
+            &app.address, slug
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
