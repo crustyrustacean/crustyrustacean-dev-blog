@@ -28,7 +28,7 @@ class HomepageManager {
                 const badgeColors = ['primary', 'secondary', 'success', 'warning', 'info', 'dark', 'danger'];
                 tagsContainer.innerHTML = data.tags.map((tag, index) => {
                     const color = badgeColors[index % badgeColors.length];
-                    return `<a href="/articles?tag=${encodeURIComponent(tag)}" class="badge bg-${color} text-decoration-none">${tag}</a>`;
+                    return `<a href="/articles?tag=${encodeURIComponent(tag)}" class="badge bg-${color} text-decoration-none me-1 mb-1">${tag}</a>`;
                 }).join('');
             } else {
                 tagsContainer.innerHTML = '<span class="text-muted small">No tags yet</span>';
@@ -72,8 +72,8 @@ class HomepageManager {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Only initialize on homepage
-    if (document.querySelector('.homepage, .hero-section')) {
+    // Only initialize on homepage - check for tags-container as a reliable indicator
+    if (document.getElementById('tags-container')) {
         new HomepageManager();
     }
 });
