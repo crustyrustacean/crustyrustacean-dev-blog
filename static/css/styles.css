@@ -577,52 +577,6 @@ footer .social-links a:hover {
     transform: scale(1.2);
 }
 
-/* Dark mode support for markdown */
-@media (prefers-color-scheme: dark) {
-    .article-content, .article-body {
-        color: #e2e8f0;
-    }
-
-    .article-content h1, .article-body h1,
-    .article-content h2, .article-body h2,
-    .article-content h3, .article-body h3,
-    .article-content h4, .article-body h4,
-    .article-content h5, .article-body h5,
-    .article-content h6, .article-body h6 {
-        color: #f7fafc;
-    }
-
-    .article-content h1, .article-body h1 {
-        border-bottom-color: #4a5568;
-    }
-
-    .article-content pre, .article-body pre {
-        background-color: #2d3748;
-        border-color: #4a5568;
-    }
-
-    .article-content pre code, .article-body pre code {
-        color: #e2e8f0;
-    }
-
-    .article-content code, .article-body code {
-        background-color: #4a5568;
-        color: #f56565;
-    }
-
-    .article-content blockquote, .article-body blockquote {
-        background-color: #2d3748;
-    }
-
-    .article-content th, .article-body th {
-        background-color: var(--secondary-color);
-    }
-
-    .article-content tr:nth-child(even), .article-body tr:nth-child(even) {
-        background-color: #2d3748;
-    }
-}
-
 /* Print styles */
 @media print {
     .navbar,
