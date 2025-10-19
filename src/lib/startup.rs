@@ -3,14 +3,14 @@
 // dependencies
 use crate::config::AppConfig;
 use crate::routes::{
-    add_comment, create_article, delete_article, delete_comment, favorite_article, follow_user,
-    get_about, get_admin_dashboard, get_article, get_article_page, get_articles_feed,
+    add_comment, create_article, delete_article, delete_comment, delete_tag, favorite_article,
+    follow_user, get_about, get_admin_dashboard, get_article, get_article_page, get_articles_feed,
     get_articles_feed_page, get_articles_list_page, get_authors_page, get_comments,
     get_current_user, get_edit_article_page, get_editor_page, get_index, get_login_page,
     get_my_favorites_page, get_privacy, get_profile, get_profile_page, get_register_page,
-    get_rss_feed, get_tags, get_terms, handle_404_simple, health_check, list_articles,
-    list_profiles, login_user, register_user, unfavorite_article, unfollow_user, update_article,
-    update_current_user,
+    get_rss_feed, get_tags, get_tags_admin_page, get_terms, handle_404_simple, health_check,
+    list_articles, list_profiles, login_user, register_user, unfavorite_article, unfollow_user,
+    update_article, update_current_user, update_tag,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -75,6 +75,7 @@ impl App {
             .route("/articles", get(get_articles_list_page))
             .route("/articles/{slug}", get(get_article_page))
             .route("/admin", get(get_admin_dashboard))
+            .route("/admin/tags", get(get_tags_admin_page))
             // API routes
             .route("/api/users", post(register_user))
             .route("/api/users/login", post(login_user))
@@ -104,6 +105,10 @@ impl App {
                 axum::routing::delete(delete_comment),
             )
             .route("/api/tags", get(get_tags))
+            .route(
+                "/api/tags/{name}",
+                axum::routing::put(update_tag).delete(delete_tag),
+            )
             .nest_service("/static", ServeDir::new("static"))
             .fallback(handle_404_simple)
             .with_state(state)

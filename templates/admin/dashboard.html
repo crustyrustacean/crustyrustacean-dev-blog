@@ -110,6 +110,36 @@
     </div>
 </div>
 
+<!-- Add this to templates/admin/dashboard.html -->
+<!-- Place it after your articles section or wherever makes sense in your dashboard layout -->
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h2>Content Management</h2>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Manage Tags Card -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-tags-fill"></i> Manage Tags
+                </h5>
+                <p class="card-text">
+                    Edit, rename, and organize your blog tags. Update tag names or remove unused tags.
+                </p>
+                <a href="/admin/tags" class="btn btn-primary">
+                    <i class="bi bi-pencil-square"></i> Manage Tags
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- You can add other admin cards here -->
+</div>
+
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">

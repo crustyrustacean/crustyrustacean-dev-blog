@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use validator::Validate;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tag {
@@ -18,6 +19,17 @@ pub struct TagsResponse {
 pub struct ArticleTag {
     pub article_id: Uuid,
     pub tag_id: Uuid,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateTag {
+    #[validate(length(min = 1, max = 50))]
+    pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SingleTagResponse {
+    pub tag: String,
 }
 
 #[derive(Debug, Clone)]
