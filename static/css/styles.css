@@ -206,6 +206,36 @@ h1, h2, h3, h4, h5, h6 {
     text-align: center;
 }
 
+.article-content,
+.article-body {
+    color: #212529;
+    font-size: 1.125rem;
+    line-height: 1.8;
+}
+
+.article-content h1,
+.article-content h2,
+.article-content h3,
+.article-content h4,
+.article-content h5,
+.article-content h6,
+.article-body h1,
+.article-body h2,
+.article-body h3,
+.article-body h4,
+.article-body h5,
+.article-body h6 {
+    color: #212529;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+.article-content p,
+.article-body p {
+    color: #212529;
+    margin-bottom: 1.5rem;
+}
+
 /* Tabs */
 .nav-tabs {
     border-bottom: 2px solid #dee2e6;
@@ -323,31 +353,6 @@ footer .social-links a:hover {
     .nav-tabs .nav-link {
         padding: 0.75rem 1rem;
         font-size: 0.875rem;
-    }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-    .card {
-        background-color: #2d3748;
-        color: #e2e8f0;
-    }
-
-    .card-header {
-        background: linear-gradient(135deg, #2d3748, #4a5568);
-        border-bottom-color: #4a5568;
-    }
-
-    .form-control {
-        background-color: #2d3748;
-        border-color: #4a5568;
-        color: #e2e8f0;
-    }
-
-    .form-control:focus {
-        background-color: #2d3748;
-        border-color: var(--primary-color);
-        color: #e2e8f0;
     }
 }
 
