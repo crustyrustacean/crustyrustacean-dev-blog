@@ -3,6 +3,7 @@
 // modules
 pub mod articles;
 pub mod auth;
+pub mod comments;
 pub mod error_pages;
 pub mod health_check;
 pub mod index;
@@ -14,6 +15,7 @@ pub mod users;
 // re-exports
 pub use articles::*;
 pub use auth::*;
+pub use comments::*;
 pub use error_pages::*;
 pub use health_check::*;
 pub use index::*;

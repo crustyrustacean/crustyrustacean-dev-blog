@@ -17,6 +17,7 @@ pub struct Comment {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CommentResponse {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,

@@ -54,12 +54,125 @@
                     <a href="/editor/{{ article.slug }}" class="btn btn-primary">Edit</a>
                 {% endif %}
             </div>
+            
+            <!-- Comments Section -->
+            <div class="mt-5">
+                <h3>Comments</h3>
+                
+                {% if user %}
+                <div class="card my-3">
+                    <div class="card-body">
+                        <form id="addCommentForm">
+                            <div class="mb-3">
+                                <textarea class="form-control" id="commentBody" rows="3" placeholder="Add a comment..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="submitCommentBtn">Post Comment</button>
+                        </form>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">Please <a href="/login">log in</a> to comment.</div>
+                {% endif %}
+                
+                <div id="commentsList">
+                    <div class="text-center py-3">
+                        <div class="spinner-border" role="status"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script>
+function getAuthToken() {
+    return localStorage.getItem('authToken') || getCookie('authToken');
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+async function loadComments() {
+    const commentsList = document.getElementById('commentsList');
+    try {
+        const response = await fetch('/api/articles/{{ article.slug }}/comments');
+        if (!response.ok) throw new Error('Failed to load');
+        
+        const data = await response.json();
+        const comments = data.comments || [];
+        
+        if (comments.length === 0) {
+            commentsList.innerHTML = '<p class="text-muted">No comments yet.</p>';
+            return;
+        }
+        
+        const currentUser = {% if user %}'{{ user.username }}'{% else %}null{% endif %};
+        commentsList.innerHTML = comments.map(c => `
+            <div class="card mb-2">
+                <div class="card-body">
+                    <strong>${c.author.username}</strong>
+                    <small class="text-muted">${new Date(c.createdAt).toLocaleDateString()}</small>
+                    ${currentUser === c.author.username ? `<button class="btn btn-sm btn-danger float-end" onclick="deleteComment('${c.id}')">Delete</button>` : ''}
+                    <p class="mt-2">${c.body}</p>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        commentsList.innerHTML = '<p class="text-danger">Failed to load comments.</p>';
+    }
+}
+
+async function deleteComment(id) {
+    if (!confirm('Delete this comment?')) return;
+    try {
+        const response = await fetch(`/api/articles/{{ article.slug }}/comments/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+        });
+        if (response.ok) loadComments();
+    } catch (e) {
+        alert('Failed to delete comment');
+    }
+}
+
+const addCommentForm = document.getElementById('addCommentForm');
+if (addCommentForm) {
+    addCommentForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = document.getElementById('commentBody').value;
+        const btn = document.getElementById('submitCommentBtn');
+        
+        btn.disabled = true;
+        try {
+            const response = await fetch('/api/articles/{{ article.slug }}/comments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getAuthToken()}`
+                },
+                body: JSON.stringify({ comment: { body } })
+            });
+            
+            if (response.ok) {
+                document.getElementById('commentBody').value = '';
+                loadComments();
+            }
+        } catch (e) {
+            alert('Failed to post comment');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
+loadComments();
+</script>
+
 {% if user %}
 <script>
 function toggleFavorite() {

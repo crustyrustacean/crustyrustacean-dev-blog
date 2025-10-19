@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 65 integration tests
+- **Comprehensive test suite** with 76 integration tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -58,9 +58,15 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Automatic article syndication (latest 20 articles)
   - Proper XML escaping for security
   - RFC 2822 date formatting
+- **Comments System** (TDD implementation):
+  - Add comments to articles with authentication
+  - View all comments on article pages
+  - Delete own comments with proper authorization
+  - Interactive frontend with real-time updates
+  - Complete API endpoints (POST, GET, DELETE)
+  - 11 comprehensive integration tests
 
 ### 🚧 Planned
-- Comments system for articles
 - Advanced search and filtering
 - Rich text editor enhancements
 - Social sharing features
@@ -125,6 +131,7 @@ tests/
     authors.rs      # Authors discovery integration tests (8 tests)
     tags.rs         # Tags API integration tests (3 tests)
     rss.rs          # RSS feed integration tests (4 tests)
+    comments.rs     # Comments API integration tests (11 tests)
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
     main.rs         # Test module declarations
@@ -146,13 +153,14 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (65 total)
+cargo test              # Run all tests (76 total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
 cargo test authors      # Run authors discovery tests only
 cargo test tags         # Run tags API tests only
 cargo test rss          # Run RSS feed tests only
+cargo test comments     # Run comments API tests only
 cargo test api::        # Run all API integration tests
 ```
 
@@ -167,6 +175,7 @@ The test suite includes comprehensive testing:
 - ✅ Authors discovery with search and pagination
 - ✅ Tags API with alphabetical sorting and filtering
 - ✅ RSS feed generation with XML validation
+- ✅ Comments API with authorization and validation
 - ✅ Idempotent operations and multi-user scenarios
 
 ### Deploying with Shuttle
@@ -232,6 +241,13 @@ GET    /api/articles?favorited={user}  # Get articles favorited by user
 GET /api/tags                      # Get all tags (alphabetically sorted)
 ```
 
+### Comments API
+```
+POST   /api/articles/{slug}/comments       # Add comment to article (protected)
+GET    /api/articles/{slug}/comments       # Get all comments for article
+DELETE /api/articles/{slug}/comments/{id}  # Delete comment (protected, author only)
+```
+
 ### System
 ```
 GET /health_check                  # Health check endpoint
@@ -252,7 +268,8 @@ The application now includes a complete blog system:
 9. **Social Features**: Complete follow/unfollow system with real-time updates
 10. **Tags System**: Dynamic tag display with filtering and alphabetical organization
 11. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
-12. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+12. **Comments System**: Add, view, and delete comments on articles with proper authorization
+13. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -277,8 +294,8 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 65 integration tests covering happy path and failure scenarios
-- **Test-Driven Development**: Tags and RSS features built with TDD approach
+- **Comprehensive Testing**: 76 integration tests covering happy path and failure scenarios
+- **Test-Driven Development**: Tags, RSS, and Comments features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 

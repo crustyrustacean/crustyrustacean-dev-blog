@@ -3,13 +3,14 @@
 // dependencies
 use crate::config::AppConfig;
 use crate::routes::{
-    create_article, delete_article, favorite_article, follow_user, get_about, get_admin_dashboard,
-    get_article, get_article_page, get_articles_feed, get_articles_feed_page,
-    get_articles_list_page, get_authors_page, get_current_user, get_edit_article_page,
-    get_editor_page, get_index, get_login_page, get_my_favorites_page, get_privacy, get_profile,
-    get_profile_page, get_register_page, get_rss_feed, get_tags, get_terms, handle_404_simple,
-    health_check, list_articles, list_profiles, login_user, register_user, unfavorite_article,
-    unfollow_user, update_article, update_current_user,
+    add_comment, create_article, delete_article, delete_comment, favorite_article, follow_user,
+    get_about, get_admin_dashboard, get_article, get_article_page, get_articles_feed,
+    get_articles_feed_page, get_articles_list_page, get_authors_page, get_comments,
+    get_current_user, get_edit_article_page, get_editor_page, get_index, get_login_page,
+    get_my_favorites_page, get_privacy, get_profile, get_profile_page, get_register_page,
+    get_rss_feed, get_tags, get_terms, handle_404_simple, health_check, list_articles,
+    list_profiles, login_user, register_user, unfavorite_article, unfollow_user, update_article,
+    update_current_user,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -93,6 +94,14 @@ impl App {
             .route(
                 "/api/articles/{slug}/favorite",
                 post(favorite_article).delete(unfavorite_article),
+            )
+            .route(
+                "/api/articles/{slug}/comments",
+                post(add_comment).get(get_comments),
+            )
+            .route(
+                "/api/articles/{slug}/comments/{comment_id}",
+                axum::routing::delete(delete_comment),
             )
             .route("/api/tags", get(get_tags))
             .nest_service("/static", ServeDir::new("static"))
