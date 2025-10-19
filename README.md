@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 76 integration tests
+- **Comprehensive test suite** with 81 integration tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -101,7 +101,23 @@ src/
 static/
   css/
     styles.css      # Main stylesheet with responsive design
-  js/               # JavaScript for interactive features
+  js/               # Modular JavaScript architecture (19 modules)
+    admin.js        # Admin dashboard functionality
+    article-init.js # Article initialization
+    article-list.js # Articles listing interactions
+    article-page.js # Individual article page features
+    article.js      # General article functionality
+    auth.js         # Authentication forms and validation
+    authors.js      # Authors discovery features
+    base.js         # Global functionality and utilities
+    comments.js     # Comments system interactions
+    editor.js       # Article editor functionality
+    error404.js     # Error page enhancements
+    favorites.js    # Favorites system
+    feed.js         # Personal feed functionality
+    homepage.js     # Homepage dynamic features
+    profile.js      # User profile interactions
+    utils.js        # Shared utilities and helpers
   images/           # Static images and assets
 templates/          # Tera templates for HTML rendering
   base.html         # Base layout template
@@ -109,6 +125,8 @@ templates/          # Tera templates for HTML rendering
   articles/
     list.html       # Articles listing page
     article.html    # Individual article view
+    article-old.html# Legacy article template
+    modern.html     # Modern article template
     editor.html     # Article creation/editing
     simple.html     # Simplified article view
   auth/
@@ -132,6 +150,7 @@ tests/
     tags.rs         # Tags API integration tests (3 tests)
     rss.rs          # RSS feed integration tests (4 tests)
     comments.rs     # Comments API integration tests (11 tests)
+    template_rendering.rs # Template rendering integration tests
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
     main.rs         # Test module declarations
@@ -153,7 +172,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (76 total)
+cargo test              # Run all tests (81 total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -294,7 +313,7 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 76 integration tests covering happy path and failure scenarios
+- **Comprehensive Testing**: 81 integration tests covering happy path and failure scenarios
 - **Test-Driven Development**: Tags, RSS, and Comments features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
