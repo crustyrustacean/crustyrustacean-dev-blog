@@ -928,7 +928,7 @@ pub async fn get_article_page(
         "article": article
     });
 
-    Ok(RenderHtml("articles/simple.html", state.engine, context))
+    Ok(RenderHtml("articles/article.html", state.engine, context))
 }
 
 pub async fn get_articles_list_page(

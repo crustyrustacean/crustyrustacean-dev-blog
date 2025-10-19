@@ -19,7 +19,7 @@
                             {% else %}
                                 <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
                                      style="width: 48px; height: 48px;">
-                                    <span class="text-white fw-bold fs-5">{{ article.author.username | truncate(length=1) | upper }}</span>
+                                    <span class="text-white fw-bold fs-5">{{ article.author.username | slice(end=1) | upper }}</span>
                                 </div>
                             {% endif %}
                         </div>
@@ -38,7 +38,7 @@
                     <p class="lead text-muted">{{ article.description }}</p>
 
                     <!-- Tags -->
-                            {% if article.tagList %}
+                    {% if article.tagList and article.tagList|length > 0 %}
                         <div class="mb-3">
                             {% for tag in article.tagList %}
                                 <span class="badge bg-secondary me-1">{{ tag }}</span>
@@ -65,7 +65,7 @@
                 </div>
 
                 <!-- Article Footer -->
-                <footer class="border-top pt-4 mt-5 bg-transparent">
+                <footer class="border-top pt-4 mt-5">
                     <div class="row">
                         <div class="col-md-8">
                             <div class="d-flex align-items-center">
@@ -76,7 +76,7 @@
                                     {% else %}
                                         <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
                                              style="width: 64px; height: 64px;">
-                                            <span class="text-white fw-bold fs-4">{{ article.author.username | truncate(length=1) | upper }}</span>
+                                            <span class="text-white fw-bold fs-4">{{ article.author.username | slice(end=1) | upper }}</span>
                                         </div>
                                     {% endif %}
                                 </div>
@@ -187,6 +187,6 @@
 {% block scripts %}
 <script src="/static/js/article-page.js"></script>
 {% if user %}
-    <div style="display: none;" data-current-user="{{ user.username }}"></div>
+    <div style="display: none;" data-current-user="{{ user.username | escape }}"></div>
 {% endif %}
 {% endblock %}

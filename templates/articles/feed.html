@@ -103,7 +103,7 @@
 
             {% if articles|length == 20 %}
                 <div class="text-center mt-4">
-                    <button class="btn btn-outline-primary" onclick="loadMore()">
+                    <button class="btn btn-outline-primary" id="loadMoreBtn">
                         <i class="fas fa-plus-circle me-2"></i>
                         Load More Articles
                     </button>
@@ -180,69 +180,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    let currentOffset = {{ articles | length }};
-    
-    // Handle favorite/unfavorite functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        // Handle favorite buttons
-        document.querySelectorAll('.favorite-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                toggleFavorite(this);
-            });
-        });
-
-        // Animate cards on scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-
-        const observer = new IntersectionObserver(function(entries) {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }
-            });
-        }, observerOptions);
-
-        document.querySelectorAll('.card').forEach(card => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-            card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-            observer.observe(card);
-        });
-    });
-
-    async function toggleFavorite(btn) {
-        const slug = btn.getAttribute('data-slug');
-        const favorited = btn.getAttribute('data-favorited') === 'true';
-        const method = favorited ? 'DELETE' : 'POST';
-        
-        try {
-            const response = await fetch(`/api/articles/${slug}/favorite`, {
-                method: method,
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
-                    'Content-Type': 'application/json',
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                const article = data.article;
-                
-                // Update button state
-                const icon = btn.querySelector('i');
-                if (article.favorited) {
-                    icon.className = 'fas fa-heart';
-                    btn.setAttribute('data-favorited', 'true');
-                } else {
-                    icon.className = 'far fa-heart';
-                    btn.setAttribute('data-favorited', 'false');
-                }
+<script src="/static/js/feed.js"></script>
                 
                 // Update favorites count
                 const countSpan = btn.closest('.d-flex').querySelector('.text-muted');

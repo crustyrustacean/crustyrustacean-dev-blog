@@ -13,3 +13,4 @@ mod helpers;
 mod markdown_integration;
 mod rss;
 mod tags;
+mod template_rendering;
