@@ -1,0 +1,6 @@
+[template]
+exclude = [
+  "assets/*",
+  "static/*",
+  "templates/*"
+]

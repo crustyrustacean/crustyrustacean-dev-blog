@@ -12,6 +12,3 @@ Secrets*.toml
 
 # Local database
 *.db
-
-# for cargo-generate
-cargo-generate.toml
