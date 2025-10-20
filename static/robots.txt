@@ -1,0 +1,20 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow admin and authentication pages
+Disallow: /admin
+Disallow: /login
+Disallow: /register
+Disallow: /editor
+Disallow: /api/
+
+# Allow crawling of article pages and public content
+Allow: /articles
+Allow: /rss
+
+# Sitemap and feeds
+Sitemap: https://crustyrustacean-dev-blog-5d59.shuttle.app/sitemap.xml
+
+# Crawl delay (optional, polite to set for smaller sites)
+Crawl-delay: 1

@@ -1,5 +1,6 @@
 [build]
 assets = [
   "templates/*",
-  "static/*"
+  "static/*",
+  "assets/*"
 ]

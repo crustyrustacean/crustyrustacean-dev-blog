@@ -8,9 +8,9 @@ use crate::routes::{
     get_articles_feed_page, get_articles_list_page, get_authors_page, get_comments,
     get_current_user, get_edit_article_page, get_editor_page, get_index, get_login_page,
     get_my_favorites_page, get_privacy, get_profile, get_profile_page, get_register_page,
-    get_rss_feed, get_tags, get_tags_admin_page, get_terms, handle_404_simple, health_check,
-    list_articles, list_profiles, login_user, register_user, unfavorite_article, unfollow_user,
-    update_article, update_current_user, update_tag,
+    get_robots_txt, get_rss_feed, get_sitemap, get_tags, get_tags_admin_page, get_terms,
+    handle_404_simple, health_check, list_articles, list_profiles, login_user, register_user,
+    unfavorite_article, unfollow_user, update_article, update_current_user, update_tag,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -58,6 +58,8 @@ impl App {
         // build the application router
         Router::new()
             .route("/health_check", get(health_check))
+            .route("/robots.txt", get(get_robots_txt))
+            .route("/sitemap.xml", get(get_sitemap))
             .route("/", get(get_index))
             .route("/about", get(get_about))
             .route("/privacy", get(get_privacy))

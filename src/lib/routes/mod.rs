@@ -8,7 +8,9 @@ pub mod error_pages;
 pub mod health_check;
 pub mod index;
 pub mod profile;
+pub mod robots;
 pub mod rss;
+pub mod sitemap;
 pub mod tags;
 pub mod users;
 
@@ -20,6 +22,8 @@ pub use error_pages::*;
 pub use health_check::*;
 pub use index::*;
 pub use profile::*;
+pub use robots::*;
 pub use rss::*;
+pub use sitemap::*;
 pub use tags::*;
 pub use users::*;
