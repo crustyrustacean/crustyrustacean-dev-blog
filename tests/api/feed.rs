@@ -3,7 +3,7 @@
 use crate::helpers::{spawn_app, TestArticleBuilder, TestFixture, TestUserBuilder};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 #[tokio::test]
 async fn test_get_feed_happy_path() {
@@ -45,7 +45,6 @@ async fn test_get_feed_happy_path() {
         format!("{}/api/articles/feed", &fixture.app.address),
         &follower_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -88,7 +87,6 @@ async fn test_get_feed_empty_when_not_following_anyone() {
         format!("{}/api/articles/feed", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -145,7 +143,6 @@ async fn test_get_feed_with_pagination() {
         format!("{}/api/articles/feed?limit=2", &fixture.app.address),
         &follower_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -220,7 +217,6 @@ async fn test_get_feed_excludes_unfollowed_authors() {
         format!("{}/api/articles/feed", &fixture.app.address),
         &follower_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert

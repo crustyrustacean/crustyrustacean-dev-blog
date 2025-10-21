@@ -3,7 +3,7 @@
 use crate::helpers::{spawn_app, TestUserBuilder};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 #[tokio::test]
 async fn test_get_authors_requires_authentication() {
@@ -37,7 +37,6 @@ async fn test_get_authors_happy_path() {
         format!("{}/api/profiles", &app.address),
         &current_user_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -75,7 +74,6 @@ async fn test_get_authors_with_search() {
         format!("{}/api/profiles?search=rust", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -114,7 +112,6 @@ async fn test_get_authors_with_pagination() {
         format!("{}/api/profiles?limit=3", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -149,7 +146,6 @@ async fn test_get_authors_shows_follow_status() {
         format!("{}/api/profiles", &app.address),
         &current_user_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert

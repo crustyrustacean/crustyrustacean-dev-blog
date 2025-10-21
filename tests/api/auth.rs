@@ -96,7 +96,6 @@ async fn test_protected_endpoint_with_valid_token() {
         format!("{}/api/user", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
