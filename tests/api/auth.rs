@@ -1,8 +1,9 @@
 // tests/api/auth.rs
 
-use crate::helpers::spawn_app;
+use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 #[tokio::test]
 async fn test_user_registration_happy_path() {
@@ -34,10 +35,7 @@ async fn test_user_registration_happy_path() {
         panic!("Expected 200 OK, got {}: {}", status, error_body);
     }
 
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    let response_body: Value = parse_json!(response);
 
     // Verify response structure
     assert!(response_body["user"].is_object());
@@ -53,21 +51,8 @@ async fn test_user_login_happy_path() {
     let app = spawn_app().await;
 
     // First, register a user
-    let registration_data = json!({
-        "user": {
-            "username": "loginuser",
-            "email": "login@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&registration_data)
-        .send()
-        .await
-        .expect("Failed to register user");
+    app.register_user("loginuser", "login@example.com", "securepassword123")
+        .await;
 
     let login_data = json!({
         "user": {
@@ -87,12 +72,8 @@ async fn test_user_login_happy_path() {
         .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     // Verify response structure
     assert!(response_body["user"].is_object());
@@ -106,48 +87,21 @@ async fn test_user_login_happy_path() {
 async fn test_protected_endpoint_with_valid_token() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register and get a token
-    let user_data = json!({
-        "user": {
-            "username": "protecteduser",
-            "email": "protected@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("protecteduser", "protected@example.com", "securepassword123")
+        .await;
 
     // Act - Access protected endpoint with valid token
-    let response = app
-        .client
-        .get(format!("{}/api/user", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = bearer_request!(get &app,
+        format!("{}/api/user", &app.address),
+        &token
+    )
+    .await
+    .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     assert_eq!(response_body["user"]["email"], "protected@example.com");
     assert_eq!(response_body["user"]["username"], "protecteduser");
@@ -203,7 +157,7 @@ async fn test_registration_with_invalid_data() {
             .expect("Failed to execute request");
 
         // Assert
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_status!(response, StatusCode::BAD_REQUEST);
     }
 }
 
@@ -213,21 +167,8 @@ async fn test_login_with_invalid_credentials() {
     let app = spawn_app().await;
 
     // Register a user first
-    let registration_data = json!({
-        "user": {
-            "username": "validuser",
-            "email": "valid@example.com",
-            "password": "correctpassword"
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&registration_data)
-        .send()
-        .await
-        .expect("Failed to register user");
+    app.register_user("validuser", "valid@example.com", "correctpassword")
+        .await;
 
     let test_cases = vec![
         // Wrong password
@@ -288,7 +229,7 @@ async fn test_protected_endpoint_without_token() {
         .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_status!(response, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -347,7 +288,7 @@ async fn test_duplicate_user_registration() {
         .expect("Failed to execute first request");
 
     // Assert first registration succeeds
-    assert_eq!(first_response.status(), StatusCode::OK);
+    assert_status!(first_response, StatusCode::OK);
 
     // Act - Try to register same user again
     let second_response = app
@@ -360,41 +301,16 @@ async fn test_duplicate_user_registration() {
         .expect("Failed to execute second request");
 
     // Assert second registration fails
-    assert_eq!(second_response.status(), StatusCode::CONFLICT);
+    assert_status!(second_response, StatusCode::CONFLICT);
 }
 
 #[tokio::test]
 async fn test_token_contains_valid_claims() {
     // Arrange
     let app = spawn_app().await;
-
-    let user_data = json!({
-        "user": {
-            "username": "claimsuser",
-            "email": "claims@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    // Act
-    let response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
-
-    let token = response_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("claimsuser", "claims@example.com", "securepassword123")
+        .await;
 
     // Verify token is not empty and appears to be a JWT (has 3 parts separated by dots)
     assert!(!token.is_empty());
@@ -415,31 +331,9 @@ async fn test_token_contains_valid_claims() {
 async fn test_protected_endpoint_with_cookie() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register and get a token
-    let user_data = json!({
-        "user": {
-            "username": "cookieuser",
-            "email": "cookie@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("cookieuser", "cookie@example.com", "securepassword123")
+        .await;
 
     // Act - Access protected endpoint with cookie instead of Authorization header
     let response = app
@@ -451,12 +345,8 @@ async fn test_protected_endpoint_with_cookie() {
         .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     assert_eq!(response_body["user"]["email"], "cookie@example.com");
     assert_eq!(response_body["user"]["username"], "cookieuser");
@@ -466,31 +356,13 @@ async fn test_protected_endpoint_with_cookie() {
 async fn test_cookie_takes_precedence_over_missing_header() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register and get a token
-    let user_data = json!({
-        "user": {
-            "username": "precedenceuser",
-            "email": "precedence@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user(
+            "precedenceuser",
+            "precedence@example.com",
+            "securepassword123",
+        )
+        .await;
 
     // Act - Access protected endpoint with only cookie (no Authorization header)
     let response = app
@@ -502,12 +374,8 @@ async fn test_cookie_takes_precedence_over_missing_header() {
         .expect("Failed to execute request");
 
     // Assert - Should work with cookie even without Authorization header
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     assert_eq!(response_body["user"]["email"], "precedence@example.com");
     assert_eq!(response_body["user"]["username"], "precedenceuser");
