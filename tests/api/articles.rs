@@ -1,9 +1,9 @@
 // tests/api/articles.rs
 
-use crate::helpers::{spawn_app, TestUserBuilder, TestArticleBuilder, TestFixture};
+use crate::helpers::{TestArticleBuilder, TestFixture, TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_create_article_happy_path() {
@@ -23,12 +23,12 @@ async fn test_create_article_happy_path() {
     });
 
     // Act - Create article
-    let response = bearer_request!(post &app,
+    let response = bearer_request!(
+        post & app,
         format!("{}/api/articles", &app.address),
         &token,
         article_data
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -138,12 +138,12 @@ async fn test_create_article_with_invalid_data() {
 
     for invalid_data in test_cases {
         // Act
-        let response = bearer_request!(post &app,
+        let response = bearer_request!(
+            post & app,
             format!("{}/api/articles", &app.address),
             &token,
             invalid_data
         )
-        .await
         .expect("Failed to execute request");
 
         // Assert
@@ -286,12 +286,12 @@ async fn test_create_article_generates_unique_slugs() {
         }
     });
 
-    let response1 = bearer_request!(post &app,
+    let response1 = bearer_request!(
+        post & app,
         format!("{}/api/articles", &app.address),
         &token,
         article_data1
     )
-    .await
     .expect("Failed to create first article");
 
     assert_status!(response1, StatusCode::OK);
@@ -308,12 +308,12 @@ async fn test_create_article_generates_unique_slugs() {
         }
     });
 
-    let response2 = bearer_request!(post &app,
+    let response2 = bearer_request!(
+        post & app,
         format!("{}/api/articles", &app.address),
         &token,
         article_data2
     )
-    .await
     .expect("Failed to create second article");
 
     assert_status!(response2, StatusCode::OK);
@@ -356,12 +356,12 @@ async fn test_update_article_happy_path() {
     });
 
     // Act - Update the article
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/articles/{}", &app.address, slug),
         &token,
         update_data
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -407,12 +407,12 @@ async fn test_update_article_unauthorized() {
     });
 
     // Act
-    let response = bearer_request!(put &fixture.app,
+    let response = bearer_request!(
+        put & fixture.app,
         format!("{}/api/articles/{}", &fixture.app.address, slug),
         &token2,
         update_data
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -437,11 +437,11 @@ async fn test_delete_article_happy_path() {
         .await;
 
     // Act - Delete the article
-    let response = bearer_request!(delete &app,
+    let response = bearer_request!(
+        delete & app,
         format!("{}/api/articles/{}", &app.address, slug),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -478,11 +478,11 @@ async fn test_delete_article_unauthorized() {
         .await;
 
     // Act - Try to delete with wrong user
-    let response = bearer_request!(delete &fixture.app,
+    let response = bearer_request!(
+        delete & fixture.app,
         format!("{}/api/articles/{}", &fixture.app.address, slug),
         &token2
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -527,12 +527,12 @@ async fn test_list_articles_happy_path() {
     ];
 
     for article_data in &articles {
-        bearer_request!(post &app,
+        bearer_request!(
+            post & app,
             format!("{}/api/articles", &app.address),
             &token,
             article_data
         )
-        .await
         .expect("Failed to create article");
     }
 
@@ -601,27 +601,30 @@ async fn test_list_articles_with_filters() {
     });
 
     // Create articles by different authors
-    bearer_request!(post &fixture.app,
+    bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles", &fixture.app.address),
         &token1,
         article1
     )
-    .await
     .expect("Failed to create article1");
 
-    bearer_request!(post &fixture.app,
+    bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles", &fixture.app.address),
         &token2,
         article2
     )
-    .await
     .expect("Failed to create article2");
 
     // Act & Assert - Filter by author
     let response = fixture
         .app
         .client
-        .get(format!("{}/api/articles?author=author1", &fixture.app.address))
+        .get(format!(
+            "{}/api/articles?author=author1",
+            &fixture.app.address
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -665,12 +668,12 @@ async fn test_update_nonexistent_article() {
     });
 
     // Act - Try to update non-existent article
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/articles/non-existent-slug", &app.address),
         &token,
         update_data
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -684,11 +687,11 @@ async fn test_delete_nonexistent_article() {
     let token = app.register_user_default("testuser").await;
 
     // Act - Try to delete non-existent article
-    let response = bearer_request!(delete &app,
+    let response = bearer_request!(
+        delete & app,
         format!("{}/api/articles/non-existent-slug", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert

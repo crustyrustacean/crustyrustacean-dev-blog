@@ -1,9 +1,9 @@
 // tests/api/favorites.rs
 
-use crate::helpers::{spawn_app, TestArticleBuilder, TestFixture, TestUserBuilder};
+use crate::helpers::{TestArticleBuilder, TestFixture, TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_favorite_article_happy_path() {
@@ -31,12 +31,12 @@ async fn test_favorite_article_happy_path() {
         .await;
 
     // Act - Favorite the article
-    let response = bearer_request!(post &fixture.app,
+    let response = bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user_token,
         json!({})
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -75,12 +75,12 @@ async fn test_favorite_nonexistent_article() {
     let token = app.register_user_default("testuser").await;
 
     // Act - Try to favorite non-existent article
-    let response = bearer_request!(post &app,
+    let response = bearer_request!(
+        post & app,
         format!("{}/api/articles/non-existent-slug/favorite", &app.address),
         &token,
         json!({})
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -113,20 +113,20 @@ async fn test_unfavorite_article_happy_path() {
         .await;
 
     // First favorite the article
-    bearer_request!(post &fixture.app,
+    bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user_token,
         json!({})
     )
-    .await
     .expect("Failed to favorite article");
 
     // Act - Unfavorite the article
-    let response = bearer_request!(delete &fixture.app,
+    let response = bearer_request!(
+        delete & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -164,11 +164,11 @@ async fn test_unfavorite_nonexistent_article() {
     let token = app.register_user_default("testuser").await;
 
     // Act - Try to unfavorite non-existent article
-    let response = bearer_request!(delete &app,
+    let response = bearer_request!(
+        delete & app,
         format!("{}/api/articles/non-existent-slug/favorite", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -204,20 +204,20 @@ async fn test_multiple_users_favorite_same_article() {
         .await;
 
     // Act - Both users favorite the article
-    let response1 = bearer_request!(post &fixture.app,
+    let response1 = bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user1_token,
         json!({})
     )
-    .await
     .expect("Failed to favorite by user1");
 
-    let response2 = bearer_request!(post &fixture.app,
+    let response2 = bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user2_token,
         json!({})
     )
-    .await
     .expect("Failed to favorite by user2");
 
     // Assert
@@ -275,21 +275,21 @@ async fn test_favorite_already_favorited_article() {
         .await;
 
     // First favorite
-    bearer_request!(post &fixture.app,
+    bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user_token,
         json!({})
     )
-    .await
     .expect("Failed to favorite article first time");
 
     // Act - Try to favorite again
-    let response = bearer_request!(post &fixture.app,
+    let response = bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user_token,
         json!({})
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert - Should still work (idempotent) but count should remain 1
@@ -326,11 +326,11 @@ async fn test_unfavorite_not_favorited_article() {
         .await;
 
     // Act - Try to unfavorite without favoriting first
-    let response = bearer_request!(delete &fixture.app,
+    let response = bearer_request!(
+        delete & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug),
         &user_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert - Should still work (idempotent)
@@ -378,19 +378,22 @@ async fn test_get_articles_favorited_by_user() {
         .await;
 
     // Favorite only the first article
-    bearer_request!(post &fixture.app,
+    bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/favorite", &fixture.app.address, slug1),
         &user_token,
         json!({})
     )
-    .await
     .expect("Failed to favorite first article");
 
     // Act - Get articles favorited by the user
     let response = fixture
         .app
         .client
-        .get(format!("{}/api/articles?favorited=favoriter", &fixture.app.address))
+        .get(format!(
+            "{}/api/articles?favorited=favoriter",
+            &fixture.app.address
+        ))
         .send()
         .await
         .expect("Failed to execute request");

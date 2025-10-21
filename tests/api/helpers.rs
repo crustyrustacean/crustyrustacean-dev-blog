@@ -244,7 +244,10 @@ macro_rules! bearer_request {
     (get $app:expr, $url:expr, $token:expr) => {
         $app.client
             .get($url)
-            .header($crate::auth_header!($token).0, $crate::auth_header!($token).1)
+            .header(
+                $crate::auth_header!($token).0,
+                $crate::auth_header!($token).1,
+            )
             .send()
             .await
     };
@@ -253,7 +256,10 @@ macro_rules! bearer_request {
         $app.client
             .post($url)
             .header("Content-Type", "application/json")
-            .header($crate::auth_header!($token).0, $crate::auth_header!($token).1)
+            .header(
+                $crate::auth_header!($token).0,
+                $crate::auth_header!($token).1,
+            )
             .json(&$body)
             .send()
             .await
@@ -263,7 +269,10 @@ macro_rules! bearer_request {
         $app.client
             .put($url)
             .header("Content-Type", "application/json")
-            .header($crate::auth_header!($token).0, $crate::auth_header!($token).1)
+            .header(
+                $crate::auth_header!($token).0,
+                $crate::auth_header!($token).1,
+            )
             .json(&$body)
             .send()
             .await
@@ -272,7 +281,10 @@ macro_rules! bearer_request {
     (delete $app:expr, $url:expr, $token:expr) => {
         $app.client
             .delete($url)
-            .header($crate::auth_header!($token).0, $crate::auth_header!($token).1)
+            .header(
+                $crate::auth_header!($token).0,
+                $crate::auth_header!($token).1,
+            )
             .send()
             .await
     };
@@ -320,13 +332,6 @@ impl TestFixture {
             app: spawn_app().await,
             users: HashMap::new(),
         }
-    }
-
-    /// Add a user to the fixture with custom credentials
-    pub async fn with_user(mut self, name: &str, email: &str) -> Self {
-        let token = self.app.register_user(name, email, "password123").await;
-        self.users.insert(name.to_string(), token);
-        self
     }
 
     /// Add a user to the fixture with default email pattern

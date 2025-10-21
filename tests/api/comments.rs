@@ -1,9 +1,9 @@
 // tests/api/comments.rs
 
-use crate::helpers::{spawn_app, TestArticleBuilder, TestFixture, TestUserBuilder};
+use crate::helpers::{TestArticleBuilder, TestFixture, TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_add_comment_to_article_happy_path() {
@@ -31,12 +31,12 @@ async fn test_add_comment_to_article_happy_path() {
         }
     });
 
-    let response = bearer_request!(post &fixture.app,
+    let response = bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/comments", &fixture.app.address, slug),
         &commenter_token,
         comment_data
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -90,12 +90,12 @@ async fn test_add_comment_with_empty_body() {
         }
     });
 
-    let response = bearer_request!(post &app,
+    let response = bearer_request!(
+        post & app,
         format!("{}/api/articles/some-slug/comments", &app.address),
         &token,
         comment_data
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -115,12 +115,12 @@ async fn test_add_comment_to_nonexistent_article() {
         }
     });
 
-    let response = bearer_request!(post &app,
+    let response = bearer_request!(
+        post & app,
         format!("{}/api/articles/non-existent-slug/comments", &app.address),
         &token,
         comment_data
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -148,12 +148,12 @@ async fn test_get_comments_from_article_happy_path() {
             }
         });
 
-        bearer_request!(post &app,
+        bearer_request!(
+            post & app,
             format!("{}/api/articles/{}/comments", &app.address, slug),
             &token,
             comment_data
         )
-        .await
         .expect("Failed to add comment");
     }
 
@@ -250,23 +250,26 @@ async fn test_delete_comment_happy_path() {
         }
     });
 
-    let comment_response = bearer_request!(post &app,
+    let comment_response = bearer_request!(
+        post & app,
         format!("{}/api/articles/{}/comments", &app.address, slug),
         &token,
         comment_data
     )
-    .await
     .expect("Failed to add comment");
 
     let comment_body: Value = parse_json!(comment_response);
     let comment_id = comment_body["comment"]["id"].as_str().unwrap();
 
     // Act - Delete comment
-    let response = bearer_request!(delete &app,
-        format!("{}/api/articles/{}/comments/{}", &app.address, slug, comment_id),
+    let response = bearer_request!(
+        delete & app,
+        format!(
+            "{}/api/articles/{}/comments/{}",
+            &app.address, slug, comment_id
+        ),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -331,23 +334,26 @@ async fn test_delete_comment_unauthorized_user() {
         }
     });
 
-    let comment_response = bearer_request!(post &fixture.app,
+    let comment_response = bearer_request!(
+        post & fixture.app,
         format!("{}/api/articles/{}/comments", &fixture.app.address, slug),
         &author_token,
         comment_data
     )
-    .await
     .expect("Failed to add comment");
 
     let comment_body: Value = parse_json!(comment_response);
     let comment_id = comment_body["comment"]["id"].as_str().unwrap();
 
     // Act - Try to delete comment with different user
-    let response = bearer_request!(delete &fixture.app,
-        format!("{}/api/articles/{}/comments/{}", &fixture.app.address, slug, comment_id),
+    let response = bearer_request!(
+        delete & fixture.app,
+        format!(
+            "{}/api/articles/{}/comments/{}",
+            &fixture.app.address, slug, comment_id
+        ),
         &hacker_token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert
@@ -357,7 +363,10 @@ async fn test_delete_comment_unauthorized_user() {
     let get_response = fixture
         .app
         .client
-        .get(format!("{}/api/articles/{}/comments", &fixture.app.address, slug))
+        .get(format!(
+            "{}/api/articles/{}/comments",
+            &fixture.app.address, slug
+        ))
         .send()
         .await
         .expect("Failed to get comments");
@@ -377,11 +386,14 @@ async fn test_delete_nonexistent_comment() {
     let slug = app.create_article_simple(&token, "Test Article").await;
 
     // Act - Try to delete non-existent comment
-    let response = bearer_request!(delete &app,
-        format!("{}/api/articles/{}/comments/non-existent-id", &app.address, slug),
+    let response = bearer_request!(
+        delete & app,
+        format!(
+            "{}/api/articles/{}/comments/non-existent-id",
+            &app.address, slug
+        ),
         &token
     )
-    .await
     .expect("Failed to execute request");
 
     // Assert

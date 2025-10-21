@@ -1,6 +1,6 @@
 // tests/api/tags.rs
 
-use crate::helpers::{spawn_app, TestArticleBuilder, TestUserBuilder};
+use crate::helpers::{TestArticleBuilder, TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
 use serde_json::json;
@@ -136,12 +136,12 @@ async fn update_tag_happy_path() {
         }
     });
 
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/tags/oldtag", &app.address),
         &token,
         update_body
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert
@@ -206,12 +206,12 @@ async fn update_nonexistent_tag() {
         }
     });
 
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/tags/nonexistent", &app.address),
         &token,
         update_body
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert
@@ -241,12 +241,12 @@ async fn update_tag_with_duplicate_name() {
         }
     });
 
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/tags/tag1", &app.address),
         &token,
         update_body
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert - Should return conflict
@@ -276,12 +276,12 @@ async fn update_tag_with_empty_name() {
         }
     });
 
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/tags/testtag", &app.address),
         &token,
         update_body
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert
@@ -299,12 +299,12 @@ async fn update_tag_with_invalid_payload() {
         "name": "newtag"
     });
 
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/tags/sometag", &app.address),
         &token,
         update_body
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert
@@ -328,11 +328,11 @@ async fn delete_tag_happy_path() {
     .await;
 
     // Act - Delete one tag
-    let response = bearer_request!(delete &app,
+    let response = bearer_request!(
+        delete & app,
         format!("{}/api/tags/tagtodelete", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert
@@ -382,11 +382,11 @@ async fn delete_nonexistent_tag() {
     let token = app.register_user_default("testuser").await;
 
     // Act - Try to delete a tag that doesn't exist
-    let response = bearer_request!(delete &app,
+    let response = bearer_request!(
+        delete & app,
         format!("{}/api/tags/nonexistent", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert
@@ -411,11 +411,11 @@ async fn delete_tag_removes_from_articles() {
         .await;
 
     // Delete the tag
-    let delete_response = bearer_request!(delete &app,
+    let delete_response = bearer_request!(
+        delete & app,
         format!("{}/api/tags/remove", &app.address),
         &token
     )
-    .await
     .expect("Failed to execute request.");
 
     assert_status!(delete_response, StatusCode::NO_CONTENT);
@@ -463,12 +463,12 @@ async fn update_tag_same_name_is_idempotent() {
         }
     });
 
-    let response = bearer_request!(put &app,
+    let response = bearer_request!(
+        put & app,
         format!("{}/api/tags/sametag", &app.address),
         &token,
         update_body
     )
-    .await
     .expect("Failed to execute request.");
 
     // Assert - Should succeed (idempotent operation)
