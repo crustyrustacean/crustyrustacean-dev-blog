@@ -1,8 +1,9 @@
 // tests/api/authors.rs
 
-use crate::helpers::spawn_app;
+use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 #[tokio::test]
 async fn test_get_authors_requires_authentication() {
@@ -18,82 +19,30 @@ async fn test_get_authors_requires_authentication() {
         .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_status!(response, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
 async fn test_get_authors_happy_path() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register current user
-    let current_user_data = json!({
-        "user": {
-            "username": "currentuser",
-            "email": "current@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let current_user_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&current_user_data)
-        .send()
-        .await
-        .expect("Failed to register current user");
-
-    let current_user_body: Value = current_user_response
-        .json()
-        .await
-        .expect("Failed to parse current user response");
-    let current_user_token = current_user_body["user"]["token"].as_str().unwrap();
+    let current_user_token = app.register_user_default("currentuser").await;
 
     // Register other users to find
-    let authors = vec![
-        json!({
-            "user": {
-                "username": "author1",
-                "email": "author1@example.com",
-                "password": "securepassword123"
-            }
-        }),
-        json!({
-            "user": {
-                "username": "author2",
-                "email": "author2@example.com",
-                "password": "securepassword123"
-            }
-        }),
-    ];
-
-    for author_data in &authors {
-        app.client
-            .post(format!("{}/api/users", &app.address))
-            .header("Content-Type", "application/json")
-            .json(author_data)
-            .send()
-            .await
-            .expect("Failed to register author");
-    }
+    app.register_user_default("author1").await;
+    app.register_user_default("author2").await;
 
     // Act - Get list of authors
-    let response = app
-        .client
-        .get(format!("{}/api/profiles", &app.address))
-        .header("Authorization", format!("Bearer {}", current_user_token))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = bearer_request!(get &app,
+        format!("{}/api/profiles", &app.address),
+        &current_user_token
+    )
+    .await
+    .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     assert!(response_body["profiles"].is_array());
     let profiles = response_body["profiles"].as_array().unwrap();
@@ -113,82 +62,25 @@ async fn test_get_authors_happy_path() {
 async fn test_get_authors_with_search() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register user
-    let user_data = json!({
-        "user": {
-            "username": "searcher",
-            "email": "searcher@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let user_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let user_body: Value = user_response
-        .json()
-        .await
-        .expect("Failed to parse user response");
-    let token = user_body["user"]["token"].as_str().unwrap();
+    let token = app.register_user_default("searcher").await;
 
     // Register searchable authors
-    let searchable_authors = vec![
-        json!({
-            "user": {
-                "username": "rustguru",
-                "email": "rustguru@example.com",
-                "password": "securepassword123"
-            }
-        }),
-        json!({
-            "user": {
-                "username": "webdev",
-                "email": "webdev@example.com",
-                "password": "securepassword123"
-            }
-        }),
-        json!({
-            "user": {
-                "username": "pythonista",
-                "email": "pythonista@example.com",
-                "password": "securepassword123"
-            }
-        }),
-    ];
-
-    for author_data in &searchable_authors {
-        app.client
-            .post(format!("{}/api/users", &app.address))
-            .header("Content-Type", "application/json")
-            .json(author_data)
-            .send()
-            .await
-            .expect("Failed to register author");
-    }
+    app.register_user("rustguru", "rustguru@example.com", "securepassword123")
+        .await;
+    app.register_user_default("webdev").await;
+    app.register_user_default("pythonista").await;
 
     // Act - Search for authors with "rust" in username
-    let response = app
-        .client
-        .get(format!("{}/api/profiles?search=rust", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = bearer_request!(get &app,
+        format!("{}/api/profiles?search=rust", &app.address),
+        &token
+    )
+    .await
+    .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     let profiles = response_body["profiles"].as_array().unwrap();
     assert!(!profiles.is_empty());
@@ -205,66 +97,29 @@ async fn test_get_authors_with_search() {
 async fn test_get_authors_with_pagination() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register user
-    let user_data = json!({
-        "user": {
-            "username": "paginator",
-            "email": "paginator@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let user_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let user_body: Value = user_response
-        .json()
-        .await
-        .expect("Failed to parse user response");
-    let token = user_body["user"]["token"].as_str().unwrap();
+    let token = app.register_user_default("paginator").await;
 
     // Register multiple authors
     for i in 1..=5 {
-        let author_data = json!({
-            "user": {
-                "username": format!("author{}", i),
-                "email": format!("author{}@example.com", i),
-                "password": "securepassword123"
-            }
-        });
-
-        app.client
-            .post(format!("{}/api/users", &app.address))
-            .header("Content-Type", "application/json")
-            .json(&author_data)
-            .send()
-            .await
-            .expect("Failed to register author");
+        app.register_user(
+            &format!("author{}", i),
+            &format!("author{}@example.com", i),
+            "securepassword123",
+        )
+        .await;
     }
 
     // Act - Get first 3 authors
-    let response = app
-        .client
-        .get(format!("{}/api/profiles?limit=3", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = bearer_request!(get &app,
+        format!("{}/api/profiles?limit=3", &app.address),
+        &token
+    )
+    .await
+    .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     let profiles = response_body["profiles"].as_array().unwrap();
     assert_eq!(profiles.len(), 3);
@@ -275,47 +130,11 @@ async fn test_get_authors_with_pagination() {
 async fn test_get_authors_shows_follow_status() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register current user
-    let current_user_data = json!({
-        "user": {
-            "username": "follower",
-            "email": "follower@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let current_user_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&current_user_data)
-        .send()
-        .await
-        .expect("Failed to register current user");
-
-    let current_user_body: Value = current_user_response
-        .json()
-        .await
-        .expect("Failed to parse current user response");
-    let current_user_token = current_user_body["user"]["token"].as_str().unwrap();
+    let current_user_token = app.register_user_default("follower").await;
 
     // Register author to follow
-    let author_data = json!({
-        "user": {
-            "username": "followme",
-            "email": "followme@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&author_data)
-        .send()
-        .await
-        .expect("Failed to register author");
+    app.register_user("followme", "followme@example.com", "securepassword123")
+        .await;
 
     // Follow the author
     app.client
@@ -326,21 +145,16 @@ async fn test_get_authors_shows_follow_status() {
         .expect("Failed to follow author");
 
     // Act - Get authors list
-    let response = app
-        .client
-        .get(format!("{}/api/profiles", &app.address))
-        .header("Authorization", format!("Bearer {}", current_user_token))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = bearer_request!(get &app,
+        format!("{}/api/profiles", &app.address),
+        &current_user_token
+    )
+    .await
+    .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response_body: Value = response
-        .json()
-        .await
-        .expect("Failed to parse response body");
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
 
     let profiles = response_body["profiles"].as_array().unwrap();
 
@@ -367,38 +181,14 @@ async fn test_authors_page_requires_authentication() {
         .expect("Failed to execute request");
 
     // Assert
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_status!(response, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
 async fn test_authors_page_with_authentication() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register user
-    let user_data = json!({
-        "user": {
-            "username": "browserpages",
-            "email": "browser@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app.register_user_default("browserpages").await;
 
     // Act - Access authors page with authentication
     let response = app
@@ -410,7 +200,7 @@ async fn test_authors_page_with_authentication() {
         .expect("Failed to execute request");
 
     // Assert - Should return HTML page (200 OK)
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_status!(response, StatusCode::OK);
 
     // Check that it returns HTML content
     let content_type = response
