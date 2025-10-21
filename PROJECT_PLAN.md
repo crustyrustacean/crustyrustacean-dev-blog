@@ -3,7 +3,8 @@
 **Goal:** Transform the current developer blog into a WordPress-like content management platform.
 
 **Created:** 2025-10-21
-**Version:** 1.0.0
+**Updated:** 2025-10-21
+**Version:** 1.1.0
 **Repository:** https://github.com/crustyrustacean/crustyrustacean-dev-blog
 
 ---
@@ -14,12 +15,13 @@
 2. [Current State](#current-state)
 3. [Implementation Roadmap](#implementation-roadmap)
 4. [Phase 0: Quick Wins](#phase-0-quick-wins)
-5. [Phase 1: Content Management Foundations](#phase-1-content-management-foundations)
-6. [Phase 2: Core CMS Features](#phase-2-core-cms-features)
-7. [Phase 3: Customization & Extensibility](#phase-3-customization--extensibility)
-8. [Phase 4: Advanced Features](#phase-4-advanced-features)
-9. [Low Priority Features](#low-priority-features)
-10. [Implementation Guidelines](#implementation-guidelines)
+5. [Phase 0.5: Theme Foundation](#phase-05-theme-foundation)
+6. [Phase 1: Content Management Foundations](#phase-1-content-management-foundations)
+7. [Phase 2: Core CMS Features](#phase-2-core-cms-features)
+8. [Phase 3: Customization & Extensibility](#phase-3-customization--extensibility)
+9. [Phase 4: Advanced Features](#phase-4-advanced-features)
+10. [Low Priority Features](#low-priority-features)
+11. [Implementation Guidelines](#implementation-guidelines)
 
 ---
 
@@ -115,12 +117,13 @@ Based on `CODEBASE_INDEX.md`:
 | Phase | Duration | Focus Area |
 |-------|----------|------------|
 | **Phase 0** | 1 week | Quick wins & bug fixes |
+| **Phase 0.5** | 1-2 weeks | Theme system foundation |
 | **Phase 1** | 2 months | Content management foundations |
 | **Phase 2** | 2 months | Core CMS features |
 | **Phase 3** | 2 months | Customization & extensibility |
 | **Phase 4** | Ongoing | Advanced features & polish |
 
-**Total to WordPress-like Platform:** ~6-7 months
+**Total to WordPress-like Platform:** ~7-8 months
 
 ---
 
@@ -159,6 +162,124 @@ Based on `CODEBASE_INDEX.md`:
 
 ---
 
+## Phase 0.5: Theme Foundation
+
+**Timeline:** 1-2 weeks
+**Goal:** Decouple styling from functionality before building Phase 1 features
+
+### Why This Matters
+
+**The Problem:** Currently, Bootstrap classes are hardcoded throughout all 22+ templates. If we build Phase 1 features (media library, settings, admin UIs) with hardcoded Bootstrap, we'll need to refactor everything when implementing the full theme system.
+
+**The Solution:** Build lightweight theme foundation NOW, then build all new features theme-agnostic from day one.
+
+### Issue #2: Theme System Foundation 🔥
+
+**Status:** Detailed plan in `.github/issues/phase0/issue-02-theme-foundation.md`
+
+**Priority:** CRITICAL - Architectural foundation that prevents technical debt
+
+**Estimated Time:** 1-2 weeks
+
+#### Goals
+
+1. ✅ Move templates into theme directory structure
+2. ✅ Create theme metadata system (theme.toml)
+3. ✅ Abstract CSS framework with semantic classes
+4. ✅ Build reusable component system
+5. ✅ Implement basic theme loader in backend
+6. ✅ Maintain backward compatibility (everything still works)
+
+#### Implementation Overview
+
+**Week 1: Structure & Migration**
+- Create `themes/default/` directory structure
+- Create `theme.toml` with theme metadata
+- Move all templates to `themes/default/templates/`
+- Build backend theme loader (`src/lib/theme.rs`)
+- Update Tera initialization to load from theme directory
+- Add theme static file serving
+
+**Week 2: Components & Abstraction**
+- Extract common components (navbar, footer, card, button, form)
+- Create semantic CSS classes that map to Bootstrap
+- Use CSS custom properties for theme variables
+- Refactor at least one template to use components
+- Update base template to use component includes
+
+#### Benefits
+
+✅ **One-time refactor** instead of continuous rework
+✅ **All Phase 1 features** built theme-agnostic from day one
+✅ **Easy to switch** from Bootstrap to Tailwind/custom CSS later
+✅ **Better developer experience** - components are reusable
+✅ **Closer to WordPress** model from the start
+✅ **Settings UI** can include theme selector
+✅ **Future-proof** - adding new themes is easy
+
+#### New Directory Structure
+
+```
+themes/
+└── default/
+    ├── theme.toml              # Theme metadata
+    ├── templates/              # All Tera templates
+    │   ├── base.html
+    │   ├── components/         # Reusable components
+    │   │   ├── navbar.html
+    │   │   ├── footer.html
+    │   │   ├── card.html
+    │   │   └── button.html
+    │   ├── articles/
+    │   ├── admin/
+    │   └── ...
+    └── static/
+        ├── css/
+        │   ├── variables.css   # CSS custom properties
+        │   └── theme.css       # Theme-specific styles
+        └── js/
+            └── theme.js
+```
+
+#### Files to Create
+
+- `themes/default/theme.toml`
+- `themes/default/templates/components/*.html`
+- `themes/default/static/css/variables.css`
+- `themes/default/static/css/theme.css`
+- `src/lib/theme.rs` - Theme loader
+- `THEME_DEVELOPMENT.md` - Theme development guide
+
+#### Files to Modify
+
+- `src/lib/state.rs` - Add theme to AppState
+- `src/bin/main.rs` - Update Tera initialization
+- `src/lib/startup.rs` - Add theme static route
+- `themes/default/templates/base.html` - Use components
+- `Cargo.toml` - Add `toml` crate dependency
+
+#### Success Criteria
+
+- ✅ All templates moved to `themes/default/templates/`
+- ✅ Theme metadata loaded from `theme.toml`
+- ✅ Tera loads templates from theme directory
+- ✅ Theme static files served correctly
+- ✅ At least 5 reusable components created
+- ✅ Semantic CSS classes defined
+- ✅ All existing functionality works (no regressions)
+- ✅ All existing tests pass
+
+#### Why Before Phase 1?
+
+This ensures:
+- Media library UI built with theme components
+- Settings pages use theme framework
+- Admin dashboards theme-agnostic
+- No need to refactor new features later
+- Proper separation of concerns from the start
+
+---
+
 ## Phase 1: Content Management Foundations
 
 **Timeline:** Months 1-2
@@ -166,7 +287,7 @@ Based on `CODEBASE_INDEX.md`:
 
 ---
 
-### Issue #2: Media Library & Upload System 🔥
+### Issue #3: Media Library & Upload System 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 3-4 weeks
@@ -714,7 +835,7 @@ reqwest = { version = "0.11", features = ["json", "multipart"] }
 
 ---
 
-### Issue #3: Draft/Publish Workflow 🔥
+### Issue #4: Draft/Publish Workflow 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 2 weeks
@@ -928,7 +1049,7 @@ Show article status in admin dashboard:
 
 ---
 
-### Issue #4: User Roles & Permissions 🔥
+### Issue #5: User Roles & Permissions 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 2-3 weeks
@@ -1227,7 +1348,7 @@ pub async fn update_user_role(
 
 ---
 
-### Issue #5: Settings/Configuration UI 🔥
+### Issue #6: Settings/Configuration UI 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 1-2 weeks
@@ -1334,7 +1455,7 @@ Settings page with sections:
 
 ---
 
-### Issue #6: Pages System 🔥
+### Issue #7: Pages System 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 3 weeks
@@ -1374,7 +1495,7 @@ CREATE TABLE pages (
 
 ---
 
-### Issue #7: Categories System
+### Issue #8: Categories System
 
 **Priority:** MEDIUM
 **Estimated Time:** 2 weeks
@@ -1409,7 +1530,7 @@ CREATE TABLE article_categories (
 
 ---
 
-### Issue #8: Tag Management Enhancements
+### Issue #9: Tag Management Enhancements
 
 **Priority:** MEDIUM
 **Estimated Time:** 1 week
@@ -1443,7 +1564,7 @@ GROUP BY t.id;
 
 ---
 
-### Issue #9: Article Revisions/History
+### Issue #10: Article Revisions/History
 
 **Priority:** MEDIUM
 **Estimated Time:** 2 weeks
@@ -1474,7 +1595,7 @@ CREATE TABLE article_revisions (
 
 ---
 
-### Issue #10: SEO Enhancements
+### Issue #11: SEO Enhancements
 
 **Priority:** MEDIUM
 **Estimated Time:** 1 week
@@ -1496,7 +1617,7 @@ Improve search engine optimization.
 
 ---
 
-### Issue #11: Advanced Pagination
+### Issue #12: Advanced Pagination
 
 **Priority:** LOW
 **Estimated Time:** 3 days
@@ -1518,12 +1639,12 @@ Better pagination UX.
 
 ---
 
-### Issue #12: Theme System 🔥
+### Issue #13: Theme System (Full Implementation) 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 4 weeks
 
-Enable theme switching and customization.
+Expand on Phase 0.5 theme foundation with full theming capabilities.
 
 **Structure:**
 ```
@@ -1552,7 +1673,7 @@ themes/
 
 ---
 
-### Issue #13: Menu Management System 🔥
+### Issue #14: Menu Management System 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 2 weeks
@@ -1588,7 +1709,7 @@ CREATE TABLE menu_items (
 
 ---
 
-### Issue #14: Widget System 🔥
+### Issue #15: Widget System 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 3 weeks
@@ -1623,7 +1744,7 @@ CREATE TABLE widgets (
 
 ---
 
-### Issue #15: WYSIWYG Editor 🔥
+### Issue #16: WYSIWYG Editor 🔥
 
 **Priority:** MEDIUM
 **Estimated Time:** 2 weeks
@@ -1644,7 +1765,7 @@ Replace markdown editor with rich text editor.
 
 ---
 
-### Issue #16: Plugin/Extension Architecture 🔥
+### Issue #17: Plugin/Extension Architecture 🔥
 
 **Priority:** HIGH
 **Estimated Time:** 4-5 weeks
@@ -1687,7 +1808,7 @@ plugins/
 
 ---
 
-### Issue #17: Enhanced Admin Dashboard
+### Issue #18: Enhanced Admin Dashboard
 
 **Priority:** MEDIUM
 **Estimated Time:** 2 weeks
@@ -1703,7 +1824,7 @@ Better admin experience.
 
 ---
 
-### Issue #18: User Profile Enhancements
+### Issue #19: User Profile Enhancements
 
 **Priority:** LOW
 **Estimated Time:** 1 week
@@ -1825,6 +1946,12 @@ These can be implemented as needed:
 - ✅ Tag editing works
 - ✅ No regressions
 
+### Phase 0.5
+- ✅ Theme foundation established
+- ✅ Templates moved to themes directory
+- ✅ Component system created
+- ✅ Theme loader functional
+
 ### Phase 1
 - ✅ Media library functional
 - ✅ Draft/publish workflow
@@ -1837,7 +1964,7 @@ These can be implemented as needed:
 - ✅ Article revisions working
 
 ### Phase 3
-- ✅ Theme system active
+- ✅ Full theme system active
 - ✅ Menus customizable
 - ✅ Widgets functional
 
@@ -1879,7 +2006,11 @@ These can be implemented as needed:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2025-10-21 | Initial project plan created |
+| 1.1.0 | 2025-10-21 | Added Phase 0.5: Theme Foundation (based on user feedback that theming should come first) |
 
 ---
 
-**Next Action:** Implement tag editing feature as outlined in `TAG_EDITING_PLAN.md`
+**Next Actions:**
+1. Implement tag editing feature as outlined in `TAG_EDITING_PLAN.md` (2 hours)
+2. Implement theme foundation as outlined in Phase 0.5 (1-2 weeks)
+3. Begin Phase 1 features with theme-agnostic approach
