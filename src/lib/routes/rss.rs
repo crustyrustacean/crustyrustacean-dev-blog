@@ -79,17 +79,17 @@ pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, App
             r#"
         <item>
             <title>{}</title>
-            <link>https://crustyrustacean.com/articles/{}</link>
+            <link>https://crusty-rustacean.com/articles/{}</link>
             <description>{}</description>
             <author>{}</author>
-            <guid isPermaLink="true">https://crustyrustacean.com/articles/{}</guid>
+            <guid isPermaLink="true">https://crusty-rustacean.com/articles/{}</guid>
             <pubDate>{}</pubDate>
         </item>"#,
             title_escaped,
             slug,
             description_escaped,
             author_email
-                .unwrap_or_else(|| format!("noreply@crustyrustacean.com ({})", username_escaped)),
+                .unwrap_or_else(|| format!("crusty.rustacean@gmail.com ({})", username_escaped)),
             slug,
             pub_date
         );
@@ -106,11 +106,11 @@ pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, App
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title>CrustyRustacean Dev Blog</title>
-        <link>https://crustyrustacean.com</link>
+        <link>https://crusty-rustacean.com</link>
         <description>A developer's journey through Rust, systems programming, and modern web development</description>
         <language>en-us</language>
         <lastBuildDate>{}</lastBuildDate>
-        <atom:link href="https://crustyrustacean.com/rss" rel="self" type="application/rss+xml" />
+        <atom:link href="https://crusty-rustacean.com/rss" rel="self" type="application/rss+xml" />
         {}
     </channel>
 </rss>"#,

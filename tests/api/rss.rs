@@ -106,7 +106,7 @@ async fn rss_feed_includes_articles() {
     assert!(body.contains("<title>Test Article for RSS</title>"));
     assert!(body.contains("<description>This should appear in the RSS feed</description>"));
     assert!(
-        body.contains("<link>https://crustyrustacean.com/articles/test-article-for-rss</link>")
+        body.contains("<link>https://crusty-rustacean.com/articles/test-article-for-rss</link>")
     );
     assert!(body.contains("<pubDate>"));
     assert!(body.contains("</item>"));

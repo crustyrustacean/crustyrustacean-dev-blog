@@ -57,19 +57,19 @@ async fn sitemap_includes_static_pages() {
 
     // Verify static pages are included
     assert!(
-        body.contains("<loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/</loc>"),
+        body.contains("<loc>https://crusty-rustacean.com/</loc>"),
         "Should include homepage"
     );
     assert!(
-        body.contains("<loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/articles</loc>"),
+        body.contains("<loc>https://crusty-rustacean.com/articles</loc>"),
         "Should include articles page"
     );
     assert!(
-        body.contains("<loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/about</loc>"),
+        body.contains("<loc>https://crusty-rustacean.com/about</loc>"),
         "Should include about page"
     );
     assert!(
-        body.contains("<loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/rss</loc>"),
+        body.contains("<loc>https://crusty-rustacean.com/rss</loc>"),
         "Should include RSS feed"
     );
 
@@ -143,7 +143,7 @@ async fn sitemap_includes_articles() {
     // Verify the article appears in the sitemap
     assert!(body.contains("<url>"), "Should contain url tags");
     assert!(
-        body.contains("<loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/articles/sitemap-test-article</loc>"),
+        body.contains("<loc>https://crusty-rustacean.com/articles/sitemap-test-article</loc>"),
         "Should include the article URL"
     );
     assert!(
@@ -249,7 +249,7 @@ async fn sitemap_returns_valid_xml_when_no_articles() {
     assert!(body.contains("<urlset"));
     assert!(body.contains("</urlset>"));
     assert!(
-        body.contains("<loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/</loc>"),
+        body.contains("<loc>https://crusty-rustacean.com/</loc>"),
         "Should contain at least the homepage"
     );
 }

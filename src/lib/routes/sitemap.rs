@@ -44,7 +44,7 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, AppE
             format!(
                 r#"
     <url>
-        <loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/</loc>
+        <loc>https://crusty-rustacean.com/</loc>
         <changefreq>{}</changefreq>
         <priority>{}</priority>
     </url>"#,
@@ -54,7 +54,7 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, AppE
             format!(
                 r#"
     <url>
-        <loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/{}</loc>
+        <loc>https://crusty-rustacean.com/{}</loc>
         <changefreq>{}</changefreq>
         <priority>{}</priority>
     </url>"#,
@@ -91,7 +91,7 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, AppE
         let url = format!(
             r#"
     <url>
-        <loc>https://crustyrustacean-dev-blog-5d59.shuttle.app/articles/{}</loc>
+        <loc>https://crusty-rustacean.com/articles/{}</loc>
         <lastmod>{}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>

@@ -14,7 +14,7 @@ Allow: /articles
 Allow: /rss
 
 # Sitemap and feeds
-Sitemap: https://crustyrustacean-dev-blog-5d59.shuttle.app/sitemap.xml
+Sitemap: https://crusty-rustacean.com/sitemap.xml
 
 # Crawl delay (optional, polite to set for smaller sites)
 Crawl-delay: 1
