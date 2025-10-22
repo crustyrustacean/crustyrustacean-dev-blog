@@ -1,128 +1,203 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Crusty Rustacean{% endblock %}</title>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-QCWV95QMKD"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{% block title %}Crusty Rustacean{% endblock %}</title>
+        <!-- Google tag (gtag.js) -->
+        <script
+            async
+            src="https://www.googletagmanager.com/gtag/js?id=G-QCWV95QMKD"
+        ></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+                dataLayer.push(arguments);
+            }
+            gtag("js", new Date());
 
-  gtag('config', 'G-QCWV95QMKD');
-</script>
-    <link rel="stylesheet" href="{{ theme_stylesheet(which='external') }}">
-    <link rel="icon" href="/static/favicon.png">
-    <link rel="stylesheet" href="{{ theme_stylesheet(which='external') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body class="d-flex flex-column min-vh-100">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-laptop-code me-2"></i>
-                CrustyRustacean
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/articles">Articles</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/about">About</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="https://query.rs" target="_blank" rel="noopener noreferrer">query.rs</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav">
-                    {% if user %}
+            gtag("config", "G-QCWV95QMKD");
+        </script>
+        <link
+            rel="stylesheet"
+            href="{{ theme_stylesheet(which='external') }}"
+        />
+        <link rel="icon" href="/static/favicon.png" />
+        <link
+            rel="stylesheet"
+            href="{{ theme_stylesheet(which='override') }}"
+        />
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+            rel="stylesheet"
+        />
+    </head>
+    <body class="d-flex flex-column min-vh-100">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-laptop-code me-2"></i>
+                    CrustyRustacean
+                </a>
+                <button
+                    class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#navbarNav"
+                >
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/articles">Articles</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/about">About</a>
+                        </li>
+                        <li class="nav-item">
+                            <a
+                                class="nav-link"
+                                href="https://query.rs"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                >query.rs</a
+                            >
+                        </li>
+                    </ul>
+                    <ul class="navbar-nav">
+                        {% if user %}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <a
+                                class="nav-link dropdown-toggle"
+                                href="#"
+                                id="navbarDropdown"
+                                role="button"
+                                data-bs-toggle="dropdown"
+                            >
                                 <i class="fas fa-user me-1"></i>
                                 {{ user.username }}
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="/profile">Profile</a></li>
-                                <li><a class="dropdown-item" href="/feed">
-                                    <i class="fas fa-rss me-2 text-warning"></i>
-                                    My Feed
-                                </a></li>
-                                <li><a class="dropdown-item" href="/favorites">
-                                    <i class="fas fa-heart me-2 text-danger"></i>
-                                    My Favorites
-                                </a></li>
-                                <li><a class="dropdown-item" href="/settings">Settings</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/editor">
-                                    <i class="fas fa-pen-fancy me-2"></i>
-                                    Write Article
-                                </a></li>
-                                <li><a class="dropdown-item" href="/admin">
-                                    <i class="fas fa-tachometer-alt me-2"></i>
-                                    Admin Dashboard
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="#" id="logoutLink">
-                                    <i class="fas fa-sign-out-alt me-2"></i>
-                                    Logout
-                                </a></li>
+                                <li>
+                                    <a class="dropdown-item" href="/profile"
+                                        >Profile</a
+                                    >
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/feed">
+                                        <i
+                                            class="fas fa-rss me-2 text-warning"
+                                        ></i>
+                                        My Feed
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/favorites">
+                                        <i
+                                            class="fas fa-heart me-2 text-danger"
+                                        ></i>
+                                        My Favorites
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/settings"
+                                        >Settings</a
+                                    >
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <a class="dropdown-item" href="/editor">
+                                        <i class="fas fa-pen-fancy me-2"></i>
+                                        Write Article
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/admin">
+                                        <i
+                                            class="fas fa-tachometer-alt me-2"
+                                        ></i>
+                                        Admin Dashboard
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <a
+                                        class="dropdown-item"
+                                        href="#"
+                                        id="logoutLink"
+                                    >
+                                        <i class="fas fa-sign-out-alt me-2"></i>
+                                        Logout
+                                    </a>
+                                </li>
                             </ul>
                         </li>
-                    {% else %}
+                        {% else %}
                         <li class="nav-item">
                             <a class="nav-link" href="/login">Login</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/register">Register</a>
                         </li>
-                    {% endif %}
-                </ul>
+                        {% endif %}
+                    </ul>
+                </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <main class="container mt-4 flex-grow-1">
-        {% if flash_message %}
-            <div class="alert alert-{{ flash_type | default(value='info') }} alert-dismissible fade show" role="alert">
+        <main class="container mt-4 flex-grow-1">
+            {% if flash_message %}
+            <div
+                class="alert alert-{{ flash_type | default(value='info') }} alert-dismissible fade show"
+                role="alert"
+            >
                 {{ flash_message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                ></button>
             </div>
-        {% endif %}
+            {% endif %} {% block content %} {% endblock %}
+        </main>
 
-        {% block content %}
-        {% endblock %}
-    </main>
-
-    <footer class="bg-dark text-light mt-auto py-4">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5>Crusty Rustacean</h5>
-                    <p class="mb-0">Learning about solving the things, mostly in Rust...mostly.</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <div class="social-links">
-                        <a href="#" class="text-light me-3"><i class="fab fa-github"></i></a>
-                        <a href="#" class="text-light me-3"><i class="fab fa-twitter"></i></a>
-                        <a href="#" class="text-light"><i class="fas fa-rss"></i></a>
+        <footer class="bg-dark text-light mt-auto py-4">
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Crusty Rustacean</h5>
+                        <p class="mb-0">
+                            Learning about solving the things, mostly in
+                            Rust...mostly.
+                        </p>
                     </div>
-                    <small class="mt-2 d-block">&copy; {{ current_year | default(value="2025") }} CrustyRustacean. All rights reserved.</small>
+                    <div class="col-md-6 text-md-end">
+                        <div class="social-links">
+                            <a href="#" class="text-light me-3"
+                                ><i class="fab fa-github"></i
+                            ></a>
+                            <a href="#" class="text-light me-3"
+                                ><i class="fab fa-twitter"></i
+                            ></a>
+                            <a href="#" class="text-light"
+                                ><i class="fas fa-rss"></i
+                            ></a>
+                        </div>
+                        <small class="mt-2 d-block"
+                            >&copy; {{ current_year | default(value="2025") }}
+                            CrustyRustacean. All rights reserved.</small
+                        >
+                    </div>
                 </div>
             </div>
-        </div>
-    </footer>
+        </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/base.js"></script>
-    {% block scripts %}{% endblock %}
-</body>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="/static/js/base.js"></script>
+        {% block scripts %}{% endblock %}
+    </body>
 </html>

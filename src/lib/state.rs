@@ -19,8 +19,8 @@ pub struct AppState {
 }
 
 // function to setup the Tera templates
-fn setup_templates(config: &AppConfig) -> Engine<Tera> {
-    let mut tera = Tera::new("templates/**/*").unwrap();
+fn setup_templates(config: &AppConfig) -> Result<Engine<Tera>, tera::Error> {
+    let mut tera = Tera::new("templates/**/*")?;
 
     let external = config.external_stylesheet.clone();
     let override_css = config.override_stylesheet.clone();
@@ -45,14 +45,14 @@ fn setup_templates(config: &AppConfig) -> Engine<Tera> {
         },
     );
 
-    Engine::from(tera)
+    Ok(Engine::from(tera))
 }
 
 // methods to build the configuration
 impl AppState {
     // Create a new application state instance
     pub fn new(db: DatabaseConnection, config: &AppConfig) -> Result<Self, AppError> {
-        let engine = setup_templates(config);
+        let engine = setup_templates(config)?;
         let jwt_keys = Keys::from_config(config);
 
         Ok(Self {
