@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}API Keys - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <!-- Header -->
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="card-title mb-0">
+                            <i class="fas fa-key me-2"></i>
+                            API Keys
+                        </h2>
+                        <div>
+                            <a href="/admin" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Back to Admin
+                            </a>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createKeyModal">
+                                <i class="fas fa-plus me-2"></i>
+                                Generate New Key
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Mobile Workflow:</strong> Use API keys to post articles from your phone using iOS Shortcuts or other mobile apps.
+                        Keys never expire unless you delete them.
+                    </div>
+
+                    <div id="apiKeysList">
+                        <!-- API keys will be loaded here -->
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Setup Instructions Card -->
+            <div class="card shadow">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-mobile-alt me-2"></i>
+                        iOS Shortcuts Setup
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <h5>How to post from your iPhone:</h5>
+                    <ol class="mb-4">
+                        <li class="mb-2">Generate an API key above</li>
+                        <li class="mb-2">Open the Shortcuts app on your iPhone</li>
+                        <li class="mb-2">Create a new shortcut with these steps:
+                            <ul class="mt-2">
+                                <li>Get text from Shortcut Input (or Craft app)</li>
+                                <li>Set Variable "Body" to the text</li>
+                                <li>Ask for input (title of the post)</li>
+                                <li>Set Variable "Title" to the input</li>
+                                <li>Get Contents of URL with these settings:
+                                    <ul class="mt-1">
+                                        <li><strong>URL:</strong> <code id="uploadUrl"></code></li>
+                                        <li><strong>Method:</strong> POST</li>
+                                        <li><strong>Headers:</strong>
+                                            <ul>
+                                                <li><code>X-API-Key: [Your API Key]</code></li>
+                                                <li><code>Content-Type: application/json</code></li>
+                                            </ul>
+                                        </li>
+                                        <li><strong>Request Body:</strong> JSON
+                                            <pre class="mt-2"><code>{
+  "title": "[Title variable]",
+  "body": "[Body variable]"
+}</code></pre>
+                                        </li>
+                                    </ul>
+                                </li>
+                                <li>Show Result (to see the response)</li>
+                            </ul>
+                        </li>
+                        <li class="mb-2">Save the shortcut and test it!</li>
+                    </ol>
+
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fas fa-lock me-2"></i>
+                        <strong>Security:</strong> Keep your API keys private! Anyone with your API key can post to your blog.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create API Key Modal -->
+<div class="modal fade" id="createKeyModal" tabindex="-1" aria-labelledby="createKeyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createKeyModalLabel">Generate New API Key</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createKeyForm">
+                    <div class="mb-3">
+                        <label for="keyName" class="form-label">Key Name</label>
+                        <input type="text" class="form-control" id="keyName" placeholder="e.g., iPhone Shortcut" required>
+                        <div class="form-text">Give your API key a descriptive name to remember where it's used.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createKeyBtn">
+                    <i class="fas fa-key me-2"></i>
+                    Generate Key
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Show New API Key Modal -->
+<div class="modal fade" id="showKeyModal" tabindex="-1" aria-labelledby="showKeyModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="showKeyModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>
+                    API Key Generated
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Important:</strong> Copy this key now! You won't be able to see it again.
+                </div>
+                <div class="mb-3">
+                    <label for="newApiKey" class="form-label"><strong>Your API Key:</strong></label>
+                    <div class="input-group">
+                        <input type="text" class="form-control font-monospace" id="newApiKey" readonly>
+                        <button class="btn btn-outline-secondary" type="button" id="copyKeyBtn">
+                            <i class="fas fa-copy me-1"></i>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Use this key in your iOS Shortcut's <code>X-API-Key</code> header.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                    <i class="fas fa-check me-2"></i>
+                    I've Saved My Key
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteKeyModal" tabindex="-1" aria-labelledby="deleteKeyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteKeyModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning!</strong> This action cannot be undone.
+                </div>
+                <p>Are you sure you want to delete the API key <strong id="keyName"></strong>?</p>
+                <p class="text-muted">Any shortcuts or apps using this key will stop working.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteKeyBtn">
+                    <i class="fas fa-trash me-2"></i>
+                    Delete Key
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/api-keys.js"></script>
+{% endblock %}

@@ -2,7 +2,7 @@
 
 use crate::{
     AppError, AppState,
-    auth::{AuthenticatedUser, OptionalUser},
+    auth::{ApiKeyUser, AuthenticatedUser, OptionalUser},
     markdown::markdown_to_html,
     models::{
         ArticleQuery, ArticleResponse, CreateArticle, FeedQuery, MultipleArticlesResponse,
@@ -1575,4 +1575,206 @@ pub async fn get_articles_feed_page(
     });
 
     Ok(RenderHtml("articles/feed.html", state.engine, context))
+}
+
+// Mobile upload endpoint - simplified API for iOS Shortcuts
+// Accepts API key authentication via X-API-Key header
+pub async fn mobile_upload_article(
+    State(state): State<AppState>,
+    api_user: ApiKeyUser,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Extract article data from payload
+    let title: String = payload
+        .get("title")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::BadRequest("Missing title field".to_string()))?
+        .to_string();
+
+    let body: String = payload
+        .get("body")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::BadRequest("Missing body field".to_string()))?
+        .to_string();
+
+    // Description is optional, use first 200 chars of body if not provided
+    let description: String = payload
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            let clean_body = body.chars().take(200).collect::<String>();
+            clean_body.trim().to_string()
+        });
+
+    // Tags are optional
+    let tags: Vec<String> = payload
+        .get("tags")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Create the article using the same logic as create_article
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Generate base slug from title
+    let base_slug = slugify(&title);
+
+    // Check if slug already exists and generate unique one if needed
+    let mut slug = base_slug.clone();
+    let mut counter = 1;
+
+    loop {
+        let mut slug_check = conn
+            .query(
+                "SELECT id FROM articles WHERE slug = ?",
+                libsql::params![slug.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if slug_check
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .is_none()
+        {
+            break; // Slug is unique
+        }
+
+        // Generate a new slug with counter
+        slug = format!("{}-{}", base_slug, counter);
+        counter += 1;
+    }
+
+    let article_id = Uuid::new_v4();
+    let now = Utc::now();
+
+    // Insert the article
+    conn.execute(
+        "INSERT INTO articles (id, slug, title, description, body, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        libsql::params![
+            article_id.to_string(),
+            slug.clone(),
+            title.clone(),
+            description.clone(),
+            body.clone(),
+            api_user.user_id.to_string(),
+            now.to_rfc3339(),
+            now.to_rfc3339(),
+        ],
+    )
+    .await
+    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Handle tags if provided
+    if !tags.is_empty() {
+        for tag_name in &tags {
+            // Insert tag if it doesn't exist
+            let tag_id = Uuid::new_v4();
+            conn.execute(
+                "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
+                libsql::params![tag_id.to_string(), tag_name.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+            // Get the tag ID (either the one we just created or the existing one)
+            let mut tag_rows = conn
+                .query(
+                    "SELECT id FROM tags WHERE name = ?",
+                    libsql::params![tag_name.clone()],
+                )
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+            if let Some(tag_row) = tag_rows
+                .next()
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            {
+                let tag_id_str: String = tag_row
+                    .get(0)
+                    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+                // Associate tag with article
+                conn.execute(
+                    "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
+                    libsql::params![article_id.to_string(), tag_id_str],
+                )
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            }
+        }
+    }
+
+    // Return success response with article URL
+    let article_url = format!("/articles/{}", slug);
+    Ok(Json(json!({
+        "success": true,
+        "message": "Article created successfully",
+        "slug": slug,
+        "url": article_url,
+        "id": article_id.to_string(),
+    })))
+}
+
+// API Keys admin page
+pub async fn get_api_keys_admin_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    let context: Value = json!({
+        "title": "API Keys - CrustyRustacean Dev Blog",
+        "page": "API Keys",
+        "current_year": Utc::now().year(),
+        "user": user_info,
+    });
+
+    Ok(RenderHtml("admin/api-keys.html", state.engine, context))
 }

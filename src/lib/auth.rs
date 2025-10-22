@@ -164,3 +164,111 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, AuthError> {
         .verify_password(password.as_bytes(), &parsed_hash)
         .is_ok())
 }
+
+// API Key authentication
+pub fn generate_api_key() -> String {
+    use rand::Rng;
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const KEY_LEN: usize = 32;
+    let mut rng = rand::thread_rng();
+
+    let key: String = (0..KEY_LEN)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect();
+
+    format!("crdev_{}", key)
+}
+
+pub fn hash_api_key(key: &str) -> Result<String, AuthError> {
+    hash_password(key)
+}
+
+pub fn verify_api_key(key: &str, hash: &str) -> Result<bool, AuthError> {
+    verify_password(key, hash)
+}
+
+// Extractor for API key authentication
+pub struct ApiKeyUser {
+    pub user_id: Uuid,
+}
+
+impl FromRequestParts<crate::AppState> for ApiKeyUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        // Try to get API key from X-API-Key header
+        let api_key = parts
+            .headers
+            .get("X-API-Key")
+            .and_then(|h| h.to_str().ok())
+            .ok_or(AuthError::MissingToken)?;
+
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        // Find all API keys and check each one
+        let mut rows = conn
+            .query("SELECT id, user_id, key_hash, expires_at FROM api_keys", ())
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut found_user_id: Option<(Uuid, Uuid)> = None;
+
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let key_id: String = row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let user_id: String = row
+                .get(1)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let key_hash: String = row
+                .get(2)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            let expires_at: Option<String> = row.get(3).ok();
+
+            // Check if key is expired
+            if let Some(exp) = expires_at {
+                if let Ok(exp_date) = chrono::DateTime::parse_from_rfc3339(&exp) {
+                    if exp_date.with_timezone(&Utc) < Utc::now() {
+                        continue;
+                    }
+                }
+            }
+
+            // Verify the API key
+            if verify_api_key(api_key, &key_hash)? {
+                let key_uuid = Uuid::parse_str(&key_id)
+                    .map_err(|_| AppError::InternalServerError("Invalid key ID".to_string()))?;
+                let user_uuid = Uuid::parse_str(&user_id)
+                    .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
+                found_user_id = Some((key_uuid, user_uuid));
+                break;
+            }
+        }
+
+        let (key_id, user_id) = found_user_id.ok_or(AuthError::InvalidToken)?;
+
+        // Update last_used_at
+        let now = Utc::now();
+        conn.execute(
+            "UPDATE api_keys SET last_used_at = ? WHERE id = ?",
+            libsql::params![now.to_rfc3339(), key_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        Ok(ApiKeyUser { user_id })
+    }
+}
