@@ -170,11 +170,11 @@ pub fn generate_api_key() -> String {
     use rand::Rng;
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     const KEY_LEN: usize = 32;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let key: String = (0..KEY_LEN)
         .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
+            let idx = rng.random_range(0..CHARSET.len());
             CHARSET[idx] as char
         })
         .collect();
@@ -239,12 +239,11 @@ impl FromRequestParts<crate::AppState> for ApiKeyUser {
             let expires_at: Option<String> = row.get(3).ok();
 
             // Check if key is expired
-            if let Some(exp) = expires_at {
-                if let Ok(exp_date) = chrono::DateTime::parse_from_rfc3339(&exp) {
-                    if exp_date.with_timezone(&Utc) < Utc::now() {
-                        continue;
-                    }
-                }
+            if let Some(exp) = expires_at
+                && let Ok(exp_date) = chrono::DateTime::parse_from_rfc3339(&exp)
+                && exp_date.with_timezone(&Utc) < Utc::now()
+            {
+                continue;
             }
 
             // Verify the API key

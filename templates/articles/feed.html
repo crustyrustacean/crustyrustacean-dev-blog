@@ -182,32 +182,4 @@
 {% block scripts %}
 <script src="/static/js/feed.js"></script>
                 
-                // Update favorites count
-                const countSpan = btn.closest('.d-flex').querySelector('.text-muted');
-                countSpan.innerHTML = `<i class="fas fa-heart text-danger me-1"></i>${article.favoritesCount} favorites`;
-            }
-        } catch (error) {
-            console.error('Error toggling favorite:', error);
-        }
-    }
-
-    async function loadMore() {
-        try {
-            const response = await fetch(`/api/articles/feed?offset=${currentOffset}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                // TODO: Implement append new articles to the page
-                console.log('More articles:', data.articles);
-                currentOffset += data.articles.length;
-            }
-        } catch (error) {
-            console.error('Error loading more articles:', error);
-        }
-    }
-</script>
 {% endblock %}
