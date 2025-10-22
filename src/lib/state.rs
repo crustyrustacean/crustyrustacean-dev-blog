@@ -62,3 +62,80 @@ impl AppState {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn test_config() -> AppConfig {
+        AppConfig {
+            jwt_secret: "test-secret-key".to_string(),
+            external_stylesheet: "https://cdn.example.com/bootstrap.css".to_string(),
+            override_stylesheet: "/static/overrides.css".to_string(),
+        }
+    }
+
+    fn setup_test_templates_dir() -> TempDir {
+        let temp_dir = TempDir::new().unwrap();
+        let templates_path = temp_dir.path().join("templates");
+        fs::create_dir(&templates_path).unwrap();
+
+        // Create a minimal valid template
+        fs::write(
+            templates_path.join("test.html"),
+            "<html><body>{{ content }}</body></html>",
+        )
+        .unwrap();
+
+        temp_dir
+    }
+
+    #[test]
+    fn test_setup_templates_succeeds_with_valid_config() {
+        let config = test_config();
+        let _temp_dir = setup_test_templates_dir();
+
+        let result = setup_templates(&config);
+
+        assert!(
+            result.is_ok(),
+            "setup_templates should succeed with valid config"
+        );
+    }
+
+    #[test]
+    fn test_setup_templates_with_empty_stylesheets() {
+        let config = AppConfig {
+            jwt_secret: "test-secret".to_string(),
+            external_stylesheet: "".to_string(),
+            override_stylesheet: "".to_string(),
+        };
+        let _temp_dir = setup_test_templates_dir();
+
+        let result = setup_templates(&config);
+
+        assert!(
+            result.is_ok(),
+            "setup_templates should handle empty stylesheets"
+        );
+    }
+
+    #[test]
+    fn test_setup_templates_with_special_characters() {
+        let config = AppConfig {
+            jwt_secret: "test-secret".to_string(),
+            external_stylesheet: "https://example.com/style.css?v=1.0&theme=dark".to_string(),
+            override_stylesheet: "/static/override-theme.css".to_string(),
+        };
+        let _temp_dir = setup_test_templates_dir();
+
+        let result = setup_templates(&config);
+
+        assert!(
+            result.is_ok(),
+            "setup_templates should handle URLs with special characters"
+        );
+    }
+}

@@ -555,7 +555,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crustyrustacean-dev-blog"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "anyhow",
  "argon2",
@@ -577,6 +577,7 @@ dependencies = [
  "shuttle-runtime",
  "shuttle-turso",
  "slug",
+ "tempfile",
  "tera",
  "thiserror 2.0.17",
  "tokio",
