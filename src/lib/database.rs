@@ -128,6 +128,24 @@ impl DatabaseConnection {
         )
         .await?;
 
+        // Create api_keys table
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                key_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                last_used_at TEXT,
+                expires_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+            "#,
+            (),
+        )
+        .await?;
+
         // Create indexes for better performance
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_articles_author_id ON articles (author_id)",
@@ -167,6 +185,12 @@ impl DatabaseConnection {
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_user_follows_follower_id ON user_follows (follower_id)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys (user_id)",
             (),
         )
         .await?;
