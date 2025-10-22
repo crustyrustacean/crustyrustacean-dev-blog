@@ -27,14 +27,19 @@ The mobile workflow allows you to:
 
 1. Open the **Shortcuts** app on your iPhone
 2. Tap **+** to create a new shortcut
-3. Add the following actions:
+3. **Important:** Tap the settings icon (ⓘ) at the bottom and configure:
+   - Toggle ON "Show in Share Sheet"
+   - Under "Share Sheet Types" select "Text"
+   - This allows the shortcut to receive text from Craft
+4. Add the following actions:
 
-   **Action 1: Get text from Shortcut Input**
-   - This will receive the text from Craft or Share Sheet
+   **Action 1: Receive "Shortcut Input" from Share Sheet**
+   - Search for "Shortcut Input" action
+   - This receives the text from Craft when you share
 
    **Action 2: Set Variable**
    - Name: `Body`
-   - Value: (Output from previous action)
+   - Value: Shortcut Input (from previous action)
 
    **Action 3: Ask for Input**
    - Prompt: "What's the title of your post?"
