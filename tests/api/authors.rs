@@ -1,6 +1,6 @@
 // tests/api/authors.rs
 
-use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::helpers::{TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
 use serde_json::Value;
@@ -33,7 +33,8 @@ async fn test_get_authors_happy_path() {
     app.register_user_default("author2").await;
 
     // Act - Get list of authors
-    let response = bearer_request!(get &app,
+    let response = bearer_request!(
+        get & app,
         format!("{}/api/profiles", &app.address),
         &current_user_token
     )
@@ -70,7 +71,8 @@ async fn test_get_authors_with_search() {
     app.register_user_default("pythonista").await;
 
     // Act - Search for authors with "rust" in username
-    let response = bearer_request!(get &app,
+    let response = bearer_request!(
+        get & app,
         format!("{}/api/profiles?search=rust", &app.address),
         &token
     )
@@ -108,7 +110,8 @@ async fn test_get_authors_with_pagination() {
     }
 
     // Act - Get first 3 authors
-    let response = bearer_request!(get &app,
+    let response = bearer_request!(
+        get & app,
         format!("{}/api/profiles?limit=3", &app.address),
         &token
     )
@@ -142,7 +145,8 @@ async fn test_get_authors_shows_follow_status() {
         .expect("Failed to follow author");
 
     // Act - Get authors list
-    let response = bearer_request!(get &app,
+    let response = bearer_request!(
+        get & app,
         format!("{}/api/profiles", &app.address),
         &current_user_token
     )

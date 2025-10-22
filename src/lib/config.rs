@@ -1,28 +1,38 @@
 // src/lib/config.rs
 
+// dependencies
+use anyhow::{Result, anyhow};
+use shuttle_runtime::{CustomError, SecretStore};
+
 // struct type to represent the application configuration
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct AppConfig {
     pub jwt_secret: String,
+    pub external_stylesheet: String,
+    pub override_stylesheet: String,
 }
 
-// methods to build the configuration
-impl AppConfig {
-    // constructor for AppConfig with JWT secret
-    pub fn new(jwt_secret: String) -> Self {
-        Self { jwt_secret }
-    }
+// implement the TryFrom trait for the AppConfig type
+impl TryFrom<&SecretStore> for AppConfig {
+    type Error = CustomError;
 
-    // Get JWT secret as bytes for key generation
-    pub fn jwt_secret_bytes(&self) -> &[u8] {
-        self.jwt_secret.as_bytes()
-    }
-}
+    fn try_from(secrets: &SecretStore) -> Result<Self> {
+        let jwt_secret = secrets
+            .get("JWT_SECRET")
+            .ok_or_else(|| anyhow!("Missing required configuration secret: JWT_SECRET"))?;
 
-// implement the default trait for AppConfig (for testing)
-impl Default for AppConfig {
-    // provide a default implementation for testing
-    fn default() -> Self {
-        Self::new("test-secret-key-for-development".to_string())
+        let external_stylesheet = secrets
+            .get("EXTERNAL_STYLESHEET")
+            .ok_or_else(|| anyhow!("Missing required configuration secret: EXTERNAL_STYLESHEET"))?;
+
+        let override_stylesheet = secrets
+            .get("OVERRIDE_STYLESHEET")
+            .ok_or_else(|| anyhow!("Missing required configuration secret: OVERRIDE_STYLESHEET"))?;
+
+        Ok(Self {
+            jwt_secret,
+            external_stylesheet,
+            override_stylesheet,
+        })
     }
 }

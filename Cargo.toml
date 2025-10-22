@@ -1,6 +1,6 @@
 [package]
 name = "crustyrustacean-dev-blog"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2024"
 authors = ["Jeffery D. Mitchell", "<crusty.rustacean@gmail.com>"]
 description = "A developer blog application built with Axum, Tera, and Turso database, hosted on Shuttle."
@@ -51,3 +51,5 @@ validator = { version = "0.20.0", features = ["derive"] }
 [dev-dependencies]
 reqwest = { version = "0.12.12", features = [ "json" ] }
 serde_json = "1.0.145"
+shuttle-common = "0.57.0"
+toml = "0.9.5"

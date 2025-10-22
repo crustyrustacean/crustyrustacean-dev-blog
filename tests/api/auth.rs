@@ -1,9 +1,9 @@
 // tests/api/auth.rs
 
-use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::helpers::{TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_user_registration_happy_path() {
@@ -88,15 +88,16 @@ async fn test_protected_endpoint_with_valid_token() {
     // Arrange
     let app = spawn_app().await;
     let token = app
-        .register_user("protecteduser", "protected@example.com", "securepassword123")
+        .register_user(
+            "protecteduser",
+            "protected@example.com",
+            "securepassword123",
+        )
         .await;
 
     // Act - Access protected endpoint with valid token
-    let response = bearer_request!(get &app,
-        format!("{}/api/user", &app.address),
-        &token
-    )
-    .expect("Failed to execute request");
+    let response = bearer_request!(get & app, format!("{}/api/user", &app.address), &token)
+        .expect("Failed to execute request");
 
     // Assert
     assert_status!(response, StatusCode::OK);

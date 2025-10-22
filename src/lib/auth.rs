@@ -30,7 +30,7 @@ impl Keys {
     }
 
     pub fn from_config(config: &AppConfig) -> Self {
-        Self::new(config.jwt_secret_bytes())
+        Self::new(config.jwt_secret.as_bytes())
     }
 }
 

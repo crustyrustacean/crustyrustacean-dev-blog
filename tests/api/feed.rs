@@ -1,6 +1,6 @@
 // tests/api/feed.rs
 
-use crate::helpers::{spawn_app, TestArticleBuilder, TestFixture, TestUserBuilder};
+use crate::helpers::{TestArticleBuilder, TestFixture, TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
 use serde_json::Value;
@@ -22,7 +22,10 @@ async fn test_get_feed_happy_path() {
     fixture
         .app
         .client
-        .post(format!("{}/api/profiles/author/follow", &fixture.app.address))
+        .post(format!(
+            "{}/api/profiles/author/follow",
+            &fixture.app.address
+        ))
         .header("Authorization", format!("Bearer {}", follower_token))
         .send()
         .await
@@ -41,7 +44,8 @@ async fn test_get_feed_happy_path() {
         .await;
 
     // Act - Follower gets feed
-    let response = bearer_request!(get &fixture.app,
+    let response = bearer_request!(
+        get & fixture.app,
         format!("{}/api/articles/feed", &fixture.app.address),
         &follower_token
     )
@@ -83,7 +87,8 @@ async fn test_get_feed_empty_when_not_following_anyone() {
     let token = app.register_user_default("loner").await;
 
     // Act - Get feed when not following anyone
-    let response = bearer_request!(get &app,
+    let response = bearer_request!(
+        get & app,
         format!("{}/api/articles/feed", &app.address),
         &token
     )
@@ -139,7 +144,8 @@ async fn test_get_feed_with_pagination() {
     }
 
     // Act - Get feed with limit
-    let response = bearer_request!(get &fixture.app,
+    let response = bearer_request!(
+        get & fixture.app,
         format!("{}/api/articles/feed?limit=2", &fixture.app.address),
         &follower_token
     )
@@ -213,7 +219,8 @@ async fn test_get_feed_excludes_unfollowed_authors() {
         .await;
 
     // Act - Get feed
-    let response = bearer_request!(get &fixture.app,
+    let response = bearer_request!(
+        get & fixture.app,
         format!("{}/api/articles/feed", &fixture.app.address),
         &follower_token
     )

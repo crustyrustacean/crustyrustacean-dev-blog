@@ -3,16 +3,22 @@
 // types and functions used across all integration tests
 
 // dependencies
+use anyhow::{Context, Result, anyhow};
 use crustyrustacean_dev_blog_lib::config::AppConfig;
 use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
 use crustyrustacean_dev_blog_lib::startup::App;
 use crustyrustacean_dev_blog_lib::state::AppState;
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
 use reqwest::Client;
+use shuttle_common::secrets::Secret;
+use shuttle_runtime::SecretStore;
+use std::collections::BTreeMap;
 use std::env::var;
+use std::fs;
 use std::io::{sink, stdout};
 use std::sync::LazyLock;
 use tokio::net::TcpListener;
+use toml::Value;
 
 // static constant which creates one instance of tracing
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -26,6 +32,35 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
         init_subscriber(subscriber);
     }
 });
+
+// Load Shuttle secrets for tests from Secrets.dev.toml (preferred) or Secrets.toml.
+fn load_test_secret_store() -> Result<SecretStore> {
+    let path = if fs::metadata("Secrets.dev.toml").is_ok() {
+        "Secrets.dev.toml"
+    } else if fs::metadata("Secrets.toml").is_ok() {
+        "Secrets.toml"
+    } else {
+        return Err(anyhow!(
+            "Neither Secrets.dev.toml nor Secrets.toml found in project root"
+        ));
+    };
+
+    let txt = fs::read_to_string(path).with_context(|| format!("Reading {}", path))?;
+    let val: Value = toml::from_str(&txt).with_context(|| format!("Parsing {}", path))?;
+    let table = val
+        .as_table()
+        .ok_or_else(|| anyhow!("Root of {} must be a TOML table", path))?;
+
+    let mut map: BTreeMap<String, Secret<String>> = BTreeMap::new();
+    for (k, v) in table {
+        let s = v
+            .as_str()
+            .ok_or_else(|| anyhow!("Secret {k} must be a string in {}", path))?;
+        map.insert(k.clone(), Secret::new(s.to_owned()));
+    }
+
+    Ok(SecretStore::new(map))
+}
 
 // struct type which models a test application
 #[allow(dead_code)]
@@ -41,7 +76,9 @@ pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
 
     // set up the configuration with test JWT secret
-    let app_config = AppConfig::new("test-secret-key-for-integration-tests".to_string());
+    let secrets = load_test_secret_store().expect("Failed to load Shuttle secrets for tests.");
+    let app_config =
+        AppConfig::try_from(&secrets).expect("Failed to build AppConfig from Shuttle secrets.");
 
     // create a test database connection (local SQLite for testing)
     use std::env::temp_dir;

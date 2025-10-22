@@ -19,6 +19,7 @@ async fn main(
     #[Secrets] secrets: SecretStore,
 ) -> shuttle_axum::ShuttleAxum {
     // initialize tracing
+    tracing::info!("Starting tracing...");
     let subscriber = get_subscriber(
         "crustyrustacean-dev-blog".into(),
         "info".into(),
@@ -26,26 +27,26 @@ async fn main(
     );
     init_subscriber(subscriber);
 
-    // Get JWT secret from Shuttle Secrets
-    let jwt_secret = secrets.get("JWT_SECRET").ok_or_else(|| {
-        CustomError::msg("JWT_SECRET must be set in Secrets.toml for production deployment")
-    });
-
     // Initialize database connection
+    tracing::info!("Getting database connection...");
     let db = DatabaseConnection {
         db: std::sync::Arc::new(turso_client),
     };
 
     // Run database migrations
+    tracing::info!("Running database migrations...");
     db.run_migrations().await.map_err(CustomError::new)?;
 
     // Load configuration with JWT secret
-    let app_config = AppConfig::new(jwt_secret?);
+    tracing::info!("Loading application configuration from secrets...");
+    let app_config = AppConfig::try_from(&secrets)?;
 
     // Build the application state
+    tracing::info!("Building application state...");
     let app_state = AppState::new(db, &app_config).map_err(CustomError::new)?;
 
     // Initialize the application
+    tracing::info!("Initializing the application...");
     let app = App::new(app_config, app_state);
 
     // Return the Axum router to Shuttle
