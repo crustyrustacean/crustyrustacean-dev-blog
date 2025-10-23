@@ -54,6 +54,8 @@ pub struct UpdateArticle {
     pub title: Option<String>,
     pub description: Option<String>,
     pub body: Option<String>,
+    #[serde(rename = "tagList")]
+    pub tag_list: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]

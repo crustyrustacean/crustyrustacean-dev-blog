@@ -21,6 +21,69 @@ use slug::slugify;
 use uuid::Uuid;
 use validator::Validate;
 
+/// Helper function to handle tag association for articles
+///
+/// This function handles the common logic for associating tags with articles:
+/// 1. Creates tags if they don't exist
+/// 2. Links the article to the tags in the article_tags junction table
+///
+/// # Arguments
+/// * `conn` - Database connection
+/// * `article_id` - UUID of the article to associate tags with
+/// * `tag_list` - List of tag names to associate
+///
+/// # Returns
+/// * `Vec<String>` - List of tag names that were successfully associated
+async fn associate_tags_with_article(
+    conn: &libsql::Connection,
+    article_id: &str,
+    tag_list: &[String],
+) -> Result<Vec<String>, AppError> {
+    let mut associated_tags = Vec::new();
+
+    for tag_name in tag_list {
+        // Insert tag if it doesn't exist
+        let tag_id = Uuid::new_v4();
+        conn.execute(
+            "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
+            libsql::params![tag_id.to_string(), tag_name.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        // Get the tag ID (either newly created or existing)
+        let mut tag_rows = conn
+            .query(
+                "SELECT id FROM tags WHERE name = ?",
+                libsql::params![tag_name.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(tag_row) = tag_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let existing_tag_id: String = tag_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+            // Link article to tag
+            conn.execute(
+                "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
+                libsql::params![article_id, existing_tag_id],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+            associated_tags.push(tag_name.clone());
+        }
+    }
+
+    Ok(associated_tags)
+}
+
 pub async fn create_article(
     State(state): State<AppState>,
     user: AuthenticatedUser,
@@ -94,48 +157,11 @@ pub async fn create_article(
     .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
     // Handle tags if provided
-    let mut tag_names = Vec::new();
-    if let Some(tags) = &article_data.tag_list {
-        for tag_name in tags {
-            // Insert tag if it doesn't exist
-            let tag_id = Uuid::new_v4();
-            conn.execute(
-                "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
-                libsql::params![tag_id.to_string(), tag_name.clone()],
-            )
-            .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-
-            // Get the tag ID (either newly created or existing)
-            let mut tag_rows = conn
-                .query(
-                    "SELECT id FROM tags WHERE name = ?",
-                    libsql::params![tag_name.clone()],
-                )
-                .await
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-
-            if let Some(tag_row) = tag_rows
-                .next()
-                .await
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?
-            {
-                let existing_tag_id: String = tag_row
-                    .get(0)
-                    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-
-                // Link article to tag
-                conn.execute(
-                    "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
-                    libsql::params![article_id.to_string(), existing_tag_id],
-                )
-                .await
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-
-                tag_names.push(tag_name.clone());
-            }
-        }
-    }
+    let tag_names = if let Some(tags) = &article_data.tag_list {
+        associate_tags_with_article(&conn, &article_id.to_string(), tags).await?
+    } else {
+        Vec::new()
+    };
 
     // Get author profile
     let mut author_rows = conn
@@ -612,6 +638,39 @@ pub async fn update_article(
         conn.execute(&sql, libsql_params)
             .await
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    }
+
+    // Handle tag updates if provided
+    if let Some(tag_list) = &article_data.tag_list {
+        // Get the article ID first
+        let mut id_rows = conn
+            .query(
+                "SELECT id FROM articles WHERE slug = ?",
+                libsql::params![slug.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let id_row = id_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .ok_or_else(|| AppError::NotFound("Article not found".to_string()))?;
+
+        let article_id: String = id_row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        // Delete existing tag associations
+        conn.execute(
+            "DELETE FROM article_tags WHERE article_id = ?",
+            libsql::params![article_id.clone()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        // Add new tags using helper function
+        associate_tags_with_article(&conn, &article_id, tag_list).await?;
     }
 
     // Return the updated article
