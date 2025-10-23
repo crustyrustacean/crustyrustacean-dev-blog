@@ -1279,7 +1279,7 @@ async fn test_tag_updates_idempotency() {
             .json(&update_body)
             .send()
             .await
-            .expect(&format!("Failed to execute request {}", i));
+            .unwrap_or_else(|_| panic!("Failed to execute request {}", i));
 
         // Assert - Each update should succeed
         assert_eq!(response.status().as_u16(), 200);
@@ -1287,7 +1287,7 @@ async fn test_tag_updates_idempotency() {
         let response_json: Value = response
             .json()
             .await
-            .expect(&format!("Failed to parse response body {}", i));
+            .unwrap_or_else(|_| panic!("Failed to parse response body {}", i));
 
         // Tags should remain consistent
         let tag_list = response_json["article"]["tagList"]
