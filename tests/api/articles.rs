@@ -1199,3 +1199,605 @@ async fn test_delete_nonexistent_article() {
     // Assert
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
+
+// Phase 4: Tag Editing Tests
+
+#[tokio::test]
+async fn test_update_article_with_new_tags() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and get token
+    let register_body = json!({
+        "user": {
+            "username": "tagupdateuser",
+            "email": "tagupdate@example.com",
+            "password": "password123"
+        }
+    });
+
+    let register_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .json(&register_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let register_json: Value = register_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let token = register_json["user"]["token"]
+        .as_str()
+        .expect("Token not found in response");
+
+    // Create an article with initial tags
+    let article_body = json!({
+        "article": {
+            "title": "Article for Tag Update",
+            "description": "Testing tag updates",
+            "body": "Initial content",
+            "tagList": ["tutorial", "beginner"]
+        }
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&article_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let create_json: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let slug = create_json["article"]["slug"]
+        .as_str()
+        .expect("Slug not found in response");
+
+    // Act - Update with different tags (remove "tutorial", add "advanced")
+    let update_body = json!({
+        "article": {
+            "tagList": ["beginner", "advanced"]
+        }
+    });
+
+    let response = app
+        .client
+        .put(format!("{}/api/articles/{}", &app.address, slug))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&update_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status().as_u16(), 200);
+
+    let response_json: Value = response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let tag_list = response_json["article"]["tagList"]
+        .as_array()
+        .expect("tagList not found or not an array");
+
+    assert_eq!(tag_list.len(), 2);
+    assert!(tag_list.contains(&json!("beginner")));
+    assert!(tag_list.contains(&json!("advanced")));
+    assert!(!tag_list.contains(&json!("tutorial")));
+}
+
+#[tokio::test]
+async fn test_update_article_removing_all_tags() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and get token
+    let register_body = json!({
+        "user": {
+            "username": "tagremoveuser",
+            "email": "tagremove@example.com",
+            "password": "password123"
+        }
+    });
+
+    let register_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .json(&register_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let register_json: Value = register_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let token = register_json["user"]["token"]
+        .as_str()
+        .expect("Token not found in response");
+
+    // Create an article with tags
+    let article_body = json!({
+        "article": {
+            "title": "Article with Tags to Remove",
+            "description": "Testing tag removal",
+            "body": "Initial content with tags",
+            "tagList": ["tag1", "tag2", "tag3"]
+        }
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&article_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let create_json: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let slug = create_json["article"]["slug"]
+        .as_str()
+        .expect("Slug not found in response");
+
+    // Act - Update with empty tag list
+    let update_body = json!({
+        "article": {
+            "tagList": []
+        }
+    });
+
+    let response = app
+        .client
+        .put(format!("{}/api/articles/{}", &app.address, slug))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&update_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status().as_u16(), 200);
+
+    let response_json: Value = response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let tag_list = response_json["article"]["tagList"]
+        .as_array()
+        .expect("tagList not found or not an array");
+
+    assert_eq!(tag_list.len(), 0);
+}
+
+#[tokio::test]
+async fn test_update_article_without_touching_tags() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and get token
+    let register_body = json!({
+        "user": {
+            "username": "tagunchangeduser",
+            "email": "tagunchanged@example.com",
+            "password": "password123"
+        }
+    });
+
+    let register_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .json(&register_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let register_json: Value = register_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let token = register_json["user"]["token"]
+        .as_str()
+        .expect("Token not found in response");
+
+    // Create an article with tags
+    let article_body = json!({
+        "article": {
+            "title": "Original Title",
+            "description": "Original description",
+            "body": "Original content",
+            "tagList": ["persistent", "unchanged"]
+        }
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&article_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let create_json: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let slug = create_json["article"]["slug"]
+        .as_str()
+        .expect("Slug not found in response");
+
+    // Act - Update only the title, don't include tagList
+    let update_body = json!({
+        "article": {
+            "title": "Updated Title Only"
+        }
+    });
+
+    let response = app
+        .client
+        .put(format!("{}/api/articles/{}", &app.address, slug))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&update_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status().as_u16(), 200);
+
+    let response_json: Value = response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    // Title should be updated
+    assert_eq!(response_json["article"]["title"], "Updated Title Only");
+
+    // Tags should remain unchanged
+    let tag_list = response_json["article"]["tagList"]
+        .as_array()
+        .expect("tagList not found or not an array");
+
+    assert_eq!(tag_list.len(), 2);
+    assert!(tag_list.contains(&json!("persistent")));
+    assert!(tag_list.contains(&json!("unchanged")));
+}
+
+#[tokio::test]
+async fn test_add_tags_to_tagless_article() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and get token
+    let register_body = json!({
+        "user": {
+            "username": "tagadduser",
+            "email": "tagadd@example.com",
+            "password": "password123"
+        }
+    });
+
+    let register_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .json(&register_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let register_json: Value = register_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let token = register_json["user"]["token"]
+        .as_str()
+        .expect("Token not found in response");
+
+    // Create an article without tags
+    let article_body = json!({
+        "article": {
+            "title": "Article Without Tags",
+            "description": "No tags initially",
+            "body": "Content without tags"
+        }
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&article_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let create_json: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let slug = create_json["article"]["slug"]
+        .as_str()
+        .expect("Slug not found in response");
+
+    // Verify article was created without tags
+    let initial_tag_list = create_json["article"]["tagList"]
+        .as_array()
+        .expect("tagList not found or not an array");
+    assert_eq!(initial_tag_list.len(), 0);
+
+    // Act - Add tags to the tagless article
+    let update_body = json!({
+        "article": {
+            "tagList": ["new", "added", "tags"]
+        }
+    });
+
+    let response = app
+        .client
+        .put(format!("{}/api/articles/{}", &app.address, slug))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&update_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status().as_u16(), 200);
+
+    let response_json: Value = response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let tag_list = response_json["article"]["tagList"]
+        .as_array()
+        .expect("tagList not found or not an array");
+
+    assert_eq!(tag_list.len(), 3);
+    assert!(tag_list.contains(&json!("new")));
+    assert!(tag_list.contains(&json!("added")));
+    assert!(tag_list.contains(&json!("tags")));
+}
+
+#[tokio::test]
+async fn test_tag_editing_authorization() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register two users
+    let user1_body = json!({
+        "user": {
+            "username": "tagowner",
+            "email": "tagowner@example.com",
+            "password": "password123"
+        }
+    });
+
+    let user2_body = json!({
+        "user": {
+            "username": "tagthief",
+            "email": "tagthief@example.com",
+            "password": "password123"
+        }
+    });
+
+    let reg1_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .json(&user1_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let reg2_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .json(&user2_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let reg1_json: Value = reg1_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+    let reg2_json: Value = reg2_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let token1 = reg1_json["user"]["token"]
+        .as_str()
+        .expect("Token not found in response");
+    let token2 = reg2_json["user"]["token"]
+        .as_str()
+        .expect("Token not found in response");
+
+    // Create article with user1
+    let article_body = json!({
+        "article": {
+            "title": "Protected Article",
+            "description": "Only owner can modify tags",
+            "body": "Protected content",
+            "tagList": ["protected", "original"]
+        }
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token1))
+        .json(&article_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let create_json: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let slug = create_json["article"]["slug"]
+        .as_str()
+        .expect("Slug not found in response");
+
+    // Act - Try to modify tags with user2's token
+    let update_body = json!({
+        "article": {
+            "tagList": ["hacked", "stolen"]
+        }
+    });
+
+    let response = app
+        .client
+        .put(format!("{}/api/articles/{}", &app.address, slug))
+        .header("Authorization", format!("Bearer {}", token2))
+        .json(&update_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status().as_u16(), 403);
+
+    // Verify original tags are unchanged by checking with a GET request
+    let get_response = app
+        .client
+        .get(format!("{}/api/articles/{}", &app.address, slug))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(get_response.status().as_u16(), 200);
+
+    let get_json: Value = get_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let tag_list = get_json["article"]["tagList"]
+        .as_array()
+        .expect("tagList not found or not an array");
+
+    assert_eq!(tag_list.len(), 2);
+    assert!(tag_list.contains(&json!("protected")));
+    assert!(tag_list.contains(&json!("original")));
+    assert!(!tag_list.contains(&json!("hacked")));
+    assert!(!tag_list.contains(&json!("stolen")));
+}
+
+#[tokio::test]
+async fn test_tag_updates_idempotency() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and get token
+    let register_body = json!({
+        "user": {
+            "username": "idempotentuser",
+            "email": "idempotent@example.com",
+            "password": "password123"
+        }
+    });
+
+    let register_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .json(&register_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let register_json: Value = register_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let token = register_json["user"]["token"]
+        .as_str()
+        .expect("Token not found in response");
+
+    // Create an article with tags
+    let article_body = json!({
+        "article": {
+            "title": "Idempotency Test Article",
+            "description": "Testing idempotent tag updates",
+            "body": "Content for idempotency test",
+            "tagList": ["stable", "consistent"]
+        }
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&article_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let create_json: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON");
+
+    let slug = create_json["article"]["slug"]
+        .as_str()
+        .expect("Slug not found in response");
+
+    // Update data with same tags
+    let update_body = json!({
+        "article": {
+            "tagList": ["stable", "consistent"]
+        }
+    });
+
+    // Act - Update article with same tags multiple times
+    for i in 1..=3 {
+        let response = app
+            .client
+            .put(format!("{}/api/articles/{}", &app.address, slug))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&update_body)
+            .send()
+            .await
+            .expect(&format!("Failed to execute request {}", i));
+
+        // Assert - Each update should succeed
+        assert_eq!(response.status().as_u16(), 200);
+
+        let response_json: Value = response
+            .json()
+            .await
+            .expect(&format!("Failed to parse response body {}", i));
+
+        // Tags should remain consistent
+        let tag_list = response_json["article"]["tagList"]
+            .as_array()
+            .expect("tagList not found or not an array");
+
+        assert_eq!(tag_list.len(), 2);
+        assert!(tag_list.contains(&json!("stable")));
+        assert!(tag_list.contains(&json!("consistent")));
+    }
+}

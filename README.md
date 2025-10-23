@@ -53,6 +53,12 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Alphabetically sorted tag lists
   - Dynamic tag display on homepage and articles listing
   - Tag-based article filtering (via query parameters)
+  - **Advanced Tag Management**:
+    - Complete tag editing functionality for articles
+    - Add, remove, or replace tags on existing articles
+    - Flexible tag association with "Replace All Tags" strategy
+    - Comprehensive validation and error handling
+    - Maintains referential integrity across tag operations
 - **RSS Feed**:
   - Standards-compliant RSS 2.0 feed at /rss
   - Automatic article syndication (latest 20 articles)
@@ -244,7 +250,7 @@ GET    /api/articles               # List articles (JSON)
 GET    /api/articles/feed          # Get personal feed (protected)
 POST   /api/articles               # Create article (protected)
 GET    /api/articles/{slug}        # Get article (JSON)
-PUT    /api/articles/{slug}        # Update article (protected)
+PUT    /api/articles/{slug}        # Update article with tag editing (protected)
 DELETE /api/articles/{slug}        # Delete article (protected)
 ```
 

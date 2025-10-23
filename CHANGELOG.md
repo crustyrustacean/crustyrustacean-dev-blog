@@ -2,6 +2,43 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [1.1.0] - 2025-10-22
+
+### Added - Advanced Tag Management System
+- **Complete Tag Editing Functionality**:
+  - Enhanced `PUT /api/articles/{slug}` endpoint with comprehensive tag editing
+  - Support for adding, removing, and replacing tags on existing articles
+  - "Replace All Tags" strategy for flexible tag management
+  - Maintains referential integrity across all tag operations
+- **Backend Implementation**:
+  - Added `tag_list` field to `UpdateArticle` struct with proper serde serialization
+  - Implemented robust tag association logic with database transaction safety
+  - Enhanced error handling for tag-related operations
+  - Code quality improvements with reusable tag handling functions
+- **Test Coverage**: Comprehensive integration tests for tag editing scenarios
+  - Updating article tags (add/remove/replace)
+  - Removing all tags from articles
+  - Adding tags to previously tagless articles
+  - Authorization and validation checks
+  - Idempotency testing for tag operations
+- **Development Process**: Followed structured 7-phase implementation plan
+  - Phase 1: Backend data model updates
+  - Phase 2: Tag update logic implementation
+  - Phase 3: Code quality improvements and refactoring
+  - Phase 4-7: Testing, validation, and comprehensive coverage
+
+### Enhanced
+- **Article Management**: Improved article editing workflow with seamless tag operations
+- **Data Integrity**: Enhanced database operations for tag associations
+- **Code Quality**: Reduced code duplication with helper functions for tag operations
+- **API Consistency**: Maintained backward compatibility while adding new functionality
+
+### Technical Details
+- **Test-Driven Development**: Implemented using TDD methodology with comprehensive test coverage
+- **Database Safety**: All tag operations wrapped in proper transaction handling
+- **Performance**: Optimized tag association queries for better performance
+- **Maintainability**: Clean separation of concerns with reusable tag management utilities
+
 ## [1.0.0] - 2025-10-19
 
 ### Added - Comments System (TDD Implementation)
