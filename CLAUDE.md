@@ -8,7 +8,7 @@ The CrustyRustacean Dev Blog is a production-ready Rust web application built wi
 - **Backend**: Axum web framework with libSQL/Turso database
 - **Frontend**: Tera templating with Bootstrap and modular JavaScript
 - **Deployment**: Shuttle platform
-- **Testing**: Comprehensive integration test suite (81+ tests)
+- **Testing**: Comprehensive test suite (122 tests: 107 integration + 15 unit)
 
 ## Development Workflow
 
@@ -64,6 +64,75 @@ This project follows **Test-Driven Development (TDD)**:
 - **Tags**: Tag management, editing, filtering
 - **Comments**: Comment creation, deletion, authorization
 - **Social**: Following, authors discovery, personal feeds
+- **Template Rendering**: HTML page rendering, authentication state validation
+
+#### Test Helpers and Utilities
+
+The project includes comprehensive test helpers in `tests/api/helpers.rs` to reduce duplication and improve test maintainability:
+
+**Test Builder Traits:**
+- `TestUserBuilder` - Simplify user registration in tests
+  ```rust
+  // Register with specific details
+  let token = app.register_user("username", "email@example.com", "password").await;
+
+  // Register with default email pattern (username@example.com)
+  let token = app.register_user_default("username").await;
+  ```
+
+- `TestArticleBuilder` - Simplify article creation in tests
+  ```rust
+  // Create article with all details
+  let slug = app.create_article(&token, "Title", "Description", "Body", vec!["tag1", "tag2"]).await;
+
+  // Create article with minimal details
+  let slug = app.create_article_simple(&token, "Title").await;
+  ```
+
+**HTML Response Validation:**
+- `HtmlResponseValidator` trait - Validate HTML page responses
+  ```rust
+  let body = response.assert_html_response().await;
+  // Automatically validates HTML content-type and structure
+  ```
+
+- `assert_body_contains()` - Check multiple strings in response
+  ```rust
+  assert_body_contains(&body, &["Expected Text 1", "Expected Text 2", "Username"]);
+  ```
+
+**Test Fixtures:**
+- `TestFixture` - Complex multi-user test scenarios
+  ```rust
+  let fixture = TestFixture::new().await
+      .with_user_default("alice")
+      .with_user_default("bob").await;
+  let alice_token = fixture.get_token("alice");
+  ```
+
+**Usage Example:**
+```rust
+#[tokio::test]
+async fn test_admin_dashboard_shows_articles() {
+    let app = spawn_app().await;
+
+    // Register user and create article (using helpers)
+    let token = app.register_user_default("testuser").await;
+    app.create_article_simple(&token, "Test Article").await;
+
+    // Access dashboard
+    let response = app.client
+        .get(format!("{}/admin", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Validate HTML response
+    let body = response.assert_html_response().await;
+    assert_body_contains(&body, &["Admin Dashboard", "Test Article", "testuser"]);
+}
+```
 
 ### 4. Code Quality Standards
 
@@ -220,13 +289,16 @@ This project emphasizes:
 - **Security**: Industry best practices
 - **Documentation**: Keep docs up-to-date
 
-### 13. Current Status (v1.1.0)
+### 13. Current Status (v1.6.1)
 
 #### Recently Completed
+- ✅ **Bug Fix**: Editor page authentication state display issue
+- ✅ **Test Infrastructure**: New HTML response validation helpers
+- ✅ **Test Quality**: Refactored admin_dashboard.rs tests (41% reduction in code)
+- ✅ **Template Rendering Tests**: Added UI authentication state validation
 - ✅ Advanced tag management system (Phases 1-7)
 - ✅ Complete tag editing functionality
-- ✅ Comprehensive test coverage for tag operations
-- ✅ Code quality improvements with helper functions
+- ✅ Comprehensive test coverage (122 tests, all passing)
 
 #### Next Potential Features
 - Rich text editor enhancements

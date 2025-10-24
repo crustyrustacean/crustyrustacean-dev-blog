@@ -353,6 +353,54 @@ macro_rules! assert_status {
 }
 
 // ============================================================================
+// HTML Response Validation
+// ============================================================================
+
+/// Trait for validating HTML responses from page routes
+#[async_trait]
+pub trait HtmlResponseValidator {
+    /// Assert response is HTML and return the body text
+    async fn assert_html_response(self) -> String;
+}
+
+#[async_trait]
+impl HtmlResponseValidator for reqwest::Response {
+    async fn assert_html_response(self) -> String {
+        // Check content type
+        let content_type = self
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert!(
+            content_type.contains("text/html") || content_type.is_empty(),
+            "Expected HTML content type, got: {}",
+            content_type
+        );
+
+        // Get and validate HTML structure
+        let body = self.text().await.expect("Failed to get response body");
+        assert!(
+            body.contains("<html") || body.contains("<!DOCTYPE html"),
+            "Response does not contain valid HTML structure"
+        );
+
+        body
+    }
+}
+
+/// Assert that response body contains all expected strings
+pub fn assert_body_contains(body: &str, expected: &[&str]) {
+    for text in expected {
+        assert!(
+            body.contains(text),
+            "Response body missing expected text: '{}'",
+            text
+        );
+    }
+}
+
+// ============================================================================
 // Test Fixture Builder
 // ============================================================================
 

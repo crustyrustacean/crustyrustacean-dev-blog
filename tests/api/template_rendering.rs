@@ -430,3 +430,173 @@ async fn test_template_renders_consistently() {
         "Template rendering should be consistent"
     );
 }
+
+#[tokio::test]
+async fn test_editor_page_shows_authenticated_user_in_navbar() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user
+    let user_data = json!({
+        "user": {
+            "username": "navbaruser",
+            "email": "navbar@example.com",
+            "password": "securepassword123"
+        }
+    });
+
+    let registration_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&user_data)
+        .send()
+        .await
+        .expect("Failed to register user");
+
+    let registration_body: Value = registration_response
+        .json()
+        .await
+        .expect("Failed to parse registration response");
+
+    let token = registration_body["user"]["token"].as_str().unwrap();
+
+    // Create an article to edit
+    let article_data = json!({
+        "article": {
+            "title": "Navbar Authentication Test",
+            "description": "Testing that navbar shows user when editing",
+            "body": "This verifies the edit page includes user context in the template.",
+            "tagList": ["navbar", "auth"]
+        }
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&article_data)
+        .send()
+        .await
+        .expect("Failed to create article");
+
+    let create_body: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse create response");
+
+    let slug = create_body["article"]["slug"].as_str().unwrap();
+
+    // Act - Access the edit page with authentication
+    let response = app
+        .client
+        .get(format!("{}/editor/{}", &app.address, slug))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Verify the page renders
+    assert!(body.contains("<html") || body.contains("<!DOCTYPE html"));
+    assert!(body.contains("</html>"));
+
+    // CRITICAL: Verify the username appears in the navbar
+    // This checks that user context was passed to the template
+    assert!(
+        body.contains("navbaruser"),
+        "Username should appear in navbar when editing article"
+    );
+
+    // CRITICAL: Verify "Login" and "Register" buttons do NOT appear in visible navbar
+    // When authenticated, these should be hidden/not rendered in the active navbar
+    // Note: They might exist in template code, but shouldn't be in the rendered user-facing nav
+    let body_lowercase = body.to_lowercase();
+
+    // Check that we don't have both Login AND Register links visible together
+    // (which would indicate the unauthenticated navbar is showing)
+    let has_login_link = body_lowercase.contains(">login<") || body_lowercase.contains("login</a>");
+    let has_register_link = body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
+
+    // If BOTH login and register are visible, user context is missing (the bug we fixed)
+    assert!(
+        !(has_login_link && has_register_link),
+        "Login and Register links should not both be visible when user is authenticated. \
+         This indicates missing user context in template (the bug we fixed)."
+    );
+
+    // Verify the editor form is present
+    assert!(body.contains("article-form") || body.contains("editor"));
+
+    // Verify the article data is pre-filled in the form
+    assert!(body.contains("Navbar Authentication Test"));
+}
+
+#[tokio::test]
+async fn test_new_article_editor_shows_authenticated_user_in_navbar() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user
+    let user_data = json!({
+        "user": {
+            "username": "neweditoruser",
+            "email": "neweditor@example.com",
+            "password": "securepassword123"
+        }
+    });
+
+    let registration_response = app
+        .client
+        .post(format!("{}/api/users", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&user_data)
+        .send()
+        .await
+        .expect("Failed to register user");
+
+    let registration_body: Value = registration_response
+        .json()
+        .await
+        .expect("Failed to parse registration response");
+
+    let token = registration_body["user"]["token"].as_str().unwrap();
+
+    // Act - Access the new article editor page with authentication
+    let response = app
+        .client
+        .get(format!("{}/editor", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Verify the page renders
+    assert!(body.contains("<html") || body.contains("<!DOCTYPE html"));
+
+    // Verify the username appears in the navbar
+    assert!(
+        body.contains("neweditoruser"),
+        "Username should appear in navbar on new article editor page"
+    );
+
+    // Verify Login/Register links are not both visible (indicating authenticated state)
+    let body_lowercase = body.to_lowercase();
+    let has_login_link = body_lowercase.contains(">login<") || body_lowercase.contains("login</a>");
+    let has_register_link = body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
+
+    assert!(
+        !(has_login_link && has_register_link),
+        "Login and Register links should not both be visible when user is authenticated"
+    );
+}

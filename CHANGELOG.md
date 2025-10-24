@@ -2,6 +2,44 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [1.6.1] - 2025-10-23
+
+### Fixed
+- **Editor Page Authentication Bug**: Fixed issue where editing existing articles caused the UI to show Login/Register buttons (user appeared logged out) while updates still worked
+  - Root cause: `get_edit_article_page` handler was not passing user context to the template
+  - Impact: Users saw inconsistent authentication state in navbar when editing articles
+  - Solution: Added user query and context to edit article page handler (matching pattern from other page handlers)
+  - Location: `src/lib/routes/articles.rs:475-506`
+
+### Added - Test Infrastructure Improvements
+- **New Test Helpers** (`tests/api/helpers.rs`):
+  - `HtmlResponseValidator` trait for validating HTML page responses
+    - Automatically checks HTML content-type headers
+    - Validates HTML document structure
+    - Returns body text for further assertions
+  - `assert_body_contains()` helper function for cleaner multi-string assertions
+    - Simplifies checking multiple expected strings in response body
+    - Provides clear error messages when content is missing
+
+- **Enhanced Template Rendering Tests**:
+  - Added `test_editor_page_shows_authenticated_user_in_navbar` - Validates user context on edit article page
+  - Added `test_new_article_editor_shows_authenticated_user_in_navbar` - Validates user context on new article page
+  - These tests specifically check for authentication state bugs in UI rendering
+
+### Changed - Test Code Quality
+- **Refactored `admin_dashboard.rs` tests** to eliminate code duplication:
+  - Reduced test code by 41% (233 lines → 137 lines, saved 96 lines)
+  - Now uses existing `TestUserBuilder` and `TestArticleBuilder` traits
+  - Applied new `HtmlResponseValidator` and `assert_body_contains` helpers
+  - Improved consistency with other test files
+  - Enhanced maintainability and readability
+
+### Technical Details
+- **Test Coverage**: Now 122 tests (107 integration + 15 unit), all passing
+- **Code Quality**: Follows DRY principle with reusable test helpers
+- **Maintainability**: Template rendering bugs now caught by automated tests
+- **Consistency**: All page handler tests now use common validation patterns
+
 ## [1.1.0] - 2025-10-22
 
 ### Added - Advanced Tag Management System

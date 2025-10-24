@@ -472,6 +472,39 @@ pub async fn get_edit_article_page(
         return Err(AppError::NotFound("Article not found".to_string()));
     }
 
+    // Fetch user info for template context
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
     let context: Value = json!({
         "title": format!("Edit: {}", article.title),
         "page": "Editor",
@@ -484,7 +517,8 @@ pub async fn get_edit_article_page(
             "updated_at": article.updated_at
         },
         "is_edit": true,
-        "article_slug": slug
+        "article_slug": slug,
+        "user": user_info
     });
 
     Ok(RenderHtml("articles/editor.html", state.engine, context))
