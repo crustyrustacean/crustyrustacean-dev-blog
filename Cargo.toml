@@ -39,6 +39,7 @@ slug = "0.1.6"
 tera = "1.20.0"
 thiserror = "2.0.17"
 tokio = "1.47.1"
+toml = "0.9.5"
 tower = "0.5.2"
 tower-http = { version = "0.6.6", features = ["fs", "request-id", "trace", "util", "cors", "set-header"] }
 tracing = { version = "0.1.41", features = ["log"] }

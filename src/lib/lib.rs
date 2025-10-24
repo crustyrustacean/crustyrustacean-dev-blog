@@ -15,6 +15,7 @@ pub mod routes;
 pub mod startup;
 pub mod state;
 pub mod telemetry;
+pub mod themes;
 
 // re-exports for easier access
 pub use auth::*;
@@ -27,3 +28,4 @@ pub use response::*;
 pub use startup::*;
 pub use state::*;
 pub use telemetry::*;
+pub use themes::*;
