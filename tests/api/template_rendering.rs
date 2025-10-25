@@ -521,7 +521,8 @@ async fn test_editor_page_shows_authenticated_user_in_navbar() {
     // Check that we don't have both Login AND Register links visible together
     // (which would indicate the unauthenticated navbar is showing)
     let has_login_link = body_lowercase.contains(">login<") || body_lowercase.contains("login</a>");
-    let has_register_link = body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
+    let has_register_link =
+        body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
 
     // If BOTH login and register are visible, user context is missing (the bug we fixed)
     assert!(
@@ -593,7 +594,8 @@ async fn test_new_article_editor_shows_authenticated_user_in_navbar() {
     // Verify Login/Register links are not both visible (indicating authenticated state)
     let body_lowercase = body.to_lowercase();
     let has_login_link = body_lowercase.contains(">login<") || body_lowercase.contains("login</a>");
-    let has_register_link = body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
+    let has_register_link =
+        body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
 
     assert!(
         !(has_login_link && has_register_link),

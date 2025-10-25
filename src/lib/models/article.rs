@@ -1,11 +1,13 @@
 // src/lib/models/article.rs
 
+// dependencies
 use super::UserProfile;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
+// struct type to represent an article
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Article {
     pub id: Uuid,
@@ -18,6 +20,7 @@ pub struct Article {
     pub updated_at: DateTime<Utc>,
 }
 
+// struct type to represent an article response
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArticleResponse {
@@ -36,6 +39,7 @@ pub struct ArticleResponse {
     pub author: UserProfile,
 }
 
+// struct type to represent a new article
 #[derive(Debug, Deserialize, Validate)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateArticle {
@@ -49,6 +53,7 @@ pub struct CreateArticle {
     pub tag_list: Option<Vec<String>>,
 }
 
+// struct type to represent an updated article
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateArticle {
     pub title: Option<String>,
@@ -58,11 +63,13 @@ pub struct UpdateArticle {
     pub tag_list: Option<Vec<String>>,
 }
 
+// struct type to represent a response with one article
 #[derive(Debug, Serialize)]
 pub struct SingleArticleResponse {
     pub article: ArticleResponse,
 }
 
+// struct type to represent a response with multiple articles
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MultipleArticlesResponse {
@@ -70,6 +77,7 @@ pub struct MultipleArticlesResponse {
     pub articles_count: i32,
 }
 
+// struct type to represent a query for an article
 #[derive(Debug, Deserialize)]
 pub struct ArticleQuery {
     pub tag: Option<String>,
@@ -79,6 +87,7 @@ pub struct ArticleQuery {
     pub offset: Option<i32>,
 }
 
+// struct type to represent a query for a feed
 #[derive(Debug, Deserialize)]
 pub struct FeedQuery {
     pub limit: Option<i32>,

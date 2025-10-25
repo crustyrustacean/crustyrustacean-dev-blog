@@ -1,13 +1,16 @@
 // src/lib/database.rs
 
+// dependencies
 use libsql::{Connection, Database};
 use std::sync::Arc;
 
+// struct type to represent a database connection
 #[derive(Debug, Clone)]
 pub struct DatabaseConnection {
     pub db: Arc<Database>,
 }
 
+// methods for the database connection
 impl DatabaseConnection {
     pub fn connect(&self) -> Result<Connection, libsql::Error> {
         self.db.connect()
@@ -194,6 +197,86 @@ impl DatabaseConnection {
             (),
         )
         .await?;
+
+        // Create media_library table
+        conn.execute(
+            r#"
+    CREATE TABLE IF NOT EXISTS media_library (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        storage_path TEXT NOT NULL,
+        title TEXT,
+        alt_text TEXT,
+        caption TEXT,
+        description TEXT,
+        mime_type TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        width INTEGER,
+        height INTEGER,
+        uploaded_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    )
+    "#,
+            (),
+        )
+        .await?;
+
+        // Create media_usage table (tracks which articles use which media)
+        conn.execute(
+            r#"
+    CREATE TABLE IF NOT EXISTS media_usage (
+        id TEXT PRIMARY KEY,
+        media_id TEXT NOT NULL,
+        article_slug TEXT NOT NULL,
+        usage_context TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (media_id) REFERENCES media_library (id) ON DELETE CASCADE,
+        FOREIGN KEY (article_slug) REFERENCES articles (slug) ON DELETE CASCADE
+    )
+    "#,
+            (),
+        )
+        .await?;
+
+        // Create indexes for media_library
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_user_id ON media_library (user_id)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_uploaded_at ON media_library (uploaded_at DESC)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_mime_type ON media_library (mime_type)",
+            (),
+        )
+        .await?;
+
+        // Create indexes for media_usage
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_usage_media_id ON media_usage (media_id)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_usage_article_slug ON media_usage (article_slug)",
+            (),
+        )
+        .await?;
+
+        // Add featured_image_id column to articles (if it doesn't exist)
+        // Note: SQLite doesn't support adding columns with foreign keys via ALTER TABLE
+        conn.execute("ALTER TABLE articles ADD COLUMN featured_image_id TEXT", ())
+            .await
+            .ok(); // Use .ok() to ignore error if column already exists
 
         Ok(())
     }

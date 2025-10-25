@@ -8,7 +8,9 @@ use crustyrustacean_dev_blog_lib::config::AppConfig;
 use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
 use crustyrustacean_dev_blog_lib::startup::App;
 use crustyrustacean_dev_blog_lib::state::AppState;
+use crustyrustacean_dev_blog_lib::storage::{OpenDalStorage, StorageBackend};
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
+use opendal::Operator;
 use reqwest::Client;
 use shuttle_common::secrets::Secret;
 use shuttle_runtime::SecretStore;
@@ -16,7 +18,7 @@ use std::collections::BTreeMap;
 use std::env::var;
 use std::fs;
 use std::io::{sink, stdout};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use tokio::net::TcpListener;
 use toml::Value;
 
@@ -32,6 +34,29 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
         init_subscriber(subscriber);
     }
 });
+
+// function to create R2 storage operator with dev bucket configuration
+fn create_r2_storage() -> Result<Operator, Box<dyn std::error::Error>> {
+    // Load environment variables from Secrets.dev.toml
+    let _ = dotenvy::from_filename("Secrets.dev.toml");
+
+    let builder = opendal::services::S3::default()
+        .region(&var("DEFAULT_REGION").unwrap_or_else(|_| "auto".to_string()))
+        .bucket(&var("BUCKET").unwrap_or_else(|_| "photo-bucket-dev".to_string()))
+        .endpoint(&var("ENDPOINT").unwrap_or_else(|_| {
+            "https://9f8f9b268ba5c7d97ad1adfabf962f30.r2.cloudflarestorage.com".to_string()
+        }))
+        .access_key_id(
+            &var("ACCESS_KEY_ID")
+                .unwrap_or_else(|_| "9063762cd3059516a2af26a159c7a5ca".to_string()),
+        )
+        .secret_access_key(&var("SECRET_ACCESS_KEY").unwrap_or_else(|_| {
+            "2c91ace42b2df0dd4d8c3d7dc36e8d59576e90dc55b8153d64da8086f87e4f16".to_string()
+        }));
+
+    let op = Operator::new(builder)?.finish();
+    Ok(op)
+}
 
 // Load Shuttle secrets for tests from Secrets.dev.toml (preferred) or Secrets.toml.
 fn load_test_secret_store() -> Result<SecretStore> {
@@ -103,9 +128,13 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("Failed to run migrations");
 
+    // Create R2 storage operator for testing with dev bucket
+    let operator = create_r2_storage().expect("Failed to create R2 storage operator for testing");
+    let storage: Arc<dyn StorageBackend> = Arc::new(OpenDalStorage::new(operator));
+
     // set up the app state
-    let app_state =
-        AppState::new(db_connection, &app_config).expect("Unable to build the Tera templates");
+    let app_state = AppState::new(db_connection, storage, &app_config)
+        .expect("Unable to build the Tera templates");
 
     // create the test application
     let application = App::new(app_config, app_state);

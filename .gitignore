@@ -1,10 +1,13 @@
 # Ignore build outputs and sensitive files
 
-## VS Code
+# VS Code
 .vscode/
 
+# Cursor
+.cursor/
+
 # Build outputs
-/target
+target/
 
 # Shuttle specific
 .shuttle*
