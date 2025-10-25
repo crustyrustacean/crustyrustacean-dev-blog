@@ -1,6 +1,6 @@
 // tests/api/template_rendering.rs
 
-use crate::helpers::spawn_app;
+use crate::helpers::{spawn_app, TestUserBuilder, TestArticleBuilder};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -601,4 +601,45 @@ async fn test_new_article_editor_shows_authenticated_user_in_navbar() {
         !(has_login_link && has_register_link),
         "Login and Register links should not both be visible when user is authenticated"
     );
+}
+
+#[tokio::test]
+async fn test_homepage_shows_total_article_count() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and create 10 articles (more than the 4 displayed on homepage)
+    let token = app.register_user_default("testauthor").await;
+
+    for i in 1..=10 {
+        app.create_article_simple(&token, &format!("Article {}", i)).await;
+    }
+
+    // Act - Access the homepage
+    let response = app
+        .client
+        .get(&app.address)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Verify the page renders
+    assert!(body.contains("<html") || body.contains("<!DOCTYPE html"));
+    assert!(body.contains("</html>"));
+
+    // CRITICAL: Verify the total article count shows 10, not just 4
+    // The homepage should show the total count from the database,
+    // not just the count of articles displayed on the page
+    assert!(
+        body.contains(">10<") || body.contains("> 10 <"),
+        "Homepage should display total article count (10) from database, not just displayed articles (4)"
+    );
+
+    // Verify "Published Articles" label is present
+    assert!(body.contains("Published Articles"));
 }

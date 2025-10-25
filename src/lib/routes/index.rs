@@ -103,6 +103,22 @@ pub async fn get_index(
         .connect()
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
+    // Count total articles
+    let total_articles_count = match conn
+        .query("SELECT COUNT(*) FROM articles", libsql::params![])
+        .await
+    {
+        Ok(mut rows) => {
+            if let Ok(Some(row)) = rows.next().await {
+                let count: i64 = row.get(0).unwrap_or(0);
+                count
+            } else {
+                0
+            }
+        }
+        Err(_) => 0,
+    };
+
     // Count unique tags
     let tags_count = match conn
         .query("SELECT COUNT(DISTINCT name) FROM tags", libsql::params![])
@@ -132,6 +148,7 @@ pub async fn get_index(
         "message": "Welcome to CrustyRustacean Dev Blog",
         "user": user_info,
         "articles": articles_json,
+        "total_articles_count": total_articles_count,
         "tags_count": tags_count,
         "latest_post_date": latest_post_date,
         "flash_message": null,
