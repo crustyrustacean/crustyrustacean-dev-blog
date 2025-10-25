@@ -756,7 +756,7 @@ async fn complete_media_lifecycle_workflow() {
 
     assert_status!(list_response, StatusCode::OK);
     let list_body: Value = parse_json!(list_response);
-    assert!(list_body["media"].as_array().unwrap().len() >= 1);
+    assert!(!list_body["media"].as_array().unwrap().is_empty());
 
     // Step 3: Get metadata
     let meta_response = bearer_request!(
