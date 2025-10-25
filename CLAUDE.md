@@ -27,6 +27,7 @@ cargo test articles     # Article management tests
 cargo test favorites    # Favorites system tests
 cargo test tags         # Tags system tests
 cargo test comments     # Comments system tests
+cargo test media        # Media library tests
 ```
 
 ### 2. Project Structure
@@ -40,11 +41,12 @@ src/
     ├── config.rs           # Configuration management
     ├── database.rs         # Database operations
     ├── errors.rs           # Error handling
-    ├── models/             # Data models (User, Article, Comment, Tag)
+    ├── models/             # Data models (User, Article, Comment, Tag, Media)
     ├── routes/             # HTTP route handlers
     ├── response.rs         # API response utilities
     ├── startup.rs          # App initialization
     ├── state.rs            # Application state
+    ├── storage.rs          # OpenDAL storage integration
     └── telemetry.rs        # Logging/tracing
 ```
 
@@ -65,6 +67,7 @@ This project follows **Test-Driven Development (TDD)**:
 - **Comments**: Comment creation, deletion, authorization
 - **Social**: Following, authors discovery, personal feeds
 - **Template Rendering**: HTML page rendering, authentication state validation
+- **Media Library**: File upload, storage, retrieval, metadata management
 
 #### Test Helpers and Utilities
 
@@ -206,6 +209,7 @@ Key tables and relationships:
 - **comments**: Article comments
 - **favorites**: User article favorites
 - **follows**: User following relationships
+- **media_library**: Uploaded media files with metadata
 
 ### 7. Authentication & Security
 
@@ -219,15 +223,22 @@ Key tables and relationships:
 
 #### Core Endpoints
 ```
-GET  /                              # Homepage
-GET  /articles                      # Articles listing
-GET  /articles/{slug}               # Individual article
-POST /api/articles                  # Create article (protected)
-PUT  /api/articles/{slug}           # Update article with tags (protected)
-GET  /api/tags                      # Get all tags
-POST /api/users                     # User registration
-POST /api/users/login               # User login
-GET  /rss                           # RSS feed
+GET    /                              # Homepage
+GET    /articles                      # Articles listing
+GET    /articles/{slug}               # Individual article
+POST   /api/articles                  # Create article (protected)
+PUT    /api/articles/{slug}           # Update article with tags (protected)
+GET    /api/tags                      # Get all tags
+POST   /api/users                     # User registration
+POST   /api/users/login               # User login
+GET    /rss                           # RSS feed
+POST   /api/media                     # Upload media (protected)
+GET    /api/media                     # List media (protected)
+GET    /api/media/:id                 # Get media metadata (protected)
+PUT    /api/media/:id                 # Update media metadata (protected)
+DELETE /api/media/:id                 # Delete media (protected)
+GET    /api/media/:id/download        # Download media file
+GET    /admin/media                   # Media library page (protected)
 ```
 
 ### 9. Common Tasks
@@ -289,19 +300,28 @@ This project emphasizes:
 - **Security**: Industry best practices
 - **Documentation**: Keep docs up-to-date
 
-### 13. Current Status (v1.6.1)
+### 13. Current Status (v1.7.0)
 
 #### Recently Completed
-- ✅ **Bug Fix**: Editor page authentication state display issue
-- ✅ **Test Infrastructure**: New HTML response validation helpers
-- ✅ **Test Quality**: Refactored admin_dashboard.rs tests (41% reduction in code)
-- ✅ **Template Rendering Tests**: Added UI authentication state validation
+- ✅ **Media Library System (MVP)**: Complete media management functionality
+  - File upload with OpenDAL storage integration
+  - Full CRUD operations for media files and metadata
+  - User-based access control and ownership validation
+  - Media library admin page with responsive UI
+  - Comprehensive integration tests
+- ✅ **Storage Infrastructure**: OpenDAL integration for cloud storage
+  - Support for multiple storage backends (S3, local filesystem, etc.)
+  - Secure file upload and download
+  - Automatic path generation and organization
 - ✅ Advanced tag management system (Phases 1-7)
 - ✅ Complete tag editing functionality
-- ✅ Comprehensive test coverage (122 tests, all passing)
+- ✅ Comprehensive test coverage (122+ tests, all passing)
 
 #### Next Potential Features
-- Rich text editor enhancements
+- Image processing and optimization
+- Media thumbnails and previews
+- CDN integration for media delivery
+- Rich text editor enhancements with media embedding
 - Advanced search and filtering
 - Social sharing features
 - Email notifications

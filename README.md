@@ -11,10 +11,11 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 81 integration tests
+- **Comprehensive test suite** with 122+ integration tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
+- **Media library with cloud storage** (OpenDAL integration)
 - **Complete blog functionality**:
   - Dynamic homepage with real article summaries and statistics
   - Articles listing page with responsive design
@@ -71,10 +72,22 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Interactive frontend with real-time updates
   - Complete API endpoints (POST, GET, DELETE)
   - 11 comprehensive integration tests
+- **Media Library System** (MVP):
+  - File upload with multipart form support
+  - Image-only validation with 50MB file size limit
+  - OpenDAL integration for cloud storage backend
+  - Full CRUD operations for media files and metadata
+  - Per-user media organization and storage
+  - Media library admin page with responsive UI
+  - Public media download/display endpoint
+  - User-based access control and ownership validation
+  - Comprehensive integration tests
 
 ### 🚧 Planned
+- Image processing and optimization
+- Media thumbnails and CDN integration
 - Advanced search and filtering
-- Rich text editor enhancements
+- Rich text editor enhancements with media embedding
 - Social sharing features
 
 ## Project Structure
@@ -178,7 +191,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (81 total)
+cargo test              # Run all tests (122+ total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -186,6 +199,7 @@ cargo test authors      # Run authors discovery tests only
 cargo test tags         # Run tags API tests only
 cargo test rss          # Run RSS feed tests only
 cargo test comments     # Run comments API tests only
+cargo test media        # Run media library tests only
 cargo test api::        # Run all API integration tests
 ```
 
@@ -201,6 +215,7 @@ The test suite includes comprehensive testing:
 - ✅ Tags API with alphabetical sorting and filtering
 - ✅ RSS feed generation with XML validation
 - ✅ Comments API with authorization and validation
+- ✅ Media library with file upload and storage operations
 - ✅ Idempotent operations and multi-user scenarios
 
 ### Deploying with Shuttle
@@ -226,6 +241,7 @@ GET  /profiles                     # Authors discovery page (protected)
 GET  /feed                         # Personal feed page (protected)
 GET  /favorites                    # User's favorite articles (protected)
 GET  /rss                          # RSS feed (XML)
+GET  /admin/media                  # Media library admin page (protected)
 ```
 
 ### Authentication API
@@ -273,6 +289,16 @@ GET    /api/articles/{slug}/comments       # Get all comments for article
 DELETE /api/articles/{slug}/comments/{id}  # Delete comment (protected, author only)
 ```
 
+### Media Library API
+```
+POST   /api/media                  # Upload media file (protected)
+GET    /api/media                  # List user's media with pagination (protected)
+GET    /api/media/:id              # Get media metadata (protected)
+PUT    /api/media/:id              # Update media metadata (protected)
+DELETE /api/media/:id              # Delete media file (protected)
+GET    /api/media/:id/download     # Download/display media file
+```
+
 ### System
 ```
 GET /health_check                  # Health check endpoint
@@ -294,7 +320,8 @@ The application now includes a complete blog system:
 10. **Tags System**: Dynamic tag display with filtering and alphabetical organization
 11. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
 12. **Comments System**: Add, view, and delete comments on articles with proper authorization
-13. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+13. **Media Library**: Upload and manage media files with cloud storage integration
+14. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -319,8 +346,9 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 81 integration tests covering happy path and failure scenarios
-- **Test-Driven Development**: Tags, RSS, and Comments features built with TDD approach
+- **Comprehensive Testing**: 122+ integration tests covering happy path and failure scenarios
+- **Test-Driven Development**: Tags, RSS, Comments, and Media Library features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
+- **Cloud-Native Storage**: OpenDAL integration for flexible storage backend options
 

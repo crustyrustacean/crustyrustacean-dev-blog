@@ -2,6 +2,70 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [1.7.0] - 2025-10-24
+
+### Added - Media Library System (MVP)
+- **Complete Media Management**:
+  - Media file upload with multipart form support
+  - Image-only validation with 50MB file size limit
+  - Automatic unique filename generation (UUID-based)
+  - Per-user media organization and storage
+  - Full CRUD operations for media files and metadata
+  - OpenDAL integration for cloud storage backend
+  - Public media download/display endpoint
+
+- **API Endpoints**:
+  - `POST /api/media` - Upload media files with metadata (protected)
+  - `GET /api/media` - List user's media with pagination and filtering (protected)
+  - `GET /api/media/:id` - Get media metadata (protected)
+  - `PUT /api/media/:id` - Update media metadata (protected)
+  - `DELETE /api/media/:id` - Delete media file and metadata (protected)
+  - `GET /api/media/:id/download` - Download/display media file (public)
+
+- **Frontend Integration**:
+  - Media library admin page at `/admin/media`
+  - Responsive grid layout for media display
+  - Upload form with drag-and-drop support
+  - Real-time metadata editing
+  - Delete confirmation dialogs
+  - Image preview functionality
+  - Modular JavaScript (`media-library.js`)
+  - Custom CSS styling (`media-library.css`)
+
+- **Database Schema**:
+  - New `media_library` table with comprehensive metadata
+  - Fields: id, user_id, filename, storage_path, title, alt_text, caption, description
+  - Technical metadata: mime_type, file_size, width, height
+  - Timestamps: uploaded_at, updated_at
+  - Proper indexing and foreign key constraints
+
+- **Storage Integration**:
+  - OpenDAL backend for flexible storage options
+  - Support for multiple storage providers (S3, local filesystem, etc.)
+  - Automatic path generation with user-based organization
+  - File metadata tracking (size, content type)
+  - Secure upload and download operations
+
+- **Security Features**:
+  - User-based access control and ownership validation
+  - File type validation (images only)
+  - File size limits (50MB)
+  - Proper authorization checks on all operations
+  - Secure storage path handling
+
+- **Test Coverage**:
+  - Comprehensive integration tests for all endpoints
+  - Upload, list, retrieve, update, delete scenarios
+  - Authorization and ownership validation tests
+  - Edge cases and error handling tests
+
+### Technical Details
+- **TDD Implementation**: Built following test-driven development methodology
+- **Cloud-Native**: OpenDAL integration enables deployment flexibility
+- **MVP Status**: Core functionality complete, ready for production use
+- **Extensibility**: Architecture supports future enhancements (image processing, CDN integration)
+- **Performance**: Efficient query patterns with pagination support
+
 ## [1.6.1] - 2025-10-23
 
 ### Fixed

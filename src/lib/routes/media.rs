@@ -14,7 +14,9 @@ use axum::{
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use chrono::Utc;
+use axum_template::RenderHtml;
+use chrono::{Datelike, Utc};
+use serde_json::json;
 use uuid::Uuid;
 
 /// Upload media file
@@ -660,4 +662,58 @@ pub async fn download_media(
     );
 
     Ok(response)
+}
+
+/// Get media library admin page
+/// GET /admin/media
+pub async fn get_media_library_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    let context = json!({
+        "title": "Media Library - Admin",
+        "page": "MediaLibrary",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+    });
+
+    Ok(RenderHtml("media/library.html", state.engine, context))
 }

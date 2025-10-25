@@ -1,7 +1,7 @@
 # CrustyRustacean Dev Blog - Codebase Index
 
-**Generated:** 2025-10-21
-**Version:** 1.4.0
+**Generated:** 2025-10-24
+**Version:** 1.7.0
 **Repository:** https://github.com/crustyrustacean/crustyrustacean-dev-blog
 
 ---
@@ -38,6 +38,7 @@ A production-ready developer blog application built with modern Rust web technol
 - Favorites and social following
 - Tag-based categorization
 - RSS feed syndication
+- Media library with cloud storage (OpenDAL)
 - SEO optimization (sitemap, robots.txt)
 - Admin dashboard
 - Responsive Bootstrap UI
@@ -73,6 +74,12 @@ A production-ready developer blog application built with modern Rust web technol
 | Tera | 1.20.0 | Jinja-like templating engine |
 | Pulldown-cmark | 0.13.0 | Markdown to HTML conversion |
 | Bootstrap | 5.x | CSS framework |
+
+### Storage & Media
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| OpenDAL | 0.51.0 | Unified data access layer for cloud storage |
+| UUID | 1.11.0 | Unique identifier generation |
 
 ### Observability
 | Technology | Version | Purpose |
@@ -155,11 +162,12 @@ A production-ready developer blog application built with modern Rust web technol
 - `database` - Database connection and migrations
 - `errors` - Unified error types
 - `markdown` - Markdown processing
-- `models` - Data structures (User, Article, Comment, Tag)
+- `models` - Data structures (User, Article, Comment, Tag, Media)
 - `response` - Standardized API responses
 - `routes` - HTTP route handlers
 - `startup` - Application initialization
 - `state` - Shared application state
+- `storage` - OpenDAL storage integration
 - `telemetry` - Logging and tracing
 
 ---
@@ -224,6 +232,12 @@ A production-ready developer blog application built with modern Rust web technol
 7. **user_follows** - User follow relationships
    - Columns: follower_id, followee_id
    - Primary key: (follower_id, followee_id)
+
+8. **media_library** - Uploaded media files
+   - Columns: id, user_id, filename, storage_path, title, alt_text, caption, description
+   - Technical: mime_type, file_size, width, height
+   - Timestamps: uploaded_at, updated_at
+   - Foreign key: user_id references users(id)
 
 **Key Functions:**
 - `new(url: &str, auth_token: &str) -> Result<Self>` - Create connection
@@ -465,6 +479,58 @@ pub struct AppConfig {
    - Fields: follower_id, followee_id
 
 **Location:** `src/lib/models/tag.rs`
+
+---
+
+#### **src/lib/models/media.rs** (78 lines)
+
+**Structures:**
+
+1. **Media** - Media file entity
+   - Fields: id, user_id, filename, storage_path, title, alt_text, caption, description
+   - Technical fields: mime_type, file_size, width, height, uploaded_at, updated_at
+
+2. **MediaResponse** - API response format
+   - Includes all media fields with proper serialization
+
+3. **UpdateMedia** - Metadata update input
+   - Optional fields: title, alt_text, caption, description
+
+4. **MediaQuery** - List query parameters
+   - Pagination: limit, offset
+   - Filtering: mime_type
+
+5. **SingleMediaResponse** - Single media response wrapper
+   - Format: `{"media": {...}}`
+
+6. **MultipleMediaResponse** - Media list response
+   - Format: `{"media": [...], "media_count": N}`
+
+**Location:** `src/lib/models/media.rs`
+
+---
+
+#### **src/lib/storage.rs** (120 lines)
+
+**Purpose:** OpenDAL integration for cloud storage
+
+**Key Structures:**
+- `StorageService` - Wrapper around OpenDAL operator
+- `FileMetadata` - File size and content type information
+
+**Key Functions:**
+- `new() -> Result<Self>` - Initialize storage backend
+- `upload(path: &str, data: Vec<u8>, content_type: Option<String>) -> Result<FileMetadata>` - Upload file
+- `download(path: &str) -> Result<Vec<u8>>` - Download file
+- `delete(path: &str) -> Result<()>` - Delete file
+- `generate_media_path(user_id: &str, filename: &str) -> String` - Generate storage path
+
+**Storage Configuration:**
+- Configurable backend (S3, local filesystem, etc.)
+- Automatic path organization by user
+- File metadata tracking
+
+**Location:** `src/lib/storage.rs`
 
 ---
 
@@ -825,6 +891,70 @@ pub struct AppConfig {
 
 ---
 
+#### **src/lib/routes/media.rs** (720 lines)
+**Purpose:** Media library management with cloud storage
+
+**Endpoints:**
+
+1. **POST /api/media** - `upload_media()`
+   - Protected: requires JWT
+   - Multipart form upload
+   - Fields: file, title, alt_text, caption, description
+   - Validates: image files only, 50MB limit
+   - Generates unique filename (UUID)
+   - Uploads to OpenDAL storage
+   - Creates database record
+   - Returns media response
+
+2. **GET /api/media** - `list_media()`
+   - Protected: requires JWT
+   - Query params: limit, offset, mime_type
+   - Returns user's media files
+   - Pagination support
+   - Includes total count
+
+3. **GET /api/media/:id** - `get_media_metadata()`
+   - Protected: requires JWT
+   - Returns single media metadata
+   - Ownership verification
+
+4. **PUT /api/media/:id** - `update_media_metadata()`
+   - Protected: requires JWT
+   - Authorization: must be owner
+   - Updates: title, alt_text, caption, description
+   - Returns updated media
+
+5. **DELETE /api/media/:id** - `delete_media()`
+   - Protected: requires JWT
+   - Authorization: must be owner
+   - Deletes from storage (OpenDAL)
+   - Deletes database record
+   - Returns 204 No Content
+
+6. **GET /api/media/:id/download** - `download_media()`
+   - Public endpoint
+   - Downloads file from storage
+   - Returns file with proper headers
+   - Content-Type and Content-Disposition
+
+**HTML Page Handlers:**
+
+7. **GET /admin/media** - `get_media_library_page()`
+   - Protected: requires JWT
+   - Media library admin interface
+   - Upload and management UI
+   - Grid display of media
+
+**Security Features:**
+- File type validation (images only)
+- File size limits (50MB)
+- User-based access control
+- Ownership verification for all operations
+
+**Location:** `src/lib/routes/media.rs`
+
+---
+
 ## Database Schema
 
 ### Entity Relationship Diagram
@@ -949,6 +1079,28 @@ CREATE TABLE user_follows (
 );
 ```
 
+#### **media_library**
+```sql
+CREATE TABLE media_library (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    storage_path TEXT NOT NULL,
+    title TEXT,
+    alt_text TEXT,
+    caption TEXT,
+    description TEXT,
+    mime_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    width INTEGER,
+    height INTEGER,
+    uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX idx_media_user ON media_library(user_id);
+```
+
 ---
 
 ## Testing Infrastructure
@@ -1063,6 +1215,7 @@ cargo test test_create_article
 | **feed.js** | Personal feed page | base.js |
 | **admin.js** | Admin dashboard | base.js |
 | **tags-admin.js** | Tag management | base.js |
+| **media-library.js** | Media library management | base.js |
 | **error404.js** | 404 page enhancements | None |
 
 ### Template Structure (22 files)
@@ -1095,6 +1248,8 @@ base.html
   ├── admin/
   │   ├── dashboard.html
   │   └── tags.html
+  ├── media/
+  │   └── library.html (media library admin)
   └── errors/
       └── 404.html
 ```
@@ -1195,6 +1350,14 @@ base.html
 - `GET /api/tags` - List all tags
 - `PUT /api/tags/{name}` - Update (protected)
 - `DELETE /api/tags/{name}` - Delete (protected)
+
+#### Media Library
+- `POST /api/media` - Upload media (protected)
+- `GET /api/media` - List user's media (protected)
+- `GET /api/media/:id` - Get media metadata (protected)
+- `PUT /api/media/:id` - Update media metadata (protected)
+- `DELETE /api/media/:id` - Delete media (protected)
+- `GET /api/media/:id/download` - Download media file
 
 #### Content
 - `GET /rss` - RSS feed
@@ -1367,16 +1530,23 @@ crustyrustacean-dev-blog/
 
 ---
 
-## Recent Changes (v1.4.0)
+## Recent Changes (v1.7.0)
 
-- Added link to query.rs in navigation bar
-- Domain name transfer completed
-- Google Analytics integration
-- Test refactoring with traits and macros
-- Improved test fixtures
+- **Media Library System (MVP)**: Complete media management with OpenDAL integration
+  - File upload with multipart form support
+  - Full CRUD operations for media files and metadata
+  - Cloud storage integration via OpenDAL
+  - Media library admin page with responsive UI
+  - Comprehensive integration tests
+- **Storage Infrastructure**: OpenDAL backend for flexible storage
+  - Support for multiple providers (S3, local filesystem, etc.)
+  - Automatic path generation and organization
+  - File metadata tracking
+- **Security**: User-based access control and ownership validation
+- **Testing**: Comprehensive test coverage for media operations
 
 ---
 
-**Index Generated:** 2025-10-21
-**Version:** 1.4.0
+**Index Generated:** 2025-10-24
+**Version:** 1.7.0
 **Documentation:** https://github.com/crustyrustacean/crustyrustacean-dev-blog
