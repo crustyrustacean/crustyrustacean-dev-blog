@@ -4,15 +4,16 @@
 use crate::config::AppConfig;
 use crate::routes::{
     add_comment, create_api_key, create_article, delete_api_key, delete_article, delete_comment,
-    delete_tag, favorite_article, follow_user, get_about, get_admin_dashboard,
-    get_api_keys_admin_page, get_article, get_article_page, get_articles_feed,
+    delete_media, delete_tag, download_media, favorite_article, follow_user, get_about,
+    get_admin_dashboard, get_api_keys_admin_page, get_article, get_article_page, get_articles_feed,
     get_articles_feed_page, get_articles_list_page, get_authors_page, get_comments,
     get_current_user, get_edit_article_page, get_editor_page, get_index, get_login_page,
-    get_my_favorites_page, get_privacy, get_profile, get_profile_page, get_register_page,
-    get_robots_txt, get_rss_feed, get_sitemap, get_tags, get_tags_admin_page, get_terms,
-    handle_404_simple, health_check, list_api_keys, list_articles, list_profiles, login_user,
-    mobile_upload_article, register_user, unfavorite_article, unfollow_user, update_article,
-    update_current_user, update_tag,
+    get_media_metadata, get_my_favorites_page, get_privacy, get_profile, get_profile_page,
+    get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags, get_tags_admin_page,
+    get_terms, handle_404_simple, health_check, list_api_keys, list_articles, list_media,
+    list_profiles, login_user, mobile_upload_article, register_user, unfavorite_article,
+    unfollow_user, update_article, update_current_user, update_media_metadata, update_tag,
+    upload_media,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -117,6 +118,14 @@ impl App {
             .route("/api/keys", post(create_api_key).get(list_api_keys))
             .route("/api/keys/{key_id}", axum::routing::delete(delete_api_key))
             .route("/api/mobile/upload", post(mobile_upload_article))
+            .route("/api/media", post(upload_media).get(list_media))
+            .route(
+                "/api/media/{id}",
+                get(get_media_metadata)
+                    .put(update_media_metadata)
+                    .delete(delete_media),
+            )
+            .route("/api/media/{id}/download", get(download_media))
             .nest_service("/static", ServeDir::new("static"))
             .fallback(handle_404_simple)
             .with_state(state)

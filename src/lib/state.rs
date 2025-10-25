@@ -2,9 +2,11 @@
 
 // dependencies
 use crate::auth::Keys;
+use crate::storage::StorageBackend;
 use crate::{AppConfig, AppError, DatabaseConnection};
 use axum_template::engine::Engine;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tera::{Tera, Value};
 
 // type declarations
@@ -16,6 +18,7 @@ pub struct AppState {
     pub engine: AppEngine,
     pub db: DatabaseConnection,
     pub jwt_keys: Keys,
+    pub storage: Arc<dyn StorageBackend>,
 }
 
 // function to setup the Tera templates
@@ -51,7 +54,11 @@ fn setup_templates(config: &AppConfig) -> Result<Engine<Tera>, tera::Error> {
 // methods to build the configuration
 impl AppState {
     // Create a new application state instance
-    pub fn new(db: DatabaseConnection, config: &AppConfig) -> Result<Self, AppError> {
+    pub fn new(
+        db: DatabaseConnection,
+        storage: Arc<dyn StorageBackend>,
+        config: &AppConfig,
+    ) -> Result<Self, AppError> {
         let engine = setup_templates(config)?;
         let jwt_keys = Keys::from_config(config);
 
@@ -59,6 +66,7 @@ impl AppState {
             engine,
             db,
             jwt_keys,
+            storage,
         })
     }
 }

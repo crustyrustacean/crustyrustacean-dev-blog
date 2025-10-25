@@ -14,6 +14,7 @@ pub mod response;
 pub mod routes;
 pub mod startup;
 pub mod state;
+pub mod storage;
 pub mod telemetry;
 
 // re-exports for easier access
@@ -26,4 +27,5 @@ pub use models::*;
 pub use response::*;
 pub use startup::*;
 pub use state::*;
+pub use storage::*;
 pub use telemetry::*;

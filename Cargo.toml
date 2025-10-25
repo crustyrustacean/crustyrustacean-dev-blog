@@ -21,18 +21,22 @@ path = "src/lib/lib.rs"
 anyhow = "1.0.99"
 argon2 = "0.5.3"
 async-trait = "0.1.87"
-axum = "0.8.6"
+axum = { version = "0.8.6", features = [ "multipart" ] }
 axum-extra = { version = "0.10.3", features = ["typed-header"] }
 axum-macros = "0.5.0"
 axum-template = { version = "3.0.0", features = [ "tera" ] }
 chrono = { version = "0.4.42", features = ["serde"] }
+dotenvy = "0.15.7"
+futures-util = "0.3.31"
 jsonwebtoken = { version = "10.1.0", features = ["use_pem", "rust_crypto"] }
 libsql = { version = "0.9.24", features = ["serde"] }
+opendal = { version = "0.54.1", features = [ "services-s3", "services-fs"] }
 pulldown-cmark = "0.13.0"
 rand = "0.9.2"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.145"
 shuttle-axum = "0.57.0"
+shuttle-opendal = "0.57.0"
 shuttle-runtime = { version = "0.57.0", default-features = false }
 shuttle-turso = "0.57.0"
 slug = "0.1.6"
