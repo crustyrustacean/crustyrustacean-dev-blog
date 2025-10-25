@@ -11,6 +11,7 @@ mod feed_page;
 mod health_check;
 mod helpers;
 mod markdown_integration;
+mod media;
 mod robots;
 mod rss;
 mod sitemap;
