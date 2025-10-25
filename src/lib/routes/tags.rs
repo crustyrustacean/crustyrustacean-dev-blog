@@ -2,6 +2,7 @@
 
 // src/lib/routes/tags.rs
 
+use crate::state::CachedTags;
 use crate::{
     AppError, AppState,
     auth::AuthenticatedUser,
@@ -15,9 +16,21 @@ use axum::{
 use axum_template::RenderHtml;
 use chrono::Datelike;
 use serde_json::json;
+use std::time::{Duration, Instant};
 use validator::Validate;
 
 pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse>, AppError> {
+    {
+        let cache = state.cached_tags.read().await;
+        if let Some(cached) = cache.as_ref()
+            && cached.cached_at.elapsed() < Duration::from_secs(300)
+        {
+            return Ok(Json(TagsResponse {
+                tags: cached.tags.clone(),
+            }));
+        }
+    }
+
     let conn = state
         .db
         .connect()
@@ -40,6 +53,11 @@ pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
         tags.push(tag_name);
     }
+
+    *state.cached_tags.write().await = Some(CachedTags {
+        tags: tags.clone(),
+        cached_at: Instant::now(),
+    });
 
     Ok(Json(TagsResponse { tags }))
 }

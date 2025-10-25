@@ -7,10 +7,19 @@ use crate::{AppConfig, AppError, DatabaseConnection};
 use axum_template::engine::Engine;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tera::{Tera, Value};
+use tokio::sync::RwLock;
 
 // type declarations
 type AppEngine = Engine<Tera>;
+pub type TagCache = Arc<RwLock<Option<CachedTags>>>;
+
+#[derive(Clone)]
+pub struct CachedTags {
+    pub tags: Vec<String>,
+    pub cached_at: Instant,
+}
 
 // struct type to represent the application state
 #[derive(Clone)]
@@ -19,6 +28,7 @@ pub struct AppState {
     pub db: DatabaseConnection,
     pub jwt_keys: Keys,
     pub storage: Arc<dyn StorageBackend>,
+    pub cached_tags: TagCache,
 }
 
 // function to setup the Tera templates
@@ -67,6 +77,7 @@ impl AppState {
             db,
             jwt_keys,
             storage,
+            cached_tags: Arc::new(RwLock::new(None)),
         })
     }
 }

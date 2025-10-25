@@ -1,6 +1,6 @@
 // tests/api/template_rendering.rs
 
-use crate::helpers::{spawn_app, TestUserBuilder, TestArticleBuilder};
+use crate::helpers::{TestArticleBuilder, TestUserBuilder, spawn_app};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -612,7 +612,8 @@ async fn test_homepage_shows_total_article_count() {
     let token = app.register_user_default("testauthor").await;
 
     for i in 1..=10 {
-        app.create_article_simple(&token, &format!("Article {}", i)).await;
+        app.create_article_simple(&token, &format!("Article {}", i))
+            .await;
     }
 
     // Act - Access the homepage

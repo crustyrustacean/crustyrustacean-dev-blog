@@ -2,7 +2,10 @@
 
 use crate::helpers::{TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
-use reqwest::{StatusCode, multipart::{Form, Part}};
+use reqwest::{
+    StatusCode,
+    multipart::{Form, Part},
+};
 use serde_json::{Value, json};
 
 // ============================================================================
@@ -13,7 +16,9 @@ use serde_json::{Value, json};
 async fn upload_media_succeeds_with_valid_image() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("testuser", "test@example.com", "password123").await;
+    let token = app
+        .register_user("testuser", "test@example.com", "password123")
+        .await;
 
     // Create a simple 1x1 PNG image (smallest possible PNG)
     let png_bytes = vec![
@@ -58,7 +63,9 @@ async fn upload_media_succeeds_with_valid_image() {
 async fn upload_media_with_metadata() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("metauser", "meta@example.com", "password123").await;
+    let token = app
+        .register_user("metauser", "meta@example.com", "password123")
+        .await;
 
     let png_bytes = vec![
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
@@ -97,14 +104,19 @@ async fn upload_media_with_metadata() {
     assert_eq!(body["media"]["title"], "Test Image");
     assert_eq!(body["media"]["alt_text"], "A test image for testing");
     assert_eq!(body["media"]["caption"], "Test caption");
-    assert_eq!(body["media"]["description"], "This is a test image upload with metadata");
+    assert_eq!(
+        body["media"]["description"],
+        "This is a test image upload with metadata"
+    );
 }
 
 #[tokio::test]
 async fn upload_media_fails_with_non_image_file() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("textuser", "text@example.com", "password123").await;
+    let token = app
+        .register_user("textuser", "text@example.com", "password123")
+        .await;
 
     let part = Part::text("not an image")
         .file_name("test.txt")
@@ -164,7 +176,9 @@ async fn upload_media_fails_without_authentication() {
 async fn upload_media_fails_with_no_file() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("nofile", "nofile@example.com", "password123").await;
+    let token = app
+        .register_user("nofile", "nofile@example.com", "password123")
+        .await;
 
     let form = Form::new();
 
@@ -190,7 +204,9 @@ async fn upload_media_fails_with_no_file() {
 async fn list_media_returns_users_media() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("listuser", "list@example.com", "password123").await;
+    let token = app
+        .register_user("listuser", "list@example.com", "password123")
+        .await;
 
     // Upload a test image first
     let png_bytes = vec![
@@ -252,7 +268,9 @@ async fn list_media_fails_without_authentication() {
 async fn list_media_with_pagination() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("pageuser", "page@example.com", "password123").await;
+    let token = app
+        .register_user("pageuser", "page@example.com", "password123")
+        .await;
 
     // Act
     let response = app
@@ -280,7 +298,9 @@ async fn list_media_with_pagination() {
 async fn get_media_metadata_succeeds_for_owner() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("metaowner", "metaowner@example.com", "password123").await;
+    let token = app
+        .register_user("metaowner", "metaowner@example.com", "password123")
+        .await;
 
     // Upload media
     let png_bytes = vec![
@@ -331,8 +351,12 @@ async fn get_media_metadata_succeeds_for_owner() {
 async fn get_media_metadata_fails_for_non_owner() {
     // Arrange
     let app = spawn_app().await;
-    let owner_token = app.register_user("owner", "owner@example.com", "password123").await;
-    let other_token = app.register_user("other", "other@example.com", "password123").await;
+    let owner_token = app
+        .register_user("owner", "owner@example.com", "password123")
+        .await;
+    let other_token = app
+        .register_user("other", "other@example.com", "password123")
+        .await;
 
     // Owner uploads media
     let png_bytes = vec![
@@ -378,7 +402,9 @@ async fn get_media_metadata_fails_for_non_owner() {
 async fn get_media_metadata_fails_for_nonexistent_media() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("notfound", "notfound@example.com", "password123").await;
+    let token = app
+        .register_user("notfound", "notfound@example.com", "password123")
+        .await;
     let fake_id = "nonexistent-media-id";
 
     // Act
@@ -401,7 +427,9 @@ async fn get_media_metadata_fails_for_nonexistent_media() {
 async fn update_media_metadata_succeeds() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("updater", "updater@example.com", "password123").await;
+    let token = app
+        .register_user("updater", "updater@example.com", "password123")
+        .await;
 
     // Upload media
     let png_bytes = vec![
@@ -461,8 +489,12 @@ async fn update_media_metadata_succeeds() {
 async fn update_media_metadata_fails_for_non_owner() {
     // Arrange
     let app = spawn_app().await;
-    let owner_token = app.register_user("metaowner2", "metaowner2@example.com", "password123").await;
-    let other_token = app.register_user("metaother", "metaother@example.com", "password123").await;
+    let owner_token = app
+        .register_user("metaowner2", "metaowner2@example.com", "password123")
+        .await;
+    let other_token = app
+        .register_user("metaother", "metaother@example.com", "password123")
+        .await;
 
     // Owner uploads media
     let png_bytes = vec![
@@ -517,7 +549,9 @@ async fn update_media_metadata_fails_for_non_owner() {
 async fn delete_media_succeeds_for_owner() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("deleter", "deleter@example.com", "password123").await;
+    let token = app
+        .register_user("deleter", "deleter@example.com", "password123")
+        .await;
 
     // Upload media
     let png_bytes = vec![
@@ -573,8 +607,12 @@ async fn delete_media_succeeds_for_owner() {
 async fn delete_media_fails_for_non_owner() {
     // Arrange
     let app = spawn_app().await;
-    let owner_token = app.register_user("delowner", "delowner@example.com", "password123").await;
-    let other_token = app.register_user("delother", "delother@example.com", "password123").await;
+    let owner_token = app
+        .register_user("delowner", "delowner@example.com", "password123")
+        .await;
+    let other_token = app
+        .register_user("delother", "delother@example.com", "password123")
+        .await;
 
     // Owner uploads media
     let png_bytes = vec![
@@ -620,7 +658,9 @@ async fn delete_media_fails_for_non_owner() {
 async fn delete_media_fails_for_nonexistent_media() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("delfake", "delfake@example.com", "password123").await;
+    let token = app
+        .register_user("delfake", "delfake@example.com", "password123")
+        .await;
     let fake_id = "nonexistent-media-id";
 
     // Act
@@ -643,7 +683,9 @@ async fn delete_media_fails_for_nonexistent_media() {
 async fn download_media_succeeds() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("downloader", "downloader@example.com", "password123").await;
+    let token = app
+        .register_user("downloader", "downloader@example.com", "password123")
+        .await;
 
     let png_bytes = vec![
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
@@ -682,10 +724,7 @@ async fn download_media_succeeds() {
 
     // Assert
     assert_status!(response, StatusCode::OK);
-    assert_eq!(
-        response.headers().get("content-type").unwrap(),
-        "image/png"
-    );
+    assert_eq!(response.headers().get("content-type").unwrap(), "image/png");
 
     let downloaded_bytes = response.bytes().await.expect("Failed to get bytes");
     assert_eq!(downloaded_bytes.to_vec(), png_bytes);
@@ -717,7 +756,9 @@ async fn download_media_fails_for_nonexistent_media() {
 async fn complete_media_lifecycle_workflow() {
     // Arrange
     let app = spawn_app().await;
-    let token = app.register_user("lifecycle", "lifecycle@example.com", "password123").await;
+    let token = app
+        .register_user("lifecycle", "lifecycle@example.com", "password123")
+        .await;
 
     let png_bytes = vec![
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
@@ -795,7 +836,10 @@ async fn complete_media_lifecycle_workflow() {
         .expect("Failed to download");
 
     assert_status!(download_response, StatusCode::OK);
-    let downloaded_bytes = download_response.bytes().await.expect("Failed to get bytes");
+    let downloaded_bytes = download_response
+        .bytes()
+        .await
+        .expect("Failed to get bytes");
     assert_eq!(downloaded_bytes.to_vec(), png_bytes);
 
     // Step 6: Delete
