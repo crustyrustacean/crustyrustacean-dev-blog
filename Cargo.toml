@@ -1,6 +1,6 @@
 [package]
 name = "crustyrustacean-dev-blog"
-version = "1.7.3"
+version = "1.7.4"
 edition = "2024"
 authors = ["Jeffery D. Mitchell", "<crusty.rustacean@gmail.com>"]
 description = "A developer blog application built with Axum, Tera, and Turso database, hosted on Shuttle."
@@ -44,7 +44,7 @@ tera = "1.20.0"
 thiserror = "2.0.17"
 tokio = "1.47.1"
 tower = "0.5.2"
-tower-http = { version = "0.6.6", features = ["fs", "request-id", "trace", "util", "cors", "set-header"] }
+tower-http = { version = "0.6.6", features = ["compression-gzip", "fs", "request-id", "trace", "util", "cors", "set-header"] }
 tracing = { version = "0.1.41", features = ["log"] }
 tracing-bunyan-formatter = "0.3.10"
 tracing-log = "0.2.0"

@@ -24,6 +24,7 @@ use axum::{
 };
 use tokio::net::TcpListener;
 use tower_http::{
+    compression::CompressionLayer,
     cors::CorsLayer,
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
@@ -130,6 +131,7 @@ impl App {
             .nest_service("/static", ServeDir::new("static"))
             .fallback(handle_404_simple)
             .with_state(state)
+            .layer(CompressionLayer::new())
             .layer(CorsLayer::permissive())
             .layer(SetRequestIdLayer::new(
                 x_request_id.clone(),
@@ -148,6 +150,10 @@ impl App {
             .layer(SetResponseHeaderLayer::if_not_present(
                 header::STRICT_TRANSPORT_SECURITY,
                 HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+            ))
+            .layer(SetResponseHeaderLayer::if_not_present(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
             ))
     }
 
