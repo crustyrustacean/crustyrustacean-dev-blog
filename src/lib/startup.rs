@@ -151,10 +151,6 @@ impl App {
                 header::STRICT_TRANSPORT_SECURITY,
                 HeaderValue::from_static("max-age=31536000; includeSubDomains"),
             ))
-            .layer(SetResponseHeaderLayer::if_not_present(
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("public, max-age=31536000, immutable"),
-            ))
     }
 
     /// run the application until stopped (utility function to faciliate local integration testing)
