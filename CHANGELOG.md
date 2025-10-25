@@ -2,6 +2,40 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [1.8.0] - 2025-10-25
+
+### Added - Search Functionality
+- **Complete Search System**:
+  - Full-text search across article titles, descriptions, and body content
+  - Real-time search with responsive UI
+  - Search results with highlighted relevance
+  - Empty state handling for no results
+  - Client-side JavaScript module for search interactions
+
+- **API Endpoint**:
+  - `GET /api/search` - Search articles by query parameter (public)
+  - Returns matching articles with author profiles and metadata
+  - Efficient database querying with LIKE pattern matching
+
+- **Frontend Integration**:
+  - Search form in navigation bar (base template)
+  - Dedicated search results page at `/search`
+  - Modular JavaScript (`search.js`) for search interactions
+  - Responsive design matching existing UI patterns
+  - Real-time result display with article previews
+
+- **Test Coverage**:
+  - Comprehensive integration tests for search endpoint
+  - Tests for empty queries, no results, and successful searches
+  - Validation of search result format and content
+  - Multi-article search scenarios
+
+### Technical Details
+- **Implementation**: Built following TDD methodology with test-first approach
+- **Performance**: Efficient SQL LIKE queries for pattern matching
+- **User Experience**: Seamless integration with existing navigation
+- **Extensibility**: Foundation for advanced search features (filters, relevance ranking)
+
 ## [1.7.0] - 2025-10-24
 
 ### Added - Media Library System (MVP)

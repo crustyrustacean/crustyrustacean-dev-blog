@@ -93,7 +93,7 @@ async fn test_list_api_keys_happy_path() {
         assert!(key["id"].is_string());
         assert!(key["name"].is_string());
         assert!(key["created_at"].is_string());
-        assert!(!key.get("key").is_some(), "Raw key should NOT be included in list");
+        assert!(key.get("key").is_none(), "Raw key should NOT be included in list");
     }
 
     // Verify keys are ordered by created_at DESC (most recent first)

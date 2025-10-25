@@ -11,7 +11,7 @@ use crate::routes::{
     get_media_library_page, get_media_metadata, get_my_favorites_page, get_privacy, get_profile,
     get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags,
     get_tags_admin_page, get_terms, handle_404_simple, health_check, list_api_keys, list_articles,
-    list_media, list_profiles, login_user, mobile_upload_article, register_user,
+    list_media, list_profiles, login_user, mobile_upload_article, register_user, search_articles,
     unfavorite_article, unfollow_user, update_article, update_current_user, update_media_metadata,
     update_tag, upload_media,
 };
@@ -128,6 +128,7 @@ impl App {
                     .delete(delete_media),
             )
             .route("/api/media/{id}/download", get(download_media))
+            .route("/api/search", get(search_articles))
             .nest_service("/static", ServeDir::new("static"))
             .fallback(handle_404_simple)
             .with_state(state)

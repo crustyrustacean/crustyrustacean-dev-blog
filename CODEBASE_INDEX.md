@@ -1,7 +1,7 @@
 # CrustyRustacean Dev Blog - Codebase Index
 
-**Generated:** 2025-10-24
-**Version:** 1.7.0
+**Generated:** 2025-10-25
+**Version:** 1.8.0
 **Repository:** https://github.com/crustyrustacean/crustyrustacean-dev-blog
 
 ---
@@ -37,6 +37,7 @@ A production-ready developer blog application built with modern Rust web technol
 - Comments system with authorization
 - Favorites and social following
 - Tag-based categorization
+- Full-text search functionality
 - RSS feed syndication
 - Media library with cloud storage (OpenDAL)
 - SEO optimization (sitemap, robots.txt)
@@ -891,6 +892,31 @@ pub struct AppConfig {
 
 ---
 
+#### **src/lib/routes/search.rs**
+**Purpose:** Full-text search across articles
+
+**Endpoints:**
+
+1. **GET /api/search** - `search_articles()`
+   - Public endpoint
+   - Query param: q (search query)
+   - Searches across title, description, and body
+   - Returns matching articles with author profiles
+   - Uses SQL LIKE pattern matching
+   - Includes metadata and tags
+
+**HTML Page Handlers:**
+
+2. **GET /search** - `get_search_page()`
+   - Search results page
+   - Displays matching articles
+   - Empty state for no results
+   - Responsive grid layout
+
+**Location:** `src/lib/routes/search.rs`
+
+---
+
 #### **src/lib/routes/media.rs** (720 lines)
 **Purpose:** Media library management with cloud storage
 
@@ -1216,6 +1242,7 @@ cargo test test_create_article
 | **admin.js** | Admin dashboard | base.js |
 | **tags-admin.js** | Tag management | base.js |
 | **media-library.js** | Media library management | base.js |
+| **search.js** | Search functionality | base.js |
 | **error404.js** | 404 page enhancements | None |
 
 ### Template Structure (22 files)
@@ -1350,6 +1377,10 @@ base.html
 - `GET /api/tags` - List all tags
 - `PUT /api/tags/{name}` - Update (protected)
 - `DELETE /api/tags/{name}` - Delete (protected)
+
+#### Search
+- `GET /api/search` - Search articles by query
+- `GET /search` - Search results page
 
 #### Media Library
 - `POST /api/media` - Upload media (protected)
@@ -1530,7 +1561,16 @@ crustyrustacean-dev-blog/
 
 ---
 
-## Recent Changes (v1.7.0)
+## Recent Changes (v1.8.0)
+
+- **Search Functionality**: Full-text search across articles
+  - Real-time search with responsive UI
+  - Search across title, description, and body content
+  - Dedicated search results page
+  - Modular JavaScript integration
+  - Comprehensive integration tests
+
+## Previous Changes (v1.7.0)
 
 - **Media Library System (MVP)**: Complete media management with OpenDAL integration
   - File upload with multipart form support
@@ -1547,6 +1587,6 @@ crustyrustacean-dev-blog/
 
 ---
 
-**Index Generated:** 2025-10-24
-**Version:** 1.7.0
+**Index Generated:** 2025-10-25
+**Version:** 1.8.0
 **Documentation:** https://github.com/crustyrustacean/crustyrustacean-dev-blog

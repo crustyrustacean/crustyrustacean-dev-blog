@@ -49,6 +49,13 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Interactive follow/unfollow with real-time updates
   - Pagination and responsive design
   - Complete API endpoints with authentication
+- **Search System** (TDD implementation):
+  - Full-text search across article titles, descriptions, and body
+  - Real-time search with responsive UI
+  - Dedicated search results page at /search
+  - GET /api/search endpoint for querying articles
+  - Empty state handling for no results
+  - Modular JavaScript integration
 - **Tags System** (TDD implementation):
   - GET /api/tags endpoint for retrieving all tags
   - Alphabetically sorted tag lists
@@ -86,7 +93,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 ### 🚧 Planned
 - Image processing and optimization
 - Media thumbnails and CDN integration
-- Advanced search and filtering
+- Advanced search features (filters, relevance ranking)
 - Rich text editor enhancements with media embedding
 - Social sharing features
 
@@ -120,7 +127,7 @@ src/
 static/
   css/
     styles.css      # Main stylesheet with responsive design
-  js/               # Modular JavaScript architecture (19 modules)
+  js/               # Modular JavaScript architecture (20 modules)
     admin.js        # Admin dashboard functionality
     article-init.js # Article initialization
     article-list.js # Articles listing interactions
@@ -136,6 +143,7 @@ static/
     feed.js         # Personal feed functionality
     homepage.js     # Homepage dynamic features
     profile.js      # User profile interactions
+    search.js       # Search functionality
     utils.js        # Shared utilities and helpers
   images/           # Static images and assets
 templates/          # Tera templates for HTML rendering
@@ -169,6 +177,7 @@ tests/
     tags.rs         # Tags API integration tests (3 tests)
     rss.rs          # RSS feed integration tests (4 tests)
     comments.rs     # Comments API integration tests (11 tests)
+    search.rs       # Search API integration tests
     template_rendering.rs # Template rendering integration tests
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
@@ -191,7 +200,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (122+ total)
+cargo test              # Run all tests (125+ total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -199,6 +208,7 @@ cargo test authors      # Run authors discovery tests only
 cargo test tags         # Run tags API tests only
 cargo test rss          # Run RSS feed tests only
 cargo test comments     # Run comments API tests only
+cargo test search       # Run search API tests only
 cargo test media        # Run media library tests only
 cargo test api::        # Run all API integration tests
 ```
@@ -215,6 +225,7 @@ The test suite includes comprehensive testing:
 - ✅ Tags API with alphabetical sorting and filtering
 - ✅ RSS feed generation with XML validation
 - ✅ Comments API with authorization and validation
+- ✅ Search API with full-text querying across articles
 - ✅ Media library with file upload and storage operations
 - ✅ Idempotent operations and multi-user scenarios
 
@@ -231,6 +242,7 @@ shuttle deploy
 GET  /                             # Homepage with dynamic articles
 GET  /articles                     # Articles listing page
 GET  /articles/{slug}              # Individual article view
+GET  /search                       # Search results page
 GET  /login                        # Login page
 GET  /register                     # Registration page
 GET  /editor                       # Article editor (protected)
@@ -282,6 +294,11 @@ GET    /api/articles?favorited={user}  # Get articles favorited by user
 GET /api/tags                      # Get all tags (alphabetically sorted)
 ```
 
+### Search API
+```
+GET /api/search?q={query}          # Search articles by query
+```
+
 ### Comments API
 ```
 POST   /api/articles/{slug}/comments       # Add comment to article (protected)
@@ -318,10 +335,11 @@ The application now includes a complete blog system:
 8. **Authors Discovery**: Browse and search for authors to follow with interactive UI
 9. **Social Features**: Complete follow/unfollow system with real-time updates
 10. **Tags System**: Dynamic tag display with filtering and alphabetical organization
-11. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
-12. **Comments System**: Add, view, and delete comments on articles with proper authorization
-13. **Media Library**: Upload and manage media files with cloud storage integration
-14. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+11. **Search System**: Full-text search across articles with real-time results
+12. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
+13. **Comments System**: Add, view, and delete comments on articles with proper authorization
+14. **Media Library**: Upload and manage media files with cloud storage integration
+15. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -346,8 +364,8 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 122+ integration tests covering happy path and failure scenarios
-- **Test-Driven Development**: Tags, RSS, Comments, and Media Library features built with TDD approach
+- **Comprehensive Testing**: 125+ integration tests covering happy path and failure scenarios
+- **Test-Driven Development**: Tags, RSS, Comments, Search, and Media Library features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 - **Cloud-Native Storage**: OpenDAL integration for flexible storage backend options

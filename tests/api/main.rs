@@ -15,6 +15,7 @@ mod markdown_integration;
 mod media;
 mod robots;
 mod rss;
+mod search;
 mod sitemap;
 mod tags;
 mod template_rendering;
