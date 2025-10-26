@@ -41,7 +41,7 @@ A production-ready developer blog application built with modern Rust web technol
 - RSS feed syndication
 - Media library with cloud storage (OpenDAL)
 - SEO optimization (sitemap, robots.txt)
-- Admin dashboard
+- Admin dashboard with copy-to-clipboard slug functionality
 - Responsive Bootstrap UI
 
 ---
@@ -79,8 +79,8 @@ A production-ready developer blog application built with modern Rust web technol
 ### Storage & Media
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| OpenDAL | 0.51.0 | Unified data access layer for cloud storage |
-| UUID | 1.11.0 | Unique identifier generation |
+| OpenDAL | 0.54.1 | Unified data access layer for cloud storage |
+| UUID | 1.18.1 | Unique identifier generation |
 
 ### Observability
 | Technology | Version | Purpose |
@@ -508,6 +508,29 @@ pub struct AppConfig {
    - Format: `{"media": [...], "media_count": N}`
 
 **Location:** `src/lib/models/media.rs`
+
+---
+
+#### **src/lib/models/api_key.rs**
+
+**Structures:**
+
+1. **ApiKey** - API key entity
+   - Fields: id, user_id, name, key_hash, created_at, last_used_at, expires_at
+
+2. **CreateApiKey** - API key creation input
+   - Fields: name, expires_at (optional)
+   - Validation: name required
+
+3. **ApiKeyResponse** - API response format
+   - Includes: id, name, key (only on creation), created_at, expires_at
+   - Note: Actual key value only returned once during creation
+
+4. **ApiKeyInfo** - API key listing format
+   - Includes: id, name, created_at, last_used_at, expires_at
+   - Excludes: key_hash (for security)
+
+**Location:** `src/lib/models/api_key.rs`
 
 ---
 
@@ -981,6 +1004,49 @@ pub struct AppConfig {
 
 ---
 
+#### **src/lib/routes/api_keys.rs**
+**Purpose:** API key management for programmatic access
+
+**Endpoints:**
+
+1. **POST /api/keys** - `create_api_key()`
+   - Protected: requires JWT
+   - Creates new API key for authenticated user
+   - Input: name, optional expiration date
+   - Returns: API key with actual key value (shown only once)
+   - Generates secure random key and stores hash
+
+2. **GET /api/keys** - `list_api_keys()`
+   - Protected: requires JWT
+   - Lists all API keys for current user
+   - Returns: key metadata (id, name, created_at, last_used_at, expires_at)
+   - Does not include actual key values
+
+3. **DELETE /api/keys/:id** - `delete_api_key()`
+   - Protected: requires JWT
+   - Authorization: must be key owner
+   - Deletes specified API key
+   - Returns 204 No Content
+
+**HTML Page Handlers:**
+
+4. **GET /admin/api-keys** - `get_api_keys_admin_page()`
+   - Protected: requires JWT
+   - API key management interface
+   - Create and delete operations
+   - Display key metadata table
+
+**Security Features:**
+- Keys stored as hashes (never plaintext)
+- Actual key value shown only once at creation
+- Owner-based access control
+- Optional expiration dates
+- Last used tracking
+
+**Location:** `src/lib/routes/api_keys.rs`
+
+---
+
 ## Database Schema
 
 ### Entity Relationship Diagram
@@ -1135,7 +1201,7 @@ CREATE INDEX idx_media_user ON media_library(user_id);
 
 **Location:** `tests/api/`
 **Total Lines:** ~4,777
-**Total Tests:** 81+
+**Total Tests:** 122+ (107 integration + 15 unit)
 
 ### Test Helpers (`tests/api/helpers.rs` - 351 lines)
 
@@ -1183,6 +1249,9 @@ CREATE INDEX idx_media_user ON media_library(user_id);
 | admin_dashboard.rs | ~232 | 12+ | Admin functionality |
 | template_rendering.rs | ~432 | 15+ | Template compilation |
 | markdown_integration.rs | ~173 | 12+ | Markdown processing |
+| media.rs | ~350 | 15+ | Media upload, CRUD, storage integration |
+| api_keys.rs | ~280 | 12+ | API key creation, listing, deletion |
+| search.rs | ~195 | 10+ | Full-text search functionality |
 | feed_page.rs | ~80 | 8+ | Feed page rendering |
 | robots.rs | ~80 | 5+ | Robots.txt generation |
 | health_check.rs | - | 5+ | Health endpoint |
@@ -1207,6 +1276,9 @@ cargo test
 cargo test articles
 cargo test auth
 cargo test favorites
+cargo test api_keys
+cargo test media
+cargo test search
 
 # Verbose output
 TEST_LOG=true cargo test
@@ -1219,7 +1291,7 @@ cargo test test_create_article
 
 ## Frontend Assets
 
-### JavaScript Architecture (17 modules)
+### JavaScript Architecture (19 modules)
 
 **Location:** `static/js/`
 
@@ -1239,13 +1311,14 @@ cargo test test_create_article
 | **profile.js** | Profile page interactions | base.js |
 | **authors.js** | Authors discovery | base.js |
 | **feed.js** | Personal feed page | base.js |
-| **admin.js** | Admin dashboard | base.js |
+| **admin.js** | Admin dashboard with slug copy-to-clipboard | base.js |
 | **tags-admin.js** | Tag management | base.js |
+| **api-keys.js** | API key management | base.js |
 | **media-library.js** | Media library management | base.js |
 | **search.js** | Search functionality | base.js |
 | **error404.js** | 404 page enhancements | None |
 
-### Template Structure (22 files)
+### Template Structure (24 files)
 
 **Location:** `templates/`
 
@@ -1274,7 +1347,8 @@ base.html
   │   └── authors.html
   ├── admin/
   │   ├── dashboard.html
-  │   └── tags.html
+  │   ├── tags.html
+  │   └── api-keys.html
   ├── media/
   │   └── library.html (media library admin)
   └── errors/
@@ -1377,6 +1451,11 @@ base.html
 - `GET /api/tags` - List all tags
 - `PUT /api/tags/{name}` - Update (protected)
 - `DELETE /api/tags/{name}` - Delete (protected)
+
+#### API Keys
+- `POST /api/keys` - Create API key (protected)
+- `GET /api/keys` - List user's API keys (protected)
+- `DELETE /api/keys/:id` - Delete API key (protected)
 
 #### Search
 - `GET /api/search` - Search articles by query

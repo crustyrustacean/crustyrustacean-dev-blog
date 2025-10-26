@@ -93,6 +93,7 @@ pub struct TestApp {
     pub address: String,
     pub port: u16,
     pub client: Client,
+    pub db: DatabaseConnection,
 }
 
 // helper function which builds and returns a test application
@@ -133,7 +134,7 @@ pub async fn spawn_app() -> TestApp {
     let storage: Arc<dyn StorageBackend> = Arc::new(OpenDalStorage::new(operator));
 
     // set up the app state
-    let app_state = AppState::new(db_connection, storage, &app_config)
+    let app_state = AppState::new(db_connection.clone(), storage, &app_config)
         .expect("Unable to build the Tera templates");
 
     // create the test application
@@ -163,6 +164,7 @@ pub async fn spawn_app() -> TestApp {
         address: format!("http://127.0.0.1:{}", port),
         port,
         client,
+        db: db_connection,
     }
 }
 

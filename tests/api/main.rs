@@ -16,6 +16,7 @@ mod media;
 mod robots;
 mod rss;
 mod search;
+mod shortcodes;
 mod sitemap;
 mod tags;
 mod template_rendering;

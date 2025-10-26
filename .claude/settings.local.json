@@ -6,7 +6,11 @@
       "Bash(git checkout:*)",
       "Bash(cargo check:*)",
       "Bash(cargo test:*)",
-      "Bash(Select-String -Pattern \"test result:\")"
+      "Bash(Select-String -Pattern \"test result:\")",
+      "Bash(dir:*)",
+      "Bash(del \"C:\\Users\\jeff\\Development\\crustyrustacean\\rust-lang\\crustyrustacean-dev-blog\\CODEBASE_INDEX_SUMMARY.md\")",
+      "Bash(rm:*)",
+      "Bash(cargo clippy:*)"
     ],
     "deny": [],
     "ask": []

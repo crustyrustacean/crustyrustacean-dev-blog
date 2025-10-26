@@ -26,6 +26,7 @@
                                 <thead class="table-dark">
                                     <tr>
                                         <th scope="col">Title</th>
+                                        <th scope="col">Slug</th>
                                         <th scope="col">Author</th>
                                         <th scope="col">Tags</th>
                                         <th scope="col">Created</th>
@@ -41,6 +42,16 @@
                                             <div class="d-flex flex-column">
                                                 <strong>{{ article.title }}</strong>
                                                 <small class="text-muted">{{ article.description }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <code class="text-muted small">{{ article.slug }}</code>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary copy-slug-btn"
+                                                        data-slug="{{ article.slug }}"
+                                                        title="Copy slug to clipboard">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
                                             </div>
                                         </td>
                                         <td>

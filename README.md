@@ -21,7 +21,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Articles listing page with responsive design
   - Individual article pages with slug-based routing
   - Full CRUD operations for articles
-  - Admin dashboard for content management
+  - Admin dashboard for content management with copy-to-clipboard slug functionality
 - **Professional frontend** with Tera templating:
   - Bootstrap-based responsive design
   - SEO-friendly URLs and metadata
@@ -128,7 +128,7 @@ static/
   css/
     styles.css      # Main stylesheet with responsive design
   js/               # Modular JavaScript architecture (20 modules)
-    admin.js        # Admin dashboard functionality
+    admin.js        # Admin dashboard with copy-to-clipboard functionality
     article-init.js # Article initialization
     article-list.js # Articles listing interactions
     article-page.js # Individual article page features
@@ -327,9 +327,9 @@ The application now includes a complete blog system:
 
 1. **Dynamic Homepage**: Real-time article summaries, blog statistics (article count, topics covered, latest post date)
 2. **Articles Listing**: Professional grid layout with filtering options and pagination
-3. **Individual Articles**: Slug-based URLs for SEO-friendly article pages  
+3. **Individual Articles**: Slug-based URLs for SEO-friendly article pages
 4. **Content Management**: Full CRUD operations with proper authorization
-5. **Admin Interface**: Dashboard for managing articles, users, and content
+5. **Admin Interface**: Dashboard for managing articles, users, and content with copy-to-clipboard slug functionality
 6. **Favorites System**: Interactive favorite/unfavorite with personal favorites page
 7. **Personal Feed**: Curated feed showing articles from authors you follow
 8. **Authors Discovery**: Browse and search for authors to follow with interactive UI

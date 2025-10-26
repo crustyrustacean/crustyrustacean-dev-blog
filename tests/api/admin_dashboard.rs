@@ -134,3 +134,106 @@ async fn test_admin_dashboard_template_renders_with_special_characters() {
     // Should contain escaped/safe versions of special characters
     assert_body_contains(&body, &["Admin Dashboard", "Test Article with"]);
 }
+
+#[tokio::test]
+async fn test_admin_dashboard_displays_article_slugs() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and get token
+    let token = app.register_user_default("slugtest").await;
+
+    // Create an article with a known title (slug will be auto-generated)
+    let slug = app
+        .create_article(
+            &token,
+            "My Great Article Title",
+            "A description for slug testing",
+            "Body content for slug test.",
+            vec!["test"],
+        )
+        .await;
+
+    // Act - Access admin dashboard
+    let response = app
+        .client
+        .get(format!("{}/admin", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should display slug in a dedicated column
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.assert_html_response().await;
+
+    // Should contain table header for Slug column
+    assert_body_contains(&body, &["Slug"]);
+
+    // Should contain the actual slug value in the table
+    assert!(
+        body.contains(&slug),
+        "Admin dashboard should display the article slug: {}",
+        slug
+    );
+
+    // Should have a copy button for the slug (with data-slug attribute)
+    assert!(
+        body.contains(&format!("data-slug=\"{}\"", slug)),
+        "Admin dashboard should have a copy button with data-slug attribute"
+    );
+}
+
+#[tokio::test]
+async fn test_admin_dashboard_displays_multiple_article_slugs() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register user and get token
+    let token = app.register_user_default("multislug").await;
+
+    // Create multiple articles with different titles
+    let slug1 = app
+        .create_article_simple(&token, "First Article")
+        .await;
+
+    let slug2 = app
+        .create_article_simple(&token, "Second Article")
+        .await;
+
+    let slug3 = app
+        .create_article_simple(&token, "Third Article")
+        .await;
+
+    // Act - Access admin dashboard
+    let response = app
+        .client
+        .get(format!("{}/admin", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should display all slugs
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.assert_html_response().await;
+
+    // All slugs should be present
+    assert!(
+        body.contains(&slug1),
+        "Dashboard should contain first article slug: {}",
+        slug1
+    );
+    assert!(
+        body.contains(&slug2),
+        "Dashboard should contain second article slug: {}",
+        slug2
+    );
+    assert!(
+        body.contains(&slug3),
+        "Dashboard should contain third article slug: {}",
+        slug3
+    );
+}

@@ -139,6 +139,14 @@ pub async fn create_article(
     let article_id = Uuid::new_v4();
     let now = Utc::now();
 
+    // Process shortcodes in article body before storing
+    let processed_body = crate::shortcodes::process_shortcodes(&article_data.body, &state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to process shortcodes: {}", e);
+            AppError::InternalServerError("Failed to process article links".to_string())
+        })?;
+
     // Insert the article
     conn.execute(
         "INSERT INTO articles (id, slug, title, description, body, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -147,7 +155,7 @@ pub async fn create_article(
             slug.clone(),
             article_data.title.clone(),
             article_data.description.clone(),
-            article_data.body.clone(),
+            processed_body.clone(),
             user.user_id.to_string(),
             now.to_rfc3339(),
             now.to_rfc3339(),
@@ -191,13 +199,13 @@ pub async fn create_article(
         following: false, // Not relevant for article creation
     };
 
-    let rendered_body = markdown_to_html(&article_data.body);
+    let rendered_body = markdown_to_html(&processed_body);
 
     let article_response = ArticleResponse {
         slug: slug.clone(),
         title: article_data.title,
         description: article_data.description,
-        body: article_data.body,
+        body: processed_body,
         rendered_body: Some(rendered_body),
         tag_list: tag_names,
         created_at: now,
@@ -655,8 +663,15 @@ pub async fn update_article(
         params.push(description.clone());
     }
     if let Some(body) = &article_data.body {
+        // Process shortcodes in body before storing
+        let processed_body = crate::shortcodes::process_shortcodes(body, &state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to process shortcodes: {}", e);
+                AppError::InternalServerError("Failed to process article links".to_string())
+            })?;
         updates.push("body = ?");
-        params.push(body.clone());
+        params.push(processed_body);
     }
     updates.push("updated_at = ?");
     params.push(now.to_rfc3339());

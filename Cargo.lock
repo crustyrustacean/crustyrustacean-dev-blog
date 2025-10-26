@@ -638,7 +638,7 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crustyrustacean-dev-blog"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -655,6 +655,7 @@ dependencies = [
  "opendal",
  "pulldown-cmark",
  "rand 0.9.2",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

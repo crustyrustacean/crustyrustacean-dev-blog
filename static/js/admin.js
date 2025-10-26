@@ -11,6 +11,7 @@ class AdminManager {
     init() {
         this.setupArticleManagement();
         this.setupUserManagement();
+        this.setupSlugCopy();
         this.loadDashboardData();
     }
 
@@ -29,6 +30,74 @@ class AdminManager {
         });
 
         // Edit article buttons are handled by navigation (no JS needed)
+    }
+
+    /**
+     * Setup slug copy-to-clipboard functionality
+     */
+    setupSlugCopy() {
+        // Copy slug buttons
+        document.querySelectorAll('.copy-slug-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const button = e.currentTarget;
+                const slug = button.dataset.slug;
+
+                if (!slug) {
+                    console.error('No slug found on button');
+                    return;
+                }
+
+                try {
+                    // Copy to clipboard using modern API
+                    await navigator.clipboard.writeText(slug);
+
+                    // Visual feedback - change icon temporarily
+                    const icon = button.querySelector('i');
+                    const originalClass = icon.className;
+                    icon.className = 'fas fa-check';
+                    button.classList.add('btn-success');
+                    button.classList.remove('btn-outline-secondary');
+
+                    // Reset after 2 seconds
+                    setTimeout(() => {
+                        icon.className = originalClass;
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-outline-secondary');
+                    }, 2000);
+                } catch (error) {
+                    console.error('Failed to copy slug:', error);
+                    // Fallback for older browsers
+                    this.fallbackCopySlug(slug, button);
+                }
+            });
+        });
+    }
+
+    /**
+     * Fallback copy method for browsers without clipboard API
+     */
+    fallbackCopySlug(slug, button) {
+        const textArea = document.createElement('textarea');
+        textArea.value = slug;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+
+        try {
+            document.execCommand('copy');
+            // Show success feedback
+            const icon = button.querySelector('i');
+            const originalClass = icon.className;
+            icon.className = 'fas fa-check';
+            setTimeout(() => {
+                icon.className = originalClass;
+            }, 2000);
+        } catch (error) {
+            console.error('Fallback copy failed:', error);
+        }
+
+        document.body.removeChild(textArea);
     }
 
     /**
