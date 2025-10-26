@@ -40,7 +40,8 @@ class AdminManager {
         document.querySelectorAll('.copy-slug-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const button = e.currentTarget;
-                const slug = button.dataset.slug;
+                // Explicitly read from DOM to avoid caching issues
+                const slug = button.getAttribute('data-slug');
 
                 if (!slug) {
                     console.error('No slug found on button');
@@ -48,8 +49,9 @@ class AdminManager {
                 }
 
                 try {
-                    // Copy to clipboard using modern API
-                    await navigator.clipboard.writeText(slug);
+                    // Copy shortcode format for internal linking
+                    const shortcode = `[[article:${slug}]]`;
+                    await navigator.clipboard.writeText(shortcode);
 
                     // Visual feedback - change icon temporarily
                     const icon = button.querySelector('i');
@@ -78,7 +80,9 @@ class AdminManager {
      */
     fallbackCopySlug(slug, button) {
         const textArea = document.createElement('textarea');
-        textArea.value = slug;
+        // Copy shortcode format for internal linking
+        const shortcode = `[[article:${slug}]]`;
+        textArea.value = shortcode;
         textArea.style.position = 'fixed';
         textArea.style.left = '-999999px';
         document.body.appendChild(textArea);
