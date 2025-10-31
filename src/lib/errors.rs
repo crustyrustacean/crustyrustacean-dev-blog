@@ -31,9 +31,6 @@ pub enum AppError {
 
     // Template-specific errors
     #[error(transparent)]
-    AxumTera(#[from] axum_template::engine::TeraError),
-
-    #[error(transparent)]
     Tera(#[from] tera::Error),
 }
 
@@ -58,10 +55,6 @@ impl IntoResponse for AppError {
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg),
             AppError::UnprocessableEntity(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
             AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
-            AppError::AxumTera(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Axum Tera template rendering error: {err}"),
-            ),
             AppError::Tera(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Tera template rendering error: {err}"),

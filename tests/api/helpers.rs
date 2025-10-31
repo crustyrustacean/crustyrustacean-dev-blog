@@ -294,6 +294,78 @@ impl TestArticleBuilder for TestApp {
     }
 }
 
+/// Trait for building test API keys with simplified operations
+#[async_trait]
+pub trait TestApiKeyBuilder {
+    /// Create an API key and return the full response body
+    async fn create_api_key(&self, token: &str, name: &str) -> serde_json::Value;
+
+    /// Create an API key and return just the key ID
+    async fn create_api_key_simple(&self, token: &str, name: &str) -> String;
+
+    /// List all API keys for the authenticated user
+    async fn list_api_keys(&self, token: &str) -> Vec<serde_json::Value>;
+
+    /// Delete an API key by ID
+    async fn delete_api_key(&self, token: &str, key_id: &str) -> reqwest::Response;
+
+    /// Get the URL for API keys endpoint
+    fn api_keys_url(&self) -> String;
+
+    /// Get the URL for a specific API key
+    fn api_key_url(&self, key_id: &str) -> String;
+}
+
+#[async_trait]
+impl TestApiKeyBuilder for TestApp {
+    async fn create_api_key(&self, token: &str, name: &str) -> serde_json::Value {
+        let response = self.client
+            .post(self.api_keys_url())
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&json!({"name": name}))
+            .send()
+            .await
+            .expect("Failed to create API key");
+
+        response.json().await.expect("Failed to parse API key response")
+    }
+
+    async fn create_api_key_simple(&self, token: &str, name: &str) -> String {
+        let body = self.create_api_key(token, name).await;
+        body["id"].as_str().expect("API key ID not found").to_string()
+    }
+
+    async fn list_api_keys(&self, token: &str) -> Vec<serde_json::Value> {
+        let response = self.client
+            .get(self.api_keys_url())
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .expect("Failed to list API keys");
+
+        let body: serde_json::Value = response.json().await.expect("Failed to parse response");
+        body["api_keys"].as_array().expect("api_keys not found").clone()
+    }
+
+    async fn delete_api_key(&self, token: &str, key_id: &str) -> reqwest::Response {
+        self.client
+            .delete(self.api_key_url(key_id))
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .expect("Failed to delete API key")
+    }
+
+    fn api_keys_url(&self) -> String {
+        format!("{}/api/keys", &self.address)
+    }
+
+    fn api_key_url(&self, key_id: &str) -> String {
+        format!("{}/api/keys/{}", &self.address, key_id)
+    }
+}
+
 // ============================================================================
 // Helper Macros
 // ============================================================================

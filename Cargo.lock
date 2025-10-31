@@ -265,18 +265,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-template"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3df50f7d669bfc3a8c348f08f536fe37e7acfbeded3cfdffd2ad3d76725fc40c"
-dependencies = [
- "axum 0.8.6",
- "serde",
- "tera",
- "thiserror 2.0.17",
-]
-
-[[package]]
 name = "backon"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -638,7 +626,7 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crustyrustacean-dev-blog"
-version = "1.9.1"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -646,12 +634,12 @@ dependencies = [
  "axum 0.8.6",
  "axum-extra",
  "axum-macros",
- "axum-template",
  "chrono",
  "dotenvy",
  "futures-util",
  "jsonwebtoken",
  "libsql",
+ "once_cell",
  "opendal",
  "pulldown-cmark",
  "rand 0.9.2",

@@ -10,10 +10,9 @@ use crate::routes::articles::list_articles;
 use crate::state::AppState;
 use axum::{
     extract::{Query, State},
-    response::IntoResponse,
+    response::{Html, IntoResponse},
 };
 use axum_macros::debug_handler;
-use axum_template::RenderHtml;
 use chrono::Datelike;
 use serde_json::{Value, json};
 
@@ -156,7 +155,11 @@ pub async fn get_index(
         "current_year": current_year
     });
 
-    Ok(RenderHtml("index.html", state.engine, context))
+    let html = state.templates
+        .render("index.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 // handler which renders the about page template
@@ -216,7 +219,11 @@ pub async fn get_about(
         "current_year": current_year
     });
 
-    Ok(RenderHtml("about.html", state.engine, context))
+    let html = state.templates
+        .render("about.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 // handler which renders the privacy policy page template
@@ -276,7 +283,11 @@ pub async fn get_privacy(
         "current_year": current_year
     });
 
-    Ok(RenderHtml("privacy.html", state.engine, context))
+    let html = state.templates
+        .render("privacy.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 // handler which renders the terms of service page template
@@ -336,5 +347,9 @@ pub async fn get_terms(
         "current_year": current_year
     });
 
-    Ok(RenderHtml("terms.html", state.engine, context))
+    let html = state.templates
+        .render("terms.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }

@@ -10,7 +10,9 @@
       "Bash(dir:*)",
       "Bash(del \"C:\\Users\\jeff\\Development\\crustyrustacean\\rust-lang\\crustyrustacean-dev-blog\\CODEBASE_INDEX_SUMMARY.md\")",
       "Bash(rm:*)",
-      "Bash(cargo clippy:*)"
+      "Bash(cargo clippy:*)",
+      "Bash(powershell -Command \"(Get-Content tests\\api\\api_keys.rs | Measure-Object -Line).Lines\")",
+      "Bash(powershell -Command \"(Get-Content tests\\api\\helpers.rs | Measure-Object -Line).Lines\")"
     ],
     "deny": [],
     "ask": []

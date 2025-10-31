@@ -8,6 +8,7 @@ use shuttle_runtime::{CustomError, SecretStore};
 #[derive(Clone, Debug)]
 pub struct AppConfig {
     pub jwt_secret: String,
+    pub templates_dir: String,
     pub external_stylesheet: String,
     pub override_stylesheet: String,
 }
@@ -21,6 +22,10 @@ impl TryFrom<&SecretStore> for AppConfig {
             .get("JWT_SECRET")
             .ok_or_else(|| anyhow!("Missing required configuration secret: JWT_SECRET"))?;
 
+        let templates_dir = secrets
+            .get("TEMPLATES_DIR")
+            .ok_or_else(|| anyhow!("Missing required templates directory: TEMPLATES_DIR"))?;
+
         let external_stylesheet = secrets
             .get("EXTERNAL_STYLESHEET")
             .ok_or_else(|| anyhow!("Missing required configuration secret: EXTERNAL_STYLESHEET"))?;
@@ -31,6 +36,7 @@ impl TryFrom<&SecretStore> for AppConfig {
 
         Ok(Self {
             jwt_secret,
+            templates_dir,
             external_stylesheet,
             override_stylesheet,
         })

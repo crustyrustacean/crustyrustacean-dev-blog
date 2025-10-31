@@ -4,10 +4,9 @@ use crate::{errors::AppError, state::AppState};
 use axum::{
     extract::{Request, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{Html, IntoResponse},
 };
 use axum_macros::debug_handler;
-use axum_template::RenderHtml;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -28,8 +27,11 @@ pub async fn handle_404(
         request_path: Some(request_path),
     };
 
-    let response = RenderHtml("errors/404.html", state.engine, content);
-    Ok((StatusCode::NOT_FOUND, response))
+    let html = state.templates
+        .render("errors/404.html", &tera::Context::from_serialize(&content)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok((StatusCode::NOT_FOUND, Html(html)))
 }
 
 #[debug_handler]
@@ -41,6 +43,9 @@ pub async fn handle_404_simple(
         request_path: None,
     };
 
-    let response = RenderHtml("errors/404.html", state.engine, content);
-    Ok((StatusCode::NOT_FOUND, response))
+    let html = state.templates
+        .render("errors/404.html", &tera::Context::from_serialize(&content)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok((StatusCode::NOT_FOUND, Html(html)))
 }

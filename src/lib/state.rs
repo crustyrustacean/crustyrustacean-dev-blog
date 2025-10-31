@@ -4,7 +4,7 @@
 use crate::auth::Keys;
 use crate::storage::StorageBackend;
 use crate::{AppConfig, AppError, DatabaseConnection};
-use axum_template::engine::Engine;
+use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -12,8 +12,10 @@ use tera::{Tera, Value};
 use tokio::sync::RwLock;
 
 // type declarations
-type AppEngine = Engine<Tera>;
 pub type TagCache = Arc<RwLock<Option<CachedTags>>>;
+
+// initialized a static variable to hold the compiled templates
+static COMPILED_TEMPLATES: OnceCell<Tera> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct CachedTags {
@@ -24,41 +26,48 @@ pub struct CachedTags {
 // struct type to represent the application state
 #[derive(Clone)]
 pub struct AppState {
-    pub engine: AppEngine,
+    pub templates: &'static Tera,
     pub db: DatabaseConnection,
     pub jwt_keys: Keys,
     pub storage: Arc<dyn StorageBackend>,
     pub cached_tags: TagCache,
 }
 
-// function to setup the Tera templates
-fn setup_templates(config: &AppConfig) -> Result<Engine<Tera>, tera::Error> {
-    let mut tera = Tera::new("templates/**/*")?;
+// simplified setup function
+fn setup_templates(config: &AppConfig) -> Result<&'static Tera, tera::Error> {
+    load_templates(&config.templates_dir, config)
+}
 
-    let external = config.external_stylesheet.clone();
-    let override_css = config.override_stylesheet.clone();
+// utility function to load and compile the templates once, saving them in static memory
+fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Tera, tera::Error> {
+    COMPILED_TEMPLATES.get_or_try_init(|| {
+        let mut tera = Tera::new(templates_dir)?;
+        
+        let external = config.external_stylesheet.clone();
+        let override_css = config.override_stylesheet.clone();
 
-    tera.register_function(
-        "theme_stylesheet",
-        move |args: &HashMap<String, Value>| -> tera::Result<Value> {
-            use tera::from_value;
+        tera.register_function(
+            "theme_stylesheet",
+            move |args: &HashMap<String, Value>| -> tera::Result<Value> {
+                use tera::from_value;
 
-            let which = args
-                .get("which")
-                .and_then(|v| from_value::<String>(v.clone()).ok())
-                .unwrap_or_else(|| "external".to_string());
+                let which = args
+                    .get("which")
+                    .and_then(|v| from_value::<String>(v.clone()).ok())
+                    .unwrap_or_else(|| "external".to_string());
 
-            let url = match which.as_str() {
-                "external" => &external,
-                "override" => &override_css,
-                _ => "",
-            };
+                let url = match which.as_str() {
+                    "external" => &external,
+                    "override" => &override_css,
+                    _ => "",
+                };
 
-            Ok(Value::String(url.to_string()))
-        },
-    );
-
-    Ok(Engine::from(tera))
+                Ok(Value::String(url.to_string()))
+            },
+        );
+        
+        Ok(tera)
+    })
 }
 
 // methods to build the configuration
@@ -69,11 +78,11 @@ impl AppState {
         storage: Arc<dyn StorageBackend>,
         config: &AppConfig,
     ) -> Result<Self, AppError> {
-        let engine = setup_templates(config)?;
+        let templates = setup_templates(config)?;
         let jwt_keys = Keys::from_config(config);
 
         Ok(Self {
-            engine,
+            templates,
             db,
             jwt_keys,
             storage,
@@ -91,6 +100,7 @@ mod tests {
     fn test_config() -> AppConfig {
         AppConfig {
             jwt_secret: "test-secret-key".to_string(),
+            templates_dir: "templates/**/*".to_string(),
             external_stylesheet: "https://cdn.example.com/bootstrap.css".to_string(),
             override_stylesheet: "/static/overrides.css".to_string(),
         }
@@ -128,6 +138,7 @@ mod tests {
     fn test_setup_templates_with_empty_stylesheets() {
         let config = AppConfig {
             jwt_secret: "test-secret".to_string(),
+            templates_dir: "templates/**/*".to_string(),
             external_stylesheet: "".to_string(),
             override_stylesheet: "".to_string(),
         };
@@ -145,6 +156,7 @@ mod tests {
     fn test_setup_templates_with_special_characters() {
         let config = AppConfig {
             jwt_secret: "test-secret".to_string(),
+            templates_dir: "templates/**/*".to_string(),
             external_stylesheet: "https://example.com/style.css?v=1.0&theme=dark".to_string(),
             override_stylesheet: "/static/override-theme.css".to_string(),
         };

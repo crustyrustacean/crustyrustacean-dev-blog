@@ -11,9 +11,8 @@ use crate::{
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, Json},
+    response::{Html, IntoResponse, Json},
 };
-use axum_template::RenderHtml;
 use chrono::Datelike;
 use serde_json::json;
 use std::time::{Duration, Instant};
@@ -233,5 +232,9 @@ pub async fn get_tags_admin_page(
         "user": user_info,
     });
 
-    Ok(RenderHtml("admin/tags.html", state.engine, context))
+    let html = state.templates
+        .render("admin/tags.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }

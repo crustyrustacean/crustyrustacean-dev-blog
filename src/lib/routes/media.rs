@@ -12,9 +12,8 @@ use axum::{
     body::Bytes,
     extract::{Multipart, Path, Query, State},
     http::{StatusCode, header},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
 };
-use axum_template::RenderHtml;
 use chrono::{Datelike, Utc};
 use serde_json::json;
 use uuid::Uuid;
@@ -715,5 +714,9 @@ pub async fn get_media_library_page(
         "user": user_info,
     });
 
-    Ok(RenderHtml("media/library.html", state.engine, context))
+    let html = state.templates
+        .render("media/library.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }

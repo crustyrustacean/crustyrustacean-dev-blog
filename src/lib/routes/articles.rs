@@ -12,9 +12,8 @@ use crate::{
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Json},
+    response::{Html, IntoResponse, Json},
 };
-use axum_template::RenderHtml;
 use chrono::{Datelike, Utc};
 use serde_json::{Value, json};
 use slug::slugify;
@@ -434,7 +433,11 @@ pub async fn get_editor_page(
         "user": user_info
     });
 
-    Ok(RenderHtml("articles/editor.html", state.engine, context))
+    let html = state.templates
+        .render("articles/editor.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 pub async fn get_edit_article_page(
@@ -529,7 +532,11 @@ pub async fn get_edit_article_page(
         "user": user_info
     });
 
-    Ok(RenderHtml("articles/editor.html", state.engine, context))
+    let html = state.templates
+        .render("articles/editor.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 pub async fn get_admin_dashboard(
@@ -592,7 +599,11 @@ pub async fn get_admin_dashboard(
     });
 
     tracing::info!("Rendering admin dashboard template");
-    Ok(RenderHtml("admin/dashboard.html", state.engine, context))
+    let html = state.templates
+        .render("admin/dashboard.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 pub async fn update_article(
@@ -1036,7 +1047,11 @@ pub async fn get_article_page(
         "article": article
     });
 
-    Ok(RenderHtml("articles/article.html", state.engine, context))
+    let html = state.templates
+        .render("articles/article.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 pub async fn get_articles_list_page(
@@ -1154,7 +1169,11 @@ pub async fn get_articles_list_page(
         "latest_post_date": latest_post_date,
     });
 
-    Ok(RenderHtml("articles/list.html", state.engine, context))
+    let html = state.templates
+        .render("articles/list.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 pub async fn favorite_article(
@@ -1682,7 +1701,11 @@ pub async fn get_articles_feed_page(
         "latest_post_date": latest_post_date,
     });
 
-    Ok(RenderHtml("articles/feed.html", state.engine, context))
+    let html = state.templates
+        .render("articles/feed.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 // Mobile upload endpoint - simplified API for iOS Shortcuts
@@ -1884,5 +1907,9 @@ pub async fn get_api_keys_admin_page(
         "user": user_info,
     });
 
-    Ok(RenderHtml("admin/api-keys.html", state.engine, context))
+    let html = state.templates
+        .render("admin/api-keys.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }

@@ -6,10 +6,9 @@
 use crate::{auth::AuthenticatedUser, errors::AppError, models::ProfilesQuery, state::AppState};
 use axum::{
     extract::{Path, Query, State},
-    response::IntoResponse,
+    response::{Html, IntoResponse},
 };
 use axum_macros::debug_handler;
-use axum_template::RenderHtml;
 use chrono::Datelike;
 use serde::Serialize;
 
@@ -111,11 +110,11 @@ pub async fn get_profile_page(
         total_pages: 1,
     };
 
-    Ok(RenderHtml(
-        "profile/profile.html",
-        state.engine,
-        profile_content,
-    ))
+    let html = state.templates
+        .render("profile/profile.html", &tera::Context::from_serialize(&profile_content)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 pub async fn get_my_favorites_page(
@@ -187,7 +186,11 @@ pub async fn get_my_favorites_page(
         "articles": articles
     });
 
-    Ok(RenderHtml("profile/favorites.html", state.engine, context))
+    let html = state.templates
+        .render("profile/favorites.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
 
 pub async fn get_authors_page(
@@ -260,5 +263,9 @@ pub async fn get_authors_page(
         "search_query": query.search
     });
 
-    Ok(RenderHtml("profile/authors.html", state.engine, context))
+    let html = state.templates
+        .render("profile/authors.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
