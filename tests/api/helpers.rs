@@ -11,7 +11,7 @@ use crustyrustacean_dev_blog_lib::state::AppState;
 use crustyrustacean_dev_blog_lib::storage::{OpenDalStorage, StorageBackend};
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
 use opendal::Operator;
-use reqwest::Client;
+use reqwest::{Client, Response, StatusCode};
 use shuttle_common::secrets::Secret;
 use shuttle_runtime::SecretStore;
 use std::collections::BTreeMap;
@@ -535,5 +535,66 @@ impl TestFixture {
             .get(user)
             .unwrap_or_else(|| panic!("User '{}' not found in fixture", user))
             .clone()
+    }
+}
+
+// ============================================================================
+// Additional Assertion Helpers
+// ============================================================================
+
+/// Assert that response status is one of the expected status codes
+pub fn assert_status_in(response: &Response, statuses: &[StatusCode]) {
+    let actual = response.status();
+    assert!(
+        statuses.contains(&actual),
+        "Expected one of {:?}, got {}",
+        statuses,
+        actual
+    );
+}
+
+// ============================================================================
+// Unauthorized Request Helpers
+// ============================================================================
+
+/// Trait for making unauthorized requests (without authentication headers)
+#[async_trait]
+pub trait UnauthorizedRequestHelper {
+    /// Make an unauthorized POST request
+    async fn post_unauthorized(&self, url: String, body: serde_json::Value) -> Response;
+
+    /// Make an unauthorized GET request
+    async fn get_unauthorized(&self, url: String) -> Response;
+
+    /// Make an unauthorized DELETE request
+    async fn delete_unauthorized(&self, url: String) -> Response;
+}
+
+#[async_trait]
+impl UnauthorizedRequestHelper for TestApp {
+    async fn post_unauthorized(&self, url: String, body: serde_json::Value) -> Response {
+        self.client
+            .post(url)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    async fn get_unauthorized(&self, url: String) -> Response {
+        self.client
+            .get(url)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    async fn delete_unauthorized(&self, url: String) -> Response {
+        self.client
+            .delete(url)
+            .send()
+            .await
+            .expect("Failed to execute request")
     }
 }

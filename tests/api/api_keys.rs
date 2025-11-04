@@ -1,9 +1,12 @@
 // tests/api/api_keys.rs
 
-use crate::helpers::{TestApiKeyBuilder, TestFixture, TestUserBuilder, spawn_app};
+use crate::helpers::{
+    assert_status_in, spawn_app, TestApiKeyBuilder, TestFixture, TestUserBuilder,
+    UnauthorizedRequestHelper,
+};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 // ============================================================================
 // Happy Path Tests
@@ -120,13 +123,8 @@ async fn test_create_api_key_without_authentication() {
 
     // Act - Try to create API key without auth
     let response = app
-        .client
-        .post(format!("{}/api/keys", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&json!({"name": "Unauthorized Key"}))
-        .send()
-        .await
-        .expect("Failed to execute request");
+        .post_unauthorized(app.api_keys_url(), json!({"name": "Unauthorized Key"}))
+        .await;
 
     // Assert
     assert_status!(response, StatusCode::UNAUTHORIZED);
@@ -178,19 +176,13 @@ async fn test_create_api_key_with_invalid_payload() {
     let token = app.register_user_default("testuser").await;
 
     // Act - Try to create API key with missing name field
-    let response = bearer_request!(
-        post &app,
-        format!("{}/api/keys", &app.address),
-        &token,
-        json!({})
-    )
-    .expect("Failed to execute request");
+    let response = bearer_request!(post &app, app.api_keys_url(), &token, json!({}))
+        .expect("Failed to execute request");
 
     // Assert - Should fail validation
-    assert!(
-        response.status() == StatusCode::BAD_REQUEST || 
-        response.status() == StatusCode::UNPROCESSABLE_ENTITY,
-        "Expected 400 or 422 status code"
+    assert_status_in(
+        &response,
+        &[StatusCode::BAD_REQUEST, StatusCode::UNPROCESSABLE_ENTITY],
     );
 }
 
@@ -200,12 +192,7 @@ async fn test_list_api_keys_without_authentication() {
     let app = spawn_app().await;
 
     // Act - Try to list API keys without auth
-    let response = app
-        .client
-        .get(format!("{}/api/keys", &app.address))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = app.get_unauthorized(app.api_keys_url()).await;
 
     // Assert
     assert_status!(response, StatusCode::UNAUTHORIZED);
@@ -231,12 +218,7 @@ async fn test_delete_api_key_without_authentication() {
     let fake_key_id = "550e8400-e29b-41d4-a716-446655440000";
 
     // Act - Try to delete API key without auth
-    let response = app
-        .client
-        .delete(format!("{}/api/keys/{}", &app.address, fake_key_id))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = app.delete_unauthorized(app.api_key_url(fake_key_id)).await;
 
     // Assert
     assert_status!(response, StatusCode::UNAUTHORIZED);
@@ -293,11 +275,7 @@ async fn test_delete_api_key_with_invalid_uuid() {
     let response = app.delete_api_key(&token, "not-a-valid-uuid").await;
 
     // Assert - Should return bad request or not found
-    assert!(
-        response.status() == StatusCode::BAD_REQUEST ||
-        response.status() == StatusCode::NOT_FOUND,
-        "Expected 400 or 404 status code for invalid UUID"
-    );
+    assert_status_in(&response, &[StatusCode::BAD_REQUEST, StatusCode::NOT_FOUND]);
 }
 
 #[tokio::test]
