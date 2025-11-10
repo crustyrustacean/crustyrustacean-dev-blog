@@ -54,12 +54,13 @@ pub async fn search_articles(
     let mut rows = conn
         .query(
             "SELECT DISTINCT a.id, a.slug, a.title, a.description, a.body,
-                    a.author_id, a.created_at, a.updated_at, c.slug as category_slug
+                    a.author_id, a.created_at, a.updated_at, c.slug as category_slug, a.draft
              FROM articles a
              LEFT JOIN categories c ON a.category_id = c.id
-             WHERE a.title LIKE ?1 COLLATE NOCASE
+             WHERE (a.title LIKE ?1 COLLATE NOCASE
                 OR a.description LIKE ?1 COLLATE NOCASE
-                OR a.body LIKE ?1 COLLATE NOCASE
+                OR a.body LIKE ?1 COLLATE NOCASE)
+                AND a.draft = 0
              ORDER BY a.created_at DESC",
             libsql::params![search_pattern],
         )
@@ -103,6 +104,9 @@ pub async fn search_articles(
             AppError::InternalServerError("Failed to parse updated_at".to_string())
         })?;
         let category_slug: Option<String> = row.get(8).ok();
+        let draft: i64 = row.get(9).map_err(|_| {
+            AppError::InternalServerError("Failed to parse draft".to_string())
+        })?;
 
         article_ids.push(article_id.clone());
         author_ids.insert(author_id.clone());
@@ -117,6 +121,7 @@ pub async fn search_articles(
             created_at,
             updated_at,
             category_slug,
+            draft,
         ));
     }
 
@@ -259,7 +264,7 @@ pub async fn search_articles(
     let article_responses: Vec<ArticleResponse> = results
         .into_iter()
         .filter_map(
-            |(article_id, slug, title, description, body, author_id, created_at_str, updated_at_str, category_slug)| {
+            |(article_id, slug, title, description, body, author_id, created_at_str, updated_at_str, category_slug, draft)| {
                 // Parse dates
                 let created_at = DateTime::parse_from_rfc3339(&created_at_str)
                     .ok()?
@@ -289,6 +294,7 @@ pub async fn search_articles(
                     rendered_body: None,
                     tag_list,
                     category: category_slug,
+                    draft: draft != 0,
                     created_at,
                     updated_at,
                     favorited,

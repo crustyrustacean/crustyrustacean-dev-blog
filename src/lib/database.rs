@@ -299,6 +299,15 @@ impl DatabaseConnection {
             .await
             .ok(); // Use .ok() to ignore error if column already exists
 
+        // Add draft column to articles (if it doesn't exist)
+        // 0 = published (default), 1 = draft
+        conn.execute(
+            "ALTER TABLE articles ADD COLUMN draft INTEGER NOT NULL DEFAULT 0",
+            (),
+        )
+        .await
+        .ok(); // Use .ok() to ignore error if column already exists
+
         // Create index for categories
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories (slug)",

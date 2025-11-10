@@ -16,6 +16,7 @@ pub struct Article {
     pub description: String,
     pub body: String,
     pub author_id: Uuid,
+    pub draft: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -34,6 +35,7 @@ pub struct ArticleResponse {
     pub tag_list: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
+    pub draft: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub favorited: bool,
@@ -54,6 +56,8 @@ pub struct CreateArticle {
     #[serde(rename = "tagList")]
     pub tag_list: Option<Vec<String>>,
     pub category: Option<String>,
+    #[serde(default)]
+    pub draft: bool,
 }
 
 // struct type to represent an updated article
@@ -65,6 +69,7 @@ pub struct UpdateArticle {
     #[serde(rename = "tagList")]
     pub tag_list: Option<Vec<String>>,
     pub category: Option<String>,
+    pub draft: Option<bool>,
 }
 
 // struct type to represent a response with one article
