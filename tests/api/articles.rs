@@ -33,9 +33,9 @@ async fn test_create_article_happy_path() {
 
     // Assert
     let status = response.status();
-    if status != StatusCode::OK {
+    if status != StatusCode::CREATED {
         let error_body = response.text().await.expect("Failed to get error text");
-        panic!("Expected 200 OK, got {}: {}", status, error_body);
+        panic!("Expected 201 CREATED, got {}: {}", status, error_body);
     }
 
     let response_body: Value = parse_json!(response);
@@ -294,7 +294,7 @@ async fn test_create_article_generates_unique_slugs() {
     )
     .expect("Failed to create first article");
 
-    assert_status!(response1, StatusCode::OK);
+    assert_status!(response1, StatusCode::CREATED);
 
     let body1: Value = parse_json!(response1);
     let slug1 = body1["article"]["slug"].as_str().unwrap();
@@ -316,7 +316,7 @@ async fn test_create_article_generates_unique_slugs() {
     )
     .expect("Failed to create second article");
 
-    assert_status!(response2, StatusCode::OK);
+    assert_status!(response2, StatusCode::CREATED);
 
     let body2: Value = parse_json!(response2);
     let slug2 = body2["article"]["slug"].as_str().unwrap();

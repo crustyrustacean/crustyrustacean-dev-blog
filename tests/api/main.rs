@@ -5,6 +5,7 @@ mod api_keys;
 mod articles;
 mod auth;
 mod authors;
+mod categories;
 mod comments;
 mod favorites;
 mod feed;

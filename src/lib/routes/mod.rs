@@ -4,6 +4,7 @@
 pub mod api_keys;
 pub mod articles;
 pub mod auth;
+pub mod categories;
 pub mod comments;
 pub mod error_pages;
 pub mod health_check;
@@ -21,6 +22,7 @@ pub mod users;
 pub use api_keys::*;
 pub use articles::*;
 pub use auth::*;
+pub use categories::*;
 pub use comments::*;
 pub use error_pages::*;
 pub use health_check::*;

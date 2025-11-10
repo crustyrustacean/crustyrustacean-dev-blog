@@ -72,6 +72,7 @@ pub async fn get_index(
         tag: None,
         author: None,
         favorited: None,
+        category: None,
         limit: Some(4), // Show only 4 recent articles on homepage
         offset: Some(0),
     };

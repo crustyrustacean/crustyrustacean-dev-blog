@@ -168,6 +168,7 @@ pub async fn get_my_favorites_page(
         tag: None,
         author: None,
         favorited: Some(username.to_string()),
+        category: None,
         limit: Some(50), // Show up to 50 favorites
         offset: Some(0),
     };

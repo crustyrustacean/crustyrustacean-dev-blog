@@ -86,6 +86,22 @@ impl DatabaseConnection {
         )
         .await?;
 
+        // Create categories table
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS categories (
+                id TEXT PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                slug TEXT UNIQUE NOT NULL,
+                description TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            "#,
+            (),
+        )
+        .await?;
+
         // Create article_tags junction table
         conn.execute(
             r#"
@@ -277,6 +293,25 @@ impl DatabaseConnection {
         conn.execute("ALTER TABLE articles ADD COLUMN featured_image_id TEXT", ())
             .await
             .ok(); // Use .ok() to ignore error if column already exists
+
+        // Add category_id column to articles (if it doesn't exist)
+        conn.execute("ALTER TABLE articles ADD COLUMN category_id TEXT", ())
+            .await
+            .ok(); // Use .ok() to ignore error if column already exists
+
+        // Create index for categories
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories (slug)",
+            (),
+        )
+        .await?;
+
+        // Create index for articles category_id
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_category_id ON articles (category_id)",
+            (),
+        )
+        .await?;
 
         Ok(())
     }
