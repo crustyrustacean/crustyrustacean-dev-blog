@@ -34,8 +34,12 @@
                         <div class="card h-100">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    {% if article.tag_list and article.tag_list | length > 0 %}
-                                        <span class="badge bg-primary">{{ article.tag_list.0 }}</span>
+                                    {% if article.category %}
+                                        <span class="badge bg-primary">
+                                            <i class="fas fa-folder me-1"></i>{{ article.category }}
+                                        </span>
+                                    {% elif article.tag_list and article.tag_list | length > 0 %}
+                                        <span class="badge bg-secondary">{{ article.tag_list.0 }}</span>
                                     {% else %}
                                         <span class="badge bg-secondary">Article</span>
                                     {% endif %}
@@ -86,8 +90,23 @@
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-filter me-2"></i>
-                        Filter Articles
+                        <i class="fas fa-folder me-2"></i>
+                        Filter by Category
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Click a category to filter articles</p>
+                    <div id="filter-categories-container" class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-secondary">Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tags me-2"></i>
+                        Filter by Tag
                     </h5>
                 </div>
                 <div class="card-body">

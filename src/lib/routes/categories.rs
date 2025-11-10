@@ -8,8 +8,10 @@ use crate::{
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::Json,
+    response::{Html, IntoResponse, Json},
 };
+use chrono::Datelike;
+use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -359,4 +361,61 @@ pub async fn delete_category(
     .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /admin/categories - Categories admin page
+pub async fn get_categories_admin_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    let context = json!({
+        "title": "Manage Categories - Admin",
+        "page": "CategoriesAdmin",
+        "current_year": chrono::Utc::now().year(),
+        "user": user_info,
+    });
+
+    let html = state.templates
+        .render("admin/categories.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
 }
