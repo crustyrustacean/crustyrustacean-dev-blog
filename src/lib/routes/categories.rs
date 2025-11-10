@@ -10,7 +10,6 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
-use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
