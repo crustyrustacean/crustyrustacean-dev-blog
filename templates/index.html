@@ -55,8 +55,12 @@
                             <div class="card h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        {% if article.tag_list and article.tag_list | length > 0 %}
-                                            <span class="badge bg-primary">{{ article.tag_list.0 }}</span>
+                                        {% if article.category %}
+                                            <span class="badge bg-primary">
+                                                <i class="fas fa-folder me-1"></i>{{ article.category }}
+                                            </span>
+                                        {% elif article.tag_list and article.tag_list | length > 0 %}
+                                            <span class="badge bg-secondary">{{ article.tag_list.0 }}</span>
                                         {% else %}
                                             <span class="badge bg-secondary">Article</span>
                                         {% endif %}

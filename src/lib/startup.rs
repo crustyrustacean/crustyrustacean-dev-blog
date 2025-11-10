@@ -7,12 +7,12 @@ use crate::routes::{
     delete_category, delete_comment, delete_media, delete_tag, download_media, favorite_article,
     follow_user, get_about, get_admin_dashboard, get_api_keys_admin_page, get_article,
     get_article_page, get_articles_feed, get_articles_feed_page, get_articles_list_page,
-    get_authors_page, get_categories, get_category, get_comments, get_current_user,
-    get_edit_article_page, get_editor_page, get_index, get_login_page, get_media_library_page,
-    get_media_metadata, get_my_favorites_page, get_privacy, get_profile, get_profile_page,
-    get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags, get_tags_admin_page,
-    get_terms, handle_404_simple, health_check, list_api_keys, list_articles, list_media,
-    list_profiles, login_user, mobile_upload_article, register_user, search_articles,
+    get_authors_page, get_categories, get_categories_admin_page, get_category, get_comments,
+    get_current_user, get_edit_article_page, get_editor_page, get_index, get_login_page,
+    get_media_library_page, get_media_metadata, get_my_favorites_page, get_privacy, get_profile,
+    get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags,
+    get_tags_admin_page, get_terms, handle_404_simple, health_check, list_api_keys, list_articles,
+    list_media, list_profiles, login_user, mobile_upload_article, register_user, search_articles,
     unfavorite_article, unfollow_user, update_article, update_category, update_current_user,
     update_media_metadata, update_tag, upload_media,
 };
@@ -83,6 +83,7 @@ impl App {
             .route("/articles/{slug}", get(get_article_page))
             .route("/admin", get(get_admin_dashboard))
             .route("/admin/tags", get(get_tags_admin_page))
+            .route("/admin/categories", get(get_categories_admin_page))
             .route("/admin/api-keys", get(get_api_keys_admin_page))
             .route("/admin/media", get(get_media_library_page))
             // API routes

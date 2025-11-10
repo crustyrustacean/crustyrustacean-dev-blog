@@ -1,5 +1,8 @@
 // Article Editor JavaScript Module
 document.addEventListener('DOMContentLoaded', function() {
+    // Load categories on page load
+    loadCategories();
+
     // Handle form submission
     const articleForm = document.getElementById('articleForm');
     const submitBtn = document.getElementById('submitBtn');
@@ -20,6 +23,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const tagsInput = formData.get('tags');
         const tagList = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : [];
 
+        // Get category
+        const category = formData.get('category');
+
         const articleData = {
             article: {
                 title: formData.get('title'),
@@ -28,6 +34,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 tagList: tagList
             }
         };
+
+        // Add category if selected
+        if (category) {
+            articleData.article.category = category;
+        }
 
         try {
             // Get auth token from localStorage or cookies
@@ -169,4 +180,59 @@ function publishFromPreview() {
     const modal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
     modal.hide();
     document.getElementById('articleForm').dispatchEvent(new Event('submit'));
+}
+
+// Load categories from API and populate dropdown
+async function loadCategories() {
+    try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+
+        const categorySelect = document.getElementById('category');
+        if (!categorySelect) return;
+
+        // Keep the "No category" option
+        categorySelect.innerHTML = '<option value="">No category</option>';
+
+        // Add each category as an option
+        data.categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.slug;
+            option.textContent = category.name;
+            categorySelect.appendChild(option);
+        });
+
+        // If we're in edit mode and there's a current category, select it
+        loadCurrentCategory();
+    } catch (error) {
+        console.error('Error loading categories:', error);
+    }
+}
+
+// Load and select the current category if editing an article
+async function loadCurrentCategory() {
+    const articleForm = document.getElementById('articleForm');
+    const isEditMode = articleForm.getAttribute('data-edit-mode') === 'true';
+
+    if (!isEditMode) return;
+
+    const articleSlug = articleForm.getAttribute('data-article-slug');
+    if (!articleSlug) return;
+
+    try {
+        const response = await fetch(`/api/articles/${articleSlug}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const category = data.article.category;
+
+        if (category) {
+            const categorySelect = document.getElementById('category');
+            if (categorySelect) {
+                categorySelect.value = category;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading current category:', error);
+    }
 }
