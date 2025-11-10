@@ -2,6 +2,70 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [2.1.0] - 2025-11-09
+
+### Added - Categories System
+- **Complete Categories Management**:
+  - Full CRUD operations for blog post categories
+  - Automatic slug generation from category names
+  - Optional one-to-many relationship with articles
+  - Category descriptions for additional context
+  - Article count tracking per category
+  - Safe cascade deletion (preserves articles when category deleted)
+
+- **API Endpoints**:
+  - `POST /api/categories` - Create new category (protected)
+  - `GET /api/categories` - List all categories with article counts (public)
+  - `GET /api/categories/{slug}` - Get specific category (public)
+  - `PUT /api/categories/{slug}` - Update category (protected)
+  - `DELETE /api/categories/{slug}` - Delete category (protected)
+  - `GET /admin/categories` - Categories admin page (protected)
+
+- **Article Integration**:
+  - Articles can optionally reference a category by slug
+  - Category validation on article creation/update
+  - Category-based article filtering: `GET /api/articles?category={slug}`
+  - Category field included in article responses
+  - Safe cascade behavior: deleting category sets articles' category to null
+
+- **Frontend Integration**:
+  - Categories admin page at `/admin/categories`
+  - Create/edit/delete categories with modal dialogs
+  - Dynamic table with article counts and actions
+  - Modular JavaScript (`categories-admin.js`)
+  - Responsive Bootstrap design
+  - Confirmation dialogs for destructive actions
+
+- **Database Schema**:
+  - New `categories` table with id, name, slug, description, timestamps
+  - UNIQUE constraints on name and slug
+  - `articles.category_id` column for optional association
+  - Indexes on category slug and article category_id for efficient queries
+  - Automatic timestamp management (created_at, updated_at)
+
+- **Security Features**:
+  - Input validation (1-100 character limit on names)
+  - Duplicate name and slug prevention
+  - Proper authorization on protected endpoints
+  - XSS prevention with HTML escaping in frontend
+  - SQL injection prevention with parameterized queries
+
+- **Test Coverage**:
+  - 21 comprehensive integration tests
+  - Basic CRUD operations (5 tests)
+  - Authentication requirements (3 tests)
+  - Validation and duplicates (4 tests)
+  - Article integration scenarios (7 tests)
+  - Data integrity verification (2 tests)
+
+### Technical Details
+- **TDD Implementation**: Built following test-driven development methodology
+- **Consistent Patterns**: Follows project conventions from tags and media library systems
+- **Slug Generation**: Automatic URL-friendly slug creation from category names
+- **Production Ready**: Comprehensive error handling and security measures
+- **Extensibility**: Foundation for category-based navigation and filtering UI
+- **Total Tests**: Now 143 tests (122 existing + 21 categories), all passing
+
 ## [1.8.0] - 2025-10-25
 
 ### Added - Search Functionality

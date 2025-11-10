@@ -625,7 +625,7 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crustyrustacean-dev-blog"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1785,9 +1785,9 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "10.1.0"
+version = "10.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d119c6924272d16f0ab9ce41f7aa0bfef9340c00b0bb7ca3dd3b263d4a9150b"
+checksum = "c76e1c7d7df3e34443b3621b459b066a7b79644f059fc8b2db7070c825fd417e"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -1845,9 +1845,9 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libsql"
-version = "0.9.24"
+version = "0.9.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a76ffc6aaaac50c1362ebd22f7db457336ab4ee72ee115aaea11f47edf9d7720"
+checksum = "1872c72dd9f50f53c83100066da9f81584c5702e5e806d243468ad986ba2c8a6"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1885,9 +1885,9 @@ dependencies = [
 
 [[package]]
 name = "libsql-ffi"
-version = "0.9.24"
+version = "0.9.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaaa869a3c33a125231e8963f7890dae9c6de1ce4133e68121467203896203a0"
+checksum = "8cf139ef358790f799b325cc3801888f11f0077599bab284aff63f5b96669f91"
 dependencies = [
  "bindgen",
  "cc",
@@ -1897,9 +1897,9 @@ dependencies = [
 
 [[package]]
 name = "libsql-hrana"
-version = "0.9.24"
+version = "0.9.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d0a122bc4af29ffe51a4bb27f7d1b61cf2a4ef5131dad3fecdf1f5fbc6329a"
+checksum = "ab426df906aba5854034d6e6d79a46c70c185c0f4c39ac01f2c7a56c2a21f184"
 dependencies = [
  "base64 0.21.7",
  "bytes",
@@ -1909,9 +1909,9 @@ dependencies = [
 
 [[package]]
 name = "libsql-rusqlite"
-version = "0.9.24"
+version = "0.9.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2e7739b3828a547d21834779ea699a3b46c3dcfafba75da103d36adcb7c0ab"
+checksum = "a2c8d9f78d60f52776614925724defd1e89130589250ea28d7bf1053f044bdea"
 dependencies = [
  "bitflags 2.9.4",
  "fallible-iterator 0.2.0",
@@ -1941,9 +1941,9 @@ dependencies = [
 
 [[package]]
 name = "libsql-sys"
-version = "0.9.24"
+version = "0.9.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b075329f2ea5a8dc2c61b0d92ec095f823505954e1413c0a5220b40b0e4b0083"
+checksum = "eaadd08c5c2c3bfee29b5f10b6d5175bf0233fc1e7f9d0ed33fa35c254da6601"
 dependencies = [
  "bytes",
  "libsql-ffi",
@@ -1955,9 +1955,9 @@ dependencies = [
 
 [[package]]
 name = "libsql_replication"
-version = "0.9.24"
+version = "0.9.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b47841eedbf05399c552048a11529dcf1fe3d43c1ccc77de55209ba2769d44b"
+checksum = "e1482f709048fdf07266f09f46e8bba1c16a4ee1a6db3d61b86806caa64de8c5"
 dependencies = [
  "aes",
  "async-stream",
@@ -3668,9 +3668,9 @@ dependencies = [
 
 [[package]]
 name = "tera"
-version = "1.20.0"
+version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab9d851b45e865f178319da0abdbfe6acbc4328759ff18dafc3a41c16b4cd2ee"
+checksum = "e8004bca281f2d32df3bacd59bc67b312cb4c70cea46cbd79dbe8ac5ed206722"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -3685,7 +3685,7 @@ dependencies = [
  "serde",
  "serde_json",
  "slug",
- "unic-segment",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -4255,56 +4255,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "unic-char-property"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8c57a407d9b6fa02b4795eb81c5b6652060a15a7903ea981f3d723e6c0be221"
-dependencies = [
- "unic-char-range",
-]
-
-[[package]]
-name = "unic-char-range"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0398022d5f700414f6b899e10b8348231abf9173fa93144cbc1a43b9793c1fbc"
-
-[[package]]
-name = "unic-common"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80d7ff825a6a654ee85a63e80f92f054f904f21e7d12da4e22f9834a4aaa35bc"
-
-[[package]]
-name = "unic-segment"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4ed5d26be57f84f176157270c112ef57b86debac9cd21daaabbe56db0f88f23"
-dependencies = [
- "unic-ucd-segment",
-]
-
-[[package]]
-name = "unic-ucd-segment"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2079c122a62205b421f499da10f3ee0f7697f012f55b675e002483c73ea34700"
-dependencies = [
- "unic-char-property",
- "unic-char-range",
- "unic-ucd-version",
-]
-
-[[package]]
-name = "unic-ucd-version"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96bd2f2237fe450fcd0a1d2f5f4e91711124f7857ba2e964247776ebeeb7b0c4"
-dependencies = [
- "unic-common",
-]
-
-[[package]]
 name = "unicase"
 version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4315,6 +4265,12 @@ name = "unicode-ident"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f63a545481291138910575129486daeaf8ac54aee4387fe7906919f7830c7d9d"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "unicode-width"

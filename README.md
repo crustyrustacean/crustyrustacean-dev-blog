@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 122+ integration tests
+- **Comprehensive test suite** with 143+ integration tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -89,6 +89,14 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Public media download/display endpoint
   - User-based access control and ownership validation
   - Comprehensive integration tests
+- **Categories System** (TDD implementation):
+  - Full CRUD operations for blog post categories
+  - Automatic slug generation from category names
+  - Optional one-to-many relationship with articles
+  - Category-based article filtering and organization
+  - Categories admin page with interactive UI
+  - Complete API endpoints with authentication
+  - 21 comprehensive integration tests
 
 ### 🚧 Planned
 - Image processing and optimization
@@ -112,7 +120,7 @@ src/
     startup.rs      # App initialization and router setup
     state.rs        # Shared application state
     telemetry.rs    # Tracing/logging setup
-    models/         # Database entities (User, Article, Comment, Tag)
+    models/         # Database entities (User, Article, Comment, Tag, Category, Media)
     routes/         # HTTP route handlers
       health_check.rs # Health check endpoint
       users.rs      # User authentication routes
@@ -121,6 +129,7 @@ src/
       auth.rs       # Authentication pages
       profile.rs    # User profile management
       tags.rs       # Tags API endpoint
+      categories.rs # Categories management endpoints
       rss.rs        # RSS feed generation
       error_pages.rs# Error handling pages
       mod.rs        # Routes module
@@ -144,6 +153,8 @@ static/
     homepage.js     # Homepage dynamic features
     profile.js      # User profile interactions
     search.js       # Search functionality
+    categories-admin.js # Categories admin page functionality
+    media-library.js # Media library management
     utils.js        # Shared utilities and helpers
   images/           # Static images and assets
 templates/          # Tera templates for HTML rendering
@@ -161,6 +172,8 @@ templates/          # Tera templates for HTML rendering
     register.html   # User registration page
   admin/
     dashboard.html  # Admin interface
+    categories.html # Categories management page
+    media.html      # Media library page
   profile/
     profile.html    # User profile page
     favorites.html  # User favorites page
@@ -178,6 +191,8 @@ tests/
     rss.rs          # RSS feed integration tests (4 tests)
     comments.rs     # Comments API integration tests (11 tests)
     search.rs       # Search API integration tests
+    categories.rs   # Categories API integration tests (21 tests)
+    media.rs        # Media library integration tests
     template_rendering.rs # Template rendering integration tests
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
@@ -200,12 +215,13 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (125+ total)
+cargo test              # Run all tests (143+ total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
 cargo test authors      # Run authors discovery tests only
 cargo test tags         # Run tags API tests only
+cargo test categories   # Run categories API tests only
 cargo test rss          # Run RSS feed tests only
 cargo test comments     # Run comments API tests only
 cargo test search       # Run search API tests only
@@ -223,6 +239,7 @@ The test suite includes comprehensive testing:
 - ✅ Personal feed functionality with following relationships
 - ✅ Authors discovery with search and pagination
 - ✅ Tags API with alphabetical sorting and filtering
+- ✅ Categories API with CRUD operations and article integration
 - ✅ RSS feed generation with XML validation
 - ✅ Comments API with authorization and validation
 - ✅ Search API with full-text querying across articles
@@ -248,12 +265,13 @@ GET  /register                     # Registration page
 GET  /editor                       # Article editor (protected)
 GET  /editor/{slug}                # Edit article (protected)
 GET  /admin                        # Admin dashboard (protected)
+GET  /admin/categories             # Categories management page (protected)
+GET  /admin/media                  # Media library admin page (protected)
 GET  /profiles/{username}          # User profile page
 GET  /profiles                     # Authors discovery page (protected)
 GET  /feed                         # Personal feed page (protected)
 GET  /favorites                    # User's favorite articles (protected)
 GET  /rss                          # RSS feed (XML)
-GET  /admin/media                  # Media library admin page (protected)
 ```
 
 ### Authentication API
@@ -292,6 +310,15 @@ GET    /api/articles?favorited={user}  # Get articles favorited by user
 ### Tags API
 ```
 GET /api/tags                      # Get all tags (alphabetically sorted)
+```
+
+### Categories API
+```
+POST   /api/categories             # Create new category (protected)
+GET    /api/categories             # List all categories with article counts
+GET    /api/categories/{slug}      # Get specific category
+PUT    /api/categories/{slug}      # Update category (protected)
+DELETE /api/categories/{slug}      # Delete category (protected)
 ```
 
 ### Search API
@@ -335,11 +362,12 @@ The application now includes a complete blog system:
 8. **Authors Discovery**: Browse and search for authors to follow with interactive UI
 9. **Social Features**: Complete follow/unfollow system with real-time updates
 10. **Tags System**: Dynamic tag display with filtering and alphabetical organization
-11. **Search System**: Full-text search across articles with real-time results
-12. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
-13. **Comments System**: Add, view, and delete comments on articles with proper authorization
-14. **Media Library**: Upload and manage media files with cloud storage integration
-15. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+11. **Categories System**: Organize posts with categories, filter by category, admin management UI
+12. **Search System**: Full-text search across articles with real-time results
+13. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
+14. **Comments System**: Add, view, and delete comments on articles with proper authorization
+15. **Media Library**: Upload and manage media files with cloud storage integration
+16. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -364,8 +392,8 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 125+ integration tests covering happy path and failure scenarios
-- **Test-Driven Development**: Tags, RSS, Comments, Search, and Media Library features built with TDD approach
+- **Comprehensive Testing**: 143+ integration tests covering happy path and failure scenarios
+- **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, and Media Library features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 - **Cloud-Native Storage**: OpenDAL integration for flexible storage backend options

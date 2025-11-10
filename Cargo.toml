@@ -1,6 +1,6 @@
 [package]
 name = "crustyrustacean-dev-blog"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2024"
 authors = ["Jeffery D. Mitchell", "<crusty.rustacean@gmail.com>"]
 description = "A developer blog application built with Axum, Tera, and Turso database, hosted on Shuttle."
@@ -27,8 +27,8 @@ axum-macros = "0.5.0"
 chrono = { version = "0.4.42", features = ["serde"] }
 dotenvy = "0.15.7"
 futures-util = "0.3.31"
-jsonwebtoken = { version = "10.1.0", features = ["use_pem", "rust_crypto"] }
-libsql = { version = "0.9.24", features = ["serde"] }
+jsonwebtoken = { version = "10.2.0", features = ["use_pem", "rust_crypto"] }
+libsql = { version = "0.9.27", features = ["serde"] }
 once_cell = "1.21.3"
 opendal = { version = "0.54.1", features = [ "services-s3", "services-fs"] }
 pulldown-cmark = "0.13.0"
@@ -41,7 +41,7 @@ shuttle-opendal = "0.57.0"
 shuttle-runtime = { version = "0.57.0", default-features = false }
 shuttle-turso = "0.57.0"
 slug = "0.1.6"
-tera = "1.20.0"
+tera = "1.20.1"
 thiserror = "2.0.17"
 tokio = "1.47.1"
 tower = "0.5.2"
