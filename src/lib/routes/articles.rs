@@ -87,7 +87,7 @@ pub async fn create_article(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(payload): Json<serde_json::Value>,
-) -> Result<Json<SingleArticleResponse>, AppError> {
+) -> Result<(StatusCode, Json<SingleArticleResponse>), AppError> {
     let article_data: CreateArticle = serde_json::from_value(
         payload
             .get("article")
@@ -146,9 +146,38 @@ pub async fn create_article(
             AppError::InternalServerError("Failed to process article links".to_string())
         })?;
 
+    // Handle category if provided
+    let (category_id, category_slug) = if let Some(ref cat_slug) = article_data.category {
+        let mut cat_rows = conn
+            .query(
+                "SELECT id FROM categories WHERE slug = ?",
+                libsql::params![cat_slug.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(cat_row) = cat_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let cat_id: String = cat_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            (Some(cat_id), Some(cat_slug.clone()))
+        } else {
+            return Err(AppError::BadRequest(format!(
+                "Category '{}' does not exist",
+                cat_slug
+            )));
+        }
+    } else {
+        (None, None)
+    };
+
     // Insert the article
     conn.execute(
-        "INSERT INTO articles (id, slug, title, description, body, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO articles (id, slug, title, description, body, author_id, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         libsql::params![
             article_id.to_string(),
             slug.clone(),
@@ -156,6 +185,7 @@ pub async fn create_article(
             article_data.description.clone(),
             processed_body.clone(),
             user.user_id.to_string(),
+            category_id.unwrap_or_default(),
             now.to_rfc3339(),
             now.to_rfc3339(),
         ],
@@ -207,6 +237,7 @@ pub async fn create_article(
         body: processed_body,
         rendered_body: Some(rendered_body),
         tag_list: tag_names,
+        category: category_slug,
         created_at: now,
         updated_at: now,
         favorited: false, // New article is not favorited by creator
@@ -218,7 +249,7 @@ pub async fn create_article(
         article: article_response,
     };
 
-    Ok(Json(response))
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 pub async fn get_article(
@@ -234,11 +265,13 @@ pub async fn get_article(
     let mut article_rows = conn
         .query(
             r#"
-            SELECT 
+            SELECT
                 a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
-                u.username, u.bio, u.image
+                u.username, u.bio, u.image,
+                c.slug as category_slug
             FROM articles a
             JOIN users u ON a.author_id = u.id
+            LEFT JOIN categories c ON a.category_id = c.id
             WHERE a.slug = ?
             "#,
             libsql::params![slug.clone()],
@@ -278,6 +311,7 @@ pub async fn get_article(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let bio: Option<String> = article_row.get(8).ok();
     let image: Option<String> = article_row.get(9).ok();
+    let category_slug: Option<String> = article_row.get(10).ok();
 
     // Parse the timestamps
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -370,6 +404,7 @@ pub async fn get_article(
         body,
         rendered_body: Some(rendered_body),
         tag_list: tag_names,
+        category: category_slug,
         created_at,
         updated_at,
         favorited: false, // TODO: Implement based on current user if provided
@@ -684,6 +719,41 @@ pub async fn update_article(
         updates.push("body = ?");
         params.push(processed_body);
     }
+
+    // Handle category update if provided
+    if let Some(ref cat_slug) = article_data.category {
+        if !cat_slug.is_empty() {
+            // Validate that category exists
+            let mut cat_rows = conn
+                .query(
+                    "SELECT id FROM categories WHERE slug = ?",
+                    libsql::params![cat_slug.clone()],
+                )
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+            if let Some(cat_row) = cat_rows
+                .next()
+                .await
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            {
+                let cat_id: String = cat_row
+                    .get(0)
+                    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                updates.push("category_id = ?");
+                params.push(cat_id);
+            } else {
+                return Err(AppError::BadRequest(format!(
+                    "Category '{}' does not exist",
+                    cat_slug
+                )));
+            }
+        } else {
+            // Empty string means remove category
+            updates.push("category_id = NULL");
+        }
+    }
+
     updates.push("updated_at = ?");
     params.push(now.to_rfc3339());
     params.push(slug.clone());
@@ -837,6 +907,11 @@ pub async fn list_articles(
         params.push(libsql::Value::from(favorited_user.clone()));
     }
 
+    if let Some(category) = &query.category {
+        where_clauses.push("c.slug = ?");
+        params.push(libsql::Value::from(category.clone()));
+    }
+
     let where_clause = if where_clauses.is_empty() {
         String::new()
     } else {
@@ -845,11 +920,13 @@ pub async fn list_articles(
 
     let sql = format!(
         r#"
-        SELECT 
+        SELECT
             a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
-            u.username, u.bio, u.image
+            u.username, u.bio, u.image,
+            c.slug as category_slug
         FROM articles a
         JOIN users u ON a.author_id = u.id
+        LEFT JOIN categories c ON a.category_id = c.id
         {}
         ORDER BY a.created_at DESC
         LIMIT ? OFFSET ?
@@ -898,6 +975,7 @@ pub async fn list_articles(
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
+        let category_slug: Option<String> = row.get(10).ok();
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
@@ -970,6 +1048,7 @@ pub async fn list_articles(
             body,
             rendered_body: Some(rendered_body),
             tag_list: tag_names,
+            category: category_slug,
             created_at,
             updated_at,
             favorited: false,
@@ -1106,6 +1185,7 @@ pub async fn get_articles_list_page(
         tag: query.tag,
         author: query.author,
         favorited: query.favorited,
+        category: query.category,
         limit: Some(query.limit.unwrap_or(20)),
         offset: query.offset,
     };
@@ -1273,11 +1353,13 @@ async fn get_article_with_user_context(
     let mut article_rows = conn
         .query(
             r#"
-            SELECT 
+            SELECT
                 a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
-                u.username, u.bio, u.image
+                u.username, u.bio, u.image,
+                c.slug as category_slug
             FROM articles a
             JOIN users u ON a.author_id = u.id
+            LEFT JOIN categories c ON a.category_id = c.id
             WHERE a.slug = ?
             "#,
             libsql::params![slug.clone()],
@@ -1320,6 +1402,7 @@ async fn get_article_with_user_context(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let bio: Option<String> = article_row.get(9).ok();
     let image: Option<String> = article_row.get(10).ok();
+    let category_slug: Option<String> = article_row.get(11).ok();
 
     // Parse the timestamps
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -1412,6 +1495,7 @@ async fn get_article_with_user_context(
         body,
         rendered_body: Some(rendered_body),
         tag_list: tag_names,
+        category: category_slug,
         created_at,
         updated_at,
         favorited,
@@ -1441,11 +1525,13 @@ pub async fn get_articles_feed(
 
     // Get articles from users that the current user follows
     let sql = r#"
-        SELECT 
+        SELECT
             a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
-            u.username, u.bio, u.image
+            u.username, u.bio, u.image,
+            c.slug as category_slug
         FROM articles a
         JOIN users u ON a.author_id = u.id
+        LEFT JOIN categories c ON a.category_id = c.id
         JOIN user_follows uf ON a.author_id = uf.following_id
         WHERE uf.follower_id = ?
         ORDER BY a.created_at DESC
@@ -1492,6 +1578,7 @@ pub async fn get_articles_feed(
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
+        let category_slug: Option<String> = row.get(10).ok();
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
@@ -1579,6 +1666,7 @@ pub async fn get_articles_feed(
             body,
             rendered_body: Some(rendered_body),
             tag_list: tag_names,
+            category: category_slug,
             created_at,
             updated_at,
             favorited,

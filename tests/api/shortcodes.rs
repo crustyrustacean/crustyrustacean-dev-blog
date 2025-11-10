@@ -252,7 +252,7 @@ async fn test_create_article_with_shortcodes_processes_them() {
         .await
         .expect("Failed to execute request");
 
-    assert_eq!(response.status(), 200);
+    assert_eq!(response.status(), 201);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
     let stored_body = body["article"]["body"].as_str().unwrap();

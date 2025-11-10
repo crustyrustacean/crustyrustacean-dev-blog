@@ -78,7 +78,7 @@ fn main() {
         .expect("Failed to execute request.");
 
     // Assert
-    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(response.status().as_u16(), 201);
 
     let article_response: serde_json::Value = response.json().await.unwrap();
     let article = &article_response["article"];
