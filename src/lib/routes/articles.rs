@@ -176,18 +176,23 @@ pub async fn create_article(
     };
 
     // Insert the article
+    let category_id_param = match category_id {
+        Some(id) => libsql::Value::Text(id),
+        None => libsql::Value::Null,
+    };
+
     conn.execute(
         "INSERT INTO articles (id, slug, title, description, body, author_id, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        libsql::params![
-            article_id.to_string(),
-            slug.clone(),
-            article_data.title.clone(),
-            article_data.description.clone(),
-            processed_body.clone(),
-            user.user_id.to_string(),
-            category_id.unwrap_or_default(),
-            now.to_rfc3339(),
-            now.to_rfc3339(),
+        vec![
+            libsql::Value::Text(article_id.to_string()),
+            libsql::Value::Text(slug.clone()),
+            libsql::Value::Text(article_data.title.clone()),
+            libsql::Value::Text(article_data.description.clone()),
+            libsql::Value::Text(processed_body.clone()),
+            libsql::Value::Text(user.user_id.to_string()),
+            category_id_param,
+            libsql::Value::Text(now.to_rfc3339()),
+            libsql::Value::Text(now.to_rfc3339()),
         ],
     )
     .await
