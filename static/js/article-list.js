@@ -1,5 +1,25 @@
 // Article List page JavaScript Module
 document.addEventListener('DOMContentLoaded', function() {
+    // Fetch and display categories from API
+    fetch('/api/categories')
+        .then(response => response.json())
+        .then(data => {
+            const categoriesContainer = document.getElementById('filter-categories-container');
+            if (data.categories && data.categories.length > 0) {
+                categoriesContainer.innerHTML = data.categories.map(category => {
+                    return `<a href="/articles?category=${encodeURIComponent(category.slug)}" class="badge bg-primary text-decoration-none">
+                        <i class="fas fa-folder me-1"></i>${category.name}
+                    </a>`;
+                }).join('');
+            } else {
+                categoriesContainer.innerHTML = '<span class="text-muted small">No categories yet</span>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching categories:', error);
+            document.getElementById('filter-categories-container').innerHTML = '<span class="text-muted small">Unable to load categories</span>';
+        });
+
     // Fetch and display tags from API
     fetch('/api/tags')
         .then(response => response.json())

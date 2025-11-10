@@ -77,15 +77,29 @@
                             <span class="input-group-text">
                                 <i class="fas fa-tags"></i>
                             </span>
-                            <input 
-                                type="text" 
-                                class="form-control" 
-                                id="tags" 
-                                name="tags" 
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="tags"
+                                name="tags"
                                 placeholder="rust, programming, tutorial"
                                 value="{{ article.tag_list | default(value=[]) | join(sep=', ') }}">
                         </div>
                         <div class="form-text">Separate tags with commas. Tags help readers discover your content.</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="category" class="form-label">Category</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-folder"></i>
+                            </span>
+                            <select class="form-select" id="category" name="category">
+                                <option value="">No category</option>
+                                <!-- Categories will be loaded dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-text">Select a category to help organize your article (optional).</div>
                     </div>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
