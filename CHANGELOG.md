@@ -2,6 +2,225 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [2.5.0] - 2025-11-11
+
+### Added - Pagination and Draft Widget
+- **Articles Page Pagination**:
+  - Modified `/articles` route to show 10 articles per page (optimized from 20)
+  - Bootstrap-styled pagination controls with page numbers, previous/next buttons
+  - Total count query for accurate page calculation
+  - Pagination metadata passed to template context
+  - Responsive pagination UI matching existing design patterns
+  - Query parameter support: `GET /articles?page=N`
+
+- **Landing Page Draft Widget**:
+  - New widget showing draft article count for authenticated users
+  - Modified total articles count to exclude drafts (published articles only)
+  - Database query to count user's draft articles
+  - Conditional display based on authentication status
+  - "View Drafts" link navigates to `/admin/drafts` when drafts exist
+  - Empty state handling when user has zero drafts
+  - Responsive layout integrated with existing widgets
+
+### Test Coverage
+- Added 4 comprehensive pagination tests:
+  - Default page display (10 articles per page)
+  - Multi-page navigation with correct article subsets
+  - API endpoint pagination validation
+  - No pagination controls when articles fit on one page
+- Added 4 draft widget tests:
+  - Widget visibility for authenticated users with drafts
+  - Widget hidden for guest users
+  - Widget hidden when user has zero drafts
+  - Proper separation of published vs draft article counts
+- All new tests passing (8/8)
+- **Total test count**: 222 integration tests + 19 unit tests
+
+### Technical Details
+- **User Experience**: Improved browsability with pagination controls
+- **Performance**: Reduced initial page load by limiting results per page
+- **Author Dashboard**: Real-time draft count visibility on homepage
+- **Implementation**: Built following existing TDD patterns
+
+## [2.4.0] - 2025-11-11
+
+### Added - Markdown File Upload
+- **Direct Markdown File Upload in Editor**:
+  - Upload `.md` files directly in the article editor
+  - Automatic parsing and extraction of title, description, and body content
+  - File validation (markdown extension required, 1MB size limit)
+  - Progress indicator during upload
+  - Success/error messages for user feedback
+  - Seamless integration with existing editor workflow
+
+- **API Endpoint**:
+  - `POST /api/articles/upload-markdown` - Process markdown file uploads (protected)
+  - Smart metadata extraction from markdown frontmatter or content
+  - Defaults to "Untitled Article" when title not found in markdown
+  - Returns parsed title, description, and full body content as JSON
+
+- **Frontend Features**:
+  - File upload UI in editor template
+  - JavaScript handling for file selection, upload, and form population
+  - Automatic form field population with extracted data
+  - Error handling for invalid files and size limits
+
+### Test Coverage
+- 6 comprehensive integration tests:
+  - Happy path with proper markdown parsing
+  - Markdown without title (defaults to "Untitled Article")
+  - Authentication requirement validation
+  - Invalid file type rejection
+  - File size limit enforcement (1MB)
+  - Complex markdown with code blocks and formatting
+
+### Technical Details
+- **Workflow Enhancement**: Quick import of markdown drafts for editing
+- **Parser**: Custom `parse_markdown_metadata()` function for content extraction
+- **Security**: File type and size validation prevents abuse
+- **Integration**: Works seamlessly with existing article creation workflow
+
+## [2.3.0] - 2025-11-11
+
+### Added - Drafts Management System
+- **Complete Drafts Management Panel**:
+  - Dedicated drafts admin page at `/admin/drafts`
+  - Table view showing all user's draft articles
+  - Display: title, description, tags, created/updated timestamps
+  - One-click publish functionality to make drafts public
+  - Edit, preview, and delete actions for each draft
+  - Empty state message for users with no drafts
+  - Bootstrap modal confirmations for destructive actions
+  - Real-time UI updates with fade animations
+
+- **API Endpoints**:
+  - `GET /api/articles/drafts` - List authenticated user's draft articles (protected)
+  - Returns only the user's own drafts with full metadata
+
+- **Frontend Integration**:
+  - Modular JavaScript (`drafts.js`) for drafts management
+  - Publish draft functionality (updates draft status to false)
+  - Delete draft functionality with confirmation
+  - Interactive UI with real-time updates
+  - "Draft Articles" card on admin dashboard for easy navigation
+
+- **Access Control**:
+  - Only article authors can see their own drafts
+  - Drafts completely hidden from other users
+  - Authentication required for all draft operations
+
+### Test Coverage
+- 8+ comprehensive integration tests covering:
+  - Creating draft articles
+  - Listing user drafts (API and page)
+  - Publishing drafts (draft to published status change)
+  - Draft visibility (author-only access)
+  - Drafts excluded from public listings
+  - Deleting drafts
+  - Authentication requirements
+  - Empty drafts state handling
+
+### Technical Details
+- **Workflow**: Streamlined draft-to-publish workflow for authors
+- **Security**: Proper authorization and ownership validation
+- **User Experience**: Clear separation between drafts and published content
+- **Integration**: Seamless integration with existing article management system
+
+## [2.2.0] - 2025-11-10
+
+### Added - Draft Status Feature (TDD Implementation)
+- **Complete Draft/Published Status System**:
+  - Articles can be saved as drafts or published
+  - Draft status field added to all article-related data structures
+  - Default behavior: new articles are published (backward compatible)
+  - Flexible status changes: can toggle between draft and published
+
+- **Database Changes**:
+  - Added `draft` column to articles table (INTEGER: 0=published, 1=draft)
+  - Column defaults to 0 (published) for backward compatibility
+  - Migration automatically applied to existing installations
+
+- **Model Updates**:
+  - Added `draft` field to Article, ArticleResponse, CreateArticle, UpdateArticle
+  - Proper serialization with camelCase for API consistency
+  - Boolean representation: false=published, true=draft
+
+- **API Endpoints Updated**:
+  - `POST /api/articles` - Accept draft status on creation
+  - `PUT /api/articles/{slug}` - Allow changing draft status on update
+  - `GET /api/articles/{slug}` - Added optional authentication to check draft visibility
+  - `GET /api/articles` - Filter out all drafts from public listings
+  - `GET /api/articles/feed` - Show user's own drafts, exclude others' drafts
+  - `GET /api/search?q={query}` - Filter out all drafts from search results
+
+- **Authorization & Visibility Rules**:
+  - Only article author can view their own drafts
+  - Drafts completely hidden from other users
+  - Public endpoints (list, search, feed) automatically exclude drafts
+  - Draft articles inaccessible via direct URL to non-authors
+
+- **Frontend Integration**:
+  - Draft checkbox in article editor
+  - Draft status indicator on admin dashboard
+  - Visual distinction between draft and published articles
+  - "Save as Draft" functionality in editor
+
+### Test Coverage
+- 11 comprehensive integration tests:
+  - Creating articles as drafts
+  - Updating draft status
+  - Draft visibility and authorization
+  - Draft filtering in list/search/feed endpoints
+  - Author-only access to own drafts
+  - Non-author blocking from viewing drafts
+  - Idempotency testing for draft operations
+
+### Technical Details
+- **TDD Approach**: Tests written first, then implementation
+- **Backward Compatibility**: Existing articles default to published
+- **Security**: Proper authorization prevents draft leakage
+- **Data Integrity**: Database constraints ensure valid draft status
+
+## [2.2.0-alpha] - 2025-10-25
+
+### Added - Shortcode System for Internal Article Linking
+- **Shortcode Syntax**: `[[article:slug]]` or `[[article:slug|Custom Text]]`
+- **Processing Pipeline**:
+  - Parse shortcodes from article body at submission time
+  - Query database for referenced article titles
+  - Replace shortcodes with markdown links
+  - Store processed markdown in database
+
+- **Markdown Link Generation**:
+  - If article found: `[Article Title](/articles/slug)`
+  - If article not found: `[slug](/articles/slug "Article not found")`
+  - If custom text provided: `[Custom Text](/articles/slug)`
+
+- **Admin Dashboard Enhancement**:
+  - Copy-to-clipboard functionality for article slugs
+  - Quick shortcode generation for internal linking
+  - Interactive buttons for each article in dashboard
+
+- **Implementation Details**:
+  - New `src/lib/shortcodes.rs` module with regex-based parser
+  - `parse_shortcodes()` function extracts all shortcodes from text
+  - `process_shortcodes()` async function resolves shortcodes via database
+  - Integration with article creation and update workflows
+
+### Test Coverage
+- 15+ comprehensive tests covering:
+  - Shortcode parsing (basic, custom text, multiple shortcodes)
+  - Database resolution (existing and non-existing articles)
+  - Full text processing integration
+  - Admin dashboard clipboard functionality
+  - Edge cases (malformed shortcodes, empty slugs)
+
+### Technical Details
+- **Use Case**: Simplifies internal article cross-referencing
+- **Author Workflow**: Copy slug from dashboard, paste as shortcode in editor
+- **Processing Time**: Shortcodes resolved at article save time (not render time)
+- **Performance**: Regex-based parsing with efficient database queries
+
 ## [2.1.0] - 2025-11-09
 
 ### Added - Categories System

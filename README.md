@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 143+ integration tests
+- **Comprehensive test suite** with 222+ integration tests and 19 unit tests
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -97,6 +97,40 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Categories admin page with interactive UI
   - Complete API endpoints with authentication
   - 21 comprehensive integration tests
+- **Draft Status System** (TDD implementation):
+  - Save articles as drafts or publish them
+  - Draft/published status toggle
+  - Author-only visibility for draft articles
+  - Drafts excluded from public listings, search, and feeds
+  - Draft status indicator in admin dashboard
+  - 11 comprehensive integration tests
+- **Drafts Management Panel**:
+  - Dedicated admin page at `/admin/drafts` for managing draft articles
+  - One-click publish functionality
+  - Edit, preview, and delete actions for drafts
+  - Draft count widget on landing page for authenticated users
+  - Real-time UI updates with Bootstrap modals
+  - 8+ comprehensive integration tests
+- **Shortcode System**:
+  - Internal article linking with `[[article:slug]]` syntax
+  - Optional custom link text: `[[article:slug|Custom Text]]`
+  - Automatic resolution to markdown links at save time
+  - Copy-to-clipboard slug functionality in admin dashboard
+  - Smart handling of missing articles with fallback links
+  - 15+ comprehensive tests
+- **Markdown File Upload**:
+  - Upload `.md` files directly in article editor
+  - Automatic parsing and extraction of title, description, body
+  - 1MB file size limit with validation
+  - Smart defaults ("Untitled Article" when no title found)
+  - Progress indicators and error handling
+  - 6 comprehensive integration tests
+- **Articles Pagination**:
+  - 10 articles per page on `/articles` listing
+  - Bootstrap-styled pagination controls
+  - Page number display with previous/next navigation
+  - Query parameter support: `?page=N`
+  - 4 comprehensive pagination tests
 
 ### 🚧 Planned
 - Image processing and optimization
@@ -122,6 +156,7 @@ src/
     telemetry.rs    # Tracing/logging setup
     models/         # Database entities (User, Article, Comment, Tag, Category, Media)
     routes/         # HTTP route handlers
+    shortcodes.rs   # Shortcode parsing for internal article links
       health_check.rs # Health check endpoint
       users.rs      # User authentication routes
       index.rs      # Homepage with dynamic content
@@ -154,6 +189,7 @@ static/
     profile.js      # User profile interactions
     search.js       # Search functionality
     categories-admin.js # Categories admin page functionality
+    drafts.js       # Drafts management page functionality
     media-library.js # Media library management
     utils.js        # Shared utilities and helpers
   images/           # Static images and assets
@@ -173,6 +209,7 @@ templates/          # Tera templates for HTML rendering
   admin/
     dashboard.html  # Admin interface
     categories.html # Categories management page
+    drafts.html     # Drafts management page
     media.html      # Media library page
   profile/
     profile.html    # User profile page
@@ -192,11 +229,15 @@ tests/
     comments.rs     # Comments API integration tests (11 tests)
     search.rs       # Search API integration tests
     categories.rs   # Categories API integration tests (21 tests)
+    drafts.rs       # Drafts management integration tests (8 tests)
     media.rs        # Media library integration tests
+    shortcodes.rs   # Shortcodes system integration tests (15+ tests)
+    admin_dashboard.rs # Admin dashboard integration tests
     template_rendering.rs # Template rendering integration tests
     health_check.rs # Health check tests
     helpers.rs      # Test infrastructure and utilities
     main.rs         # Test module declarations
+  shortcodes.rs     # Shortcodes unit tests
 ```
 
 ## Getting Started
@@ -215,7 +256,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (143+ total)
+cargo test              # Run all tests (241 total: 222 integration + 19 unit)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -226,6 +267,8 @@ cargo test rss          # Run RSS feed tests only
 cargo test comments     # Run comments API tests only
 cargo test search       # Run search API tests only
 cargo test media        # Run media library tests only
+cargo test drafts       # Run drafts management tests only
+cargo test shortcodes   # Run shortcodes system tests only
 cargo test api::        # Run all API integration tests
 ```
 
@@ -240,10 +283,16 @@ The test suite includes comprehensive testing:
 - ✅ Authors discovery with search and pagination
 - ✅ Tags API with alphabetical sorting and filtering
 - ✅ Categories API with CRUD operations and article integration
+- ✅ Draft status system with author-only visibility
+- ✅ Drafts management with publish/delete operations
+- ✅ Shortcodes system with parsing and database resolution
+- ✅ Markdown file upload with metadata extraction
+- ✅ Articles pagination with page navigation
 - ✅ RSS feed generation with XML validation
 - ✅ Comments API with authorization and validation
 - ✅ Search API with full-text querying across articles
 - ✅ Media library with file upload and storage operations
+- ✅ Template rendering with authentication state validation
 - ✅ Idempotent operations and multi-user scenarios
 
 ### Deploying with Shuttle
@@ -266,6 +315,7 @@ GET  /editor                       # Article editor (protected)
 GET  /editor/{slug}                # Edit article (protected)
 GET  /admin                        # Admin dashboard (protected)
 GET  /admin/categories             # Categories management page (protected)
+GET  /admin/drafts                 # Drafts management page (protected)
 GET  /admin/media                  # Media library admin page (protected)
 GET  /profiles/{username}          # User profile page
 GET  /profiles                     # Authors discovery page (protected)
@@ -292,12 +342,15 @@ DELETE /api/profiles/{username}/follow    # Unfollow user (protected)
 
 ### Articles API
 ```
-GET    /api/articles               # List articles (JSON)
-GET    /api/articles/feed          # Get personal feed (protected)
-POST   /api/articles               # Create article (protected)
-GET    /api/articles/{slug}        # Get article (JSON)
-PUT    /api/articles/{slug}        # Update article with tag editing (protected)
-DELETE /api/articles/{slug}        # Delete article (protected)
+GET    /api/articles                    # List articles (JSON, paginated, excludes drafts)
+GET    /api/articles?page=N             # Get specific page of articles
+GET    /api/articles/feed               # Get personal feed (protected, includes own drafts)
+GET    /api/articles/drafts             # List user's draft articles (protected)
+POST   /api/articles                    # Create article (protected, supports draft status)
+POST   /api/articles/upload-markdown    # Upload markdown file to editor (protected)
+GET    /api/articles/{slug}             # Get article (JSON, author can view own drafts)
+PUT    /api/articles/{slug}             # Update article with tag editing and draft status (protected)
+DELETE /api/articles/{slug}             # Delete article (protected)
 ```
 
 ### Favorites API
@@ -323,7 +376,7 @@ DELETE /api/categories/{slug}      # Delete category (protected)
 
 ### Search API
 ```
-GET /api/search?q={query}          # Search articles by query
+GET /api/search?q={query}          # Search articles by query (excludes drafts)
 ```
 
 ### Comments API
@@ -352,22 +405,26 @@ GET /health_check                  # Health check endpoint
 
 The application now includes a complete blog system:
 
-1. **Dynamic Homepage**: Real-time article summaries, blog statistics (article count, topics covered, latest post date)
-2. **Articles Listing**: Professional grid layout with filtering options and pagination
+1. **Dynamic Homepage**: Real-time article summaries, blog statistics (article count, topics covered, latest post date), draft count widget for authors
+2. **Articles Listing**: Professional grid layout with pagination (10 per page), filtering options, and page navigation
 3. **Individual Articles**: Slug-based URLs for SEO-friendly article pages
 4. **Content Management**: Full CRUD operations with proper authorization
 5. **Admin Interface**: Dashboard for managing articles, users, and content with copy-to-clipboard slug functionality
-6. **Favorites System**: Interactive favorite/unfavorite with personal favorites page
-7. **Personal Feed**: Curated feed showing articles from authors you follow
-8. **Authors Discovery**: Browse and search for authors to follow with interactive UI
-9. **Social Features**: Complete follow/unfollow system with real-time updates
-10. **Tags System**: Dynamic tag display with filtering and alphabetical organization
-11. **Categories System**: Organize posts with categories, filter by category, admin management UI
-12. **Search System**: Full-text search across articles with real-time results
-13. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
-14. **Comments System**: Add, view, and delete comments on articles with proper authorization
-15. **Media Library**: Upload and manage media files with cloud storage integration
-16. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+6. **Draft System**: Save articles as drafts, manage drafts separately, one-click publishing, author-only visibility
+7. **Drafts Management**: Dedicated admin page for viewing, editing, publishing, and deleting draft articles
+8. **Shortcode System**: Internal article linking with `[[article:slug]]` syntax for easy cross-referencing
+9. **Markdown Upload**: Upload markdown files directly in editor with automatic parsing and form population
+10. **Favorites System**: Interactive favorite/unfavorite with personal favorites page
+11. **Personal Feed**: Curated feed showing articles from authors you follow
+12. **Authors Discovery**: Browse and search for authors to follow with interactive UI
+13. **Social Features**: Complete follow/unfollow system with real-time updates
+14. **Tags System**: Dynamic tag display with filtering and alphabetical organization
+15. **Categories System**: Organize posts with categories, filter by category, admin management UI
+16. **Search System**: Full-text search across articles with real-time results (excludes drafts)
+17. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
+18. **Comments System**: Add, view, and delete comments on articles with proper authorization
+19. **Media Library**: Upload and manage media files with cloud storage integration
+20. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -392,9 +449,12 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 143+ integration tests covering happy path and failure scenarios
-- **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, and Media Library features built with TDD approach
+- **Comprehensive Testing**: 241 total tests (222 integration + 19 unit) covering happy path and failure scenarios
+- **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, Drafts, and Media Library features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 - **Cloud-Native Storage**: OpenDAL integration for flexible storage backend options
+- **Modular JavaScript**: 20+ JavaScript modules with separation of concerns
+- **Content Management**: Complete draft workflow with author-only visibility
+- **Internal Linking**: Shortcode system for seamless article cross-referencing
 
