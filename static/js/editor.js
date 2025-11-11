@@ -44,12 +44,32 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        const formData = new FormData(articleForm);
+
+        // Validate required fields only when publishing (not for drafts)
+        if (!asDraft) {
+            const title = formData.get('title');
+            const description = formData.get('description');
+            const body = formData.get('body');
+
+            if (!title || title.trim() === '') {
+                showError('Article title is required for publishing.');
+                return;
+            }
+            if (!description || description.trim() === '') {
+                showError('Article description is required for publishing.');
+                return;
+            }
+            if (!body || body.trim() === '') {
+                showError('Article content is required for publishing.');
+                return;
+            }
+        }
+
         // Show loading state
         targetBtn.disabled = true;
         targetText.classList.add('d-none');
         targetLoadingText.classList.remove('d-none');
-
-        const formData = new FormData(articleForm);
 
         // Parse tags
         const tagsInput = formData.get('tags');

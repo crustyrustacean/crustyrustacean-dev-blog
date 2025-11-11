@@ -37,12 +37,11 @@
                             <span class="input-group-text">
                                 <i class="fas fa-heading"></i>
                             </span>
-                            <input 
-                                type="text" 
-                                class="form-control" 
-                                id="title" 
-                                name="title" 
-                                required 
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="title"
+                                name="title"
                                 placeholder="How to Train Your Dragon"
                                 value="{{ article.title | default(value='') }}"
                                 maxlength="200">
@@ -56,12 +55,11 @@
                             <span class="input-group-text">
                                 <i class="fas fa-align-left"></i>
                             </span>
-                            <input 
-                                type="text" 
-                                class="form-control" 
-                                id="description" 
-                                name="description" 
-                                required 
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="description"
+                                name="description"
                                 placeholder="Ever wonder how?"
                                 value="{{ article.description | default(value='') }}"
                                 maxlength="500">
@@ -71,11 +69,10 @@
 
                     <div class="mb-4">
                         <label for="body" class="form-label">Article Content</label>
-                        <textarea 
-                            class="form-control" 
-                            id="body" 
-                            name="body" 
-                            required 
+                        <textarea
+                            class="form-control"
+                            id="body"
+                            name="body"
                             rows="12"
                             placeholder="You have to believe in yourself. That's the secret to life.">{{ article.body | default(value='') }}</textarea>
                         <div class="form-text">Write your article content here. Markdown is supported for formatting.</div>
