@@ -1299,3 +1299,566 @@ async fn test_tag_updates_idempotency() {
         assert!(tag_list.contains(&json!("consistent")));
     }
 }
+
+// Draft Status Tests
+
+#[tokio::test]
+async fn test_create_article_as_draft() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("draftauthor").await;
+
+    let article_data = json!({
+        "article": {
+            "title": "Draft Article",
+            "description": "This is a draft",
+            "body": "Draft content that is not ready for publication",
+            "draft": true,
+            "tagList": ["draft", "wip"]
+        }
+    });
+
+    // Act
+    let response = bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        article_data
+    )
+    .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::CREATED);
+    let response_body: Value = parse_json!(response);
+
+    assert_eq!(response_body["article"]["title"], "Draft Article");
+    assert_eq!(response_body["article"]["draft"], true);
+}
+
+#[tokio::test]
+async fn test_create_article_as_published() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("publishedauthor").await;
+
+    let article_data = json!({
+        "article": {
+            "title": "Published Article",
+            "description": "This is published",
+            "body": "Published content",
+            "draft": false
+        }
+    });
+
+    // Act
+    let response = bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        article_data
+    )
+    .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::CREATED);
+    let response_body: Value = parse_json!(response);
+
+    assert_eq!(response_body["article"]["title"], "Published Article");
+    assert_eq!(response_body["article"]["draft"], false);
+}
+
+#[tokio::test]
+async fn test_create_article_without_draft_field_defaults_to_published() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("defaultauthor").await;
+
+    let article_data = json!({
+        "article": {
+            "title": "Default Status Article",
+            "description": "No draft field specified",
+            "body": "Should default to published"
+        }
+    });
+
+    // Act
+    let response = bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        article_data
+    )
+    .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::CREATED);
+    let response_body: Value = parse_json!(response);
+
+    // Should default to published (draft = false)
+    assert_eq!(response_body["article"]["draft"], false);
+}
+
+#[tokio::test]
+async fn test_update_article_to_draft() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("statuschanger").await;
+
+    // Create a published article
+    let slug = app.create_article_simple(&token, "Published Article").await;
+
+    // Act - Update to draft
+    let update_data = json!({
+        "article": {
+            "draft": true
+        }
+    });
+
+    let response = bearer_request!(
+        put & app,
+        format!("{}/api/articles/{}", &app.address, slug),
+        &token,
+        update_data
+    )
+    .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+    assert_eq!(response_body["article"]["draft"], true);
+}
+
+#[tokio::test]
+async fn test_update_article_from_draft_to_published() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("publisher").await;
+
+    // Create a draft article
+    let draft_data = json!({
+        "article": {
+            "title": "Draft to Publish",
+            "description": "Testing publication",
+            "body": "Draft content",
+            "draft": true
+        }
+    });
+
+    let create_response = bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        draft_data
+    )
+    .expect("Failed to create draft");
+
+    let create_body: Value = parse_json!(create_response);
+    let slug = create_body["article"]["slug"].as_str().unwrap();
+
+    // Act - Publish the draft
+    let update_data = json!({
+        "article": {
+            "draft": false
+        }
+    });
+
+    let response = bearer_request!(
+        put & app,
+        format!("{}/api/articles/{}", &app.address, slug),
+        &token,
+        update_data
+    )
+    .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+    assert_eq!(response_body["article"]["draft"], false);
+}
+
+#[tokio::test]
+async fn test_list_articles_excludes_drafts_from_other_users() {
+    // Arrange
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("author1")
+        .await
+        .with_user_default("author2")
+        .await;
+
+    let token1 = fixture.get_token("author1");
+    let token2 = fixture.get_token("author2");
+
+    // Author1 creates a published article
+    let published_data = json!({
+        "article": {
+            "title": "Published by Author1",
+            "description": "Public article",
+            "body": "Everyone can see this",
+            "draft": false
+        }
+    });
+
+    bearer_request!(
+        post & fixture.app,
+        format!("{}/api/articles", &fixture.app.address),
+        &token1,
+        published_data
+    )
+    .expect("Failed to create published article");
+
+    // Author2 creates a draft article
+    let draft_data = json!({
+        "article": {
+            "title": "Draft by Author2",
+            "description": "Private draft",
+            "body": "Only author2 should see this",
+            "draft": true
+        }
+    });
+
+    bearer_request!(
+        post & fixture.app,
+        format!("{}/api/articles", &fixture.app.address),
+        &token2,
+        draft_data
+    )
+    .expect("Failed to create draft article");
+
+    // Act - List articles without authentication
+    let response = fixture
+        .app
+        .client
+        .get(format!("{}/api/articles", &fixture.app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+
+    // Should only show the published article, not the draft
+    assert_eq!(response_body["articlesCount"], 1);
+    let articles = response_body["articles"].as_array().unwrap();
+    assert_eq!(articles[0]["title"], "Published by Author1");
+}
+
+#[tokio::test]
+async fn test_list_articles_excludes_own_drafts_by_default() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("mixedauthor").await;
+
+    // Create a published article
+    let published_data = json!({
+        "article": {
+            "title": "Published Article",
+            "description": "Public",
+            "body": "Published content",
+            "draft": false
+        }
+    });
+
+    bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        published_data
+    )
+    .expect("Failed to create published article");
+
+    // Create a draft article
+    let draft_data = json!({
+        "article": {
+            "title": "Draft Article",
+            "description": "Private",
+            "body": "Draft content",
+            "draft": true
+        }
+    });
+
+    bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        draft_data
+    )
+    .expect("Failed to create draft article");
+
+    // Act - List articles (without includeDrafts parameter)
+    let response = app
+        .client
+        .get(format!("{}/api/articles", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+
+    // By default, should only show published articles
+    assert_eq!(response_body["articlesCount"], 1);
+    let articles = response_body["articles"].as_array().unwrap();
+    assert_eq!(articles[0]["title"], "Published Article");
+}
+
+#[tokio::test]
+async fn test_get_draft_article_as_author() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("draftowner").await;
+
+    // Create a draft article
+    let draft_data = json!({
+        "article": {
+            "title": "My Private Draft",
+            "description": "Draft article",
+            "body": "Draft content",
+            "draft": true
+        }
+    });
+
+    let create_response = bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        draft_data
+    )
+    .expect("Failed to create draft");
+
+    let create_body: Value = parse_json!(create_response);
+    let slug = create_body["article"]["slug"].as_str().unwrap();
+
+    // Act - Get the draft article as the author
+    let response = app
+        .client
+        .get(format!("{}/api/articles/{}", &app.address, slug))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Author should be able to access their own draft
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+    assert_eq!(response_body["article"]["title"], "My Private Draft");
+    assert_eq!(response_body["article"]["draft"], true);
+}
+
+#[tokio::test]
+async fn test_get_draft_article_as_non_author_fails() {
+    // Arrange
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("draftauthor")
+        .await
+        .with_user_default("otheruser")
+        .await;
+
+    let author_token = fixture.get_token("draftauthor");
+    let other_token = fixture.get_token("otheruser");
+
+    // Create a draft article
+    let draft_data = json!({
+        "article": {
+            "title": "Private Draft",
+            "description": "Should not be visible to others",
+            "body": "Secret draft content",
+            "draft": true
+        }
+    });
+
+    let create_response = bearer_request!(
+        post & fixture.app,
+        format!("{}/api/articles", &fixture.app.address),
+        &author_token,
+        draft_data
+    )
+    .expect("Failed to create draft");
+
+    let create_body: Value = parse_json!(create_response);
+    let slug = create_body["article"]["slug"].as_str().unwrap();
+
+    // Act - Try to get the draft article as a different user
+    let response = fixture
+        .app
+        .client
+        .get(format!("{}/api/articles/{}", &fixture.app.address, slug))
+        .header("Authorization", format!("Bearer {}", other_token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Non-author should not be able to access the draft
+    assert_status!(response, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_get_draft_article_without_auth_fails() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("draftauthor").await;
+
+    // Create a draft article
+    let draft_data = json!({
+        "article": {
+            "title": "Private Draft",
+            "description": "Should not be visible without auth",
+            "body": "Secret content",
+            "draft": true
+        }
+    });
+
+    let create_response = bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        draft_data
+    )
+    .expect("Failed to create draft");
+
+    let create_body: Value = parse_json!(create_response);
+    let slug = create_body["article"]["slug"].as_str().unwrap();
+
+    // Act - Try to get the draft article without authentication
+    let response = app
+        .client
+        .get(format!("{}/api/articles/{}", &app.address, slug))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Unauthenticated users should not be able to access drafts
+    assert_status!(response, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_list_articles_with_author_filter_excludes_their_drafts() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("filterauthor").await;
+
+    // Create a published article
+    let published_data = json!({
+        "article": {
+            "title": "Published by FilterAuthor",
+            "description": "Public",
+            "body": "Published content",
+            "draft": false
+        }
+    });
+
+    bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        published_data
+    )
+    .expect("Failed to create published article");
+
+    // Create a draft article
+    let draft_data = json!({
+        "article": {
+            "title": "Draft by FilterAuthor",
+            "description": "Private",
+            "body": "Draft content",
+            "draft": true
+        }
+    });
+
+    bearer_request!(
+        post & app,
+        format!("{}/api/articles", &app.address),
+        &token,
+        draft_data
+    )
+    .expect("Failed to create draft article");
+
+    // Act - List articles filtered by author
+    let response = app
+        .client
+        .get(format!(
+            "{}/api/articles?author=filterauthor",
+            &app.address
+        ))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should only show published articles, not drafts
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+
+    assert_eq!(response_body["articlesCount"], 1);
+    let articles = response_body["articles"].as_array().unwrap();
+    assert_eq!(articles[0]["title"], "Published by FilterAuthor");
+}
+
+#[tokio::test]
+async fn test_update_draft_status_authorization() {
+    // Arrange
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("owner")
+        .await
+        .with_user_default("hacker")
+        .await;
+
+    let owner_token = fixture.get_token("owner");
+    let hacker_token = fixture.get_token("hacker");
+
+    // Owner creates a draft
+    let draft_data = json!({
+        "article": {
+            "title": "Owner's Draft",
+            "description": "Private draft",
+            "body": "Draft content",
+            "draft": true
+        }
+    });
+
+    let create_response = bearer_request!(
+        post & fixture.app,
+        format!("{}/api/articles", &fixture.app.address),
+        &owner_token,
+        draft_data
+    )
+    .expect("Failed to create draft");
+
+    let create_body: Value = parse_json!(create_response);
+    let slug = create_body["article"]["slug"].as_str().unwrap();
+
+    // Act - Try to publish the draft as a different user
+    let update_data = json!({
+        "article": {
+            "draft": false
+        }
+    });
+
+    let response = bearer_request!(
+        put & fixture.app,
+        format!("{}/api/articles/{}", &fixture.app.address, slug),
+        &hacker_token,
+        update_data
+    )
+    .expect("Failed to execute request");
+
+    // Assert - Should be forbidden
+    assert_status!(response, StatusCode::FORBIDDEN);
+
+    // Verify the draft status hasn't changed by checking as the owner
+    let get_response = fixture
+        .app
+        .client
+        .get(format!("{}/api/articles/{}", &fixture.app.address, slug))
+        .header("Authorization", format!("Bearer {}", owner_token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_status!(get_response, StatusCode::OK);
+    let get_body: Value = parse_json!(get_response);
+    assert_eq!(get_body["article"]["draft"], true);
+}

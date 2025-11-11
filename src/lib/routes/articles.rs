@@ -20,6 +20,58 @@ use slug::slugify;
 use uuid::Uuid;
 use validator::Validate;
 
+/// Helper function to convert a boolean draft status to SQLite INTEGER (0 or 1)
+///
+/// SQLite doesn't have a native boolean type, so we use INTEGER where:
+/// - 0 = published (false)
+/// - 1 = draft (true)
+#[inline]
+pub(crate) fn draft_bool_to_int(draft: bool) -> i64 {
+    if draft { 1 } else { 0 }
+}
+
+/// Helper function to convert SQLite INTEGER to boolean draft status
+///
+/// Converts from SQLite's INTEGER representation to Rust bool:
+/// - 0 = published (false)
+/// - non-zero = draft (true)
+#[inline]
+pub(crate) fn draft_int_to_bool(draft: i64) -> bool {
+    draft != 0
+}
+
+/// Helper function to validate draft article visibility
+///
+/// Checks if a user is authorized to view a draft article.
+/// Only the article author can view their own drafts.
+///
+/// # Arguments
+/// * `is_draft` - Whether the article is a draft
+/// * `author_id` - The UUID of the article's author
+/// * `optional_user` - The optional authenticated user attempting to view the article
+///
+/// # Returns
+/// * `Ok(())` if the user is authorized to view the article
+/// * `Err(AppError::NotFound)` if the article is a draft and the user is not authorized
+fn check_draft_visibility(
+    is_draft: bool,
+    author_id: &str,
+    optional_user: &OptionalUser,
+) -> Result<(), AppError> {
+    if is_draft {
+        if let Some(auth_user) = &optional_user.user {
+            let author_uuid = Uuid::parse_str(author_id)
+                .map_err(|_| AppError::InternalServerError("Invalid author ID".to_string()))?;
+            if auth_user.user_id != author_uuid {
+                return Err(AppError::NotFound("Article not found".to_string()));
+            }
+        } else {
+            return Err(AppError::NotFound("Article not found".to_string()));
+        }
+    }
+    Ok(())
+}
+
 /// Helper function to handle tag association for articles
 ///
 /// This function handles the common logic for associating tags with articles:
@@ -182,7 +234,7 @@ pub async fn create_article(
     };
 
     conn.execute(
-        "INSERT INTO articles (id, slug, title, description, body, author_id, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO articles (id, slug, title, description, body, author_id, category_id, draft, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         vec![
             libsql::Value::Text(article_id.to_string()),
             libsql::Value::Text(slug.clone()),
@@ -191,6 +243,7 @@ pub async fn create_article(
             libsql::Value::Text(processed_body.clone()),
             libsql::Value::Text(user.user_id.to_string()),
             category_id_param,
+            libsql::Value::Integer(draft_bool_to_int(article_data.draft)),
             libsql::Value::Text(now.to_rfc3339()),
             libsql::Value::Text(now.to_rfc3339()),
         ],
@@ -243,6 +296,7 @@ pub async fn create_article(
         rendered_body: Some(rendered_body),
         tag_list: tag_names,
         category: category_slug,
+        draft: article_data.draft,
         created_at: now,
         updated_at: now,
         favorited: false, // New article is not favorited by creator
@@ -260,6 +314,7 @@ pub async fn create_article(
 pub async fn get_article(
     State(state): State<AppState>,
     Path(slug): Path<String>,
+    optional_user: OptionalUser,
 ) -> Result<Json<SingleArticleResponse>, AppError> {
     let conn = state
         .db
@@ -273,7 +328,7 @@ pub async fn get_article(
             SELECT
                 a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
                 u.username, u.bio, u.image,
-                c.slug as category_slug
+                c.slug as category_slug, a.draft
             FROM articles a
             JOIN users u ON a.author_id = u.id
             LEFT JOIN categories c ON a.category_id = c.id
@@ -308,7 +363,7 @@ pub async fn get_article(
     let updated_at_str: String = article_row
         .get(5)
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let _author_id: String = article_row
+    let author_id_str: String = article_row
         .get(6)
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let username: String = article_row
@@ -317,6 +372,13 @@ pub async fn get_article(
     let bio: Option<String> = article_row.get(8).ok();
     let image: Option<String> = article_row.get(9).ok();
     let category_slug: Option<String> = article_row.get(10).ok();
+    let draft: i64 = article_row
+        .get(11)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let is_draft = draft_int_to_bool(draft);
+
+    // If article is a draft, only the author can see it
+    check_draft_visibility(is_draft, &author_id_str, &optional_user)?;
 
     // Parse the timestamps
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -410,6 +472,7 @@ pub async fn get_article(
         rendered_body: Some(rendered_body),
         tag_list: tag_names,
         category: category_slug,
+        draft: is_draft,
         created_at,
         updated_at,
         favorited: false, // TODO: Implement based on current user if provided
@@ -486,7 +549,7 @@ pub async fn get_edit_article_page(
     Path(slug): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     // Get the article to edit
-    let article_response = get_article(State(state.clone()), Path(slug.clone())).await?;
+    let article_response = get_article(State(state.clone()), Path(slug.clone()), OptionalUser { user: Some(user.clone()) }).await?;
     let article = article_response.0.article;
 
     // Check if the current user is the author
@@ -725,6 +788,11 @@ pub async fn update_article(
         params.push(processed_body);
     }
 
+    if let Some(draft) = article_data.draft {
+        updates.push("draft = ?");
+        params.push(draft_bool_to_int(draft).to_string());
+    }
+
     // Handle category update if provided
     if let Some(ref cat_slug) = article_data.category {
         if !cat_slug.is_empty() {
@@ -809,7 +877,7 @@ pub async fn update_article(
     }
 
     // Return the updated article
-    get_article(State(state), Path(slug)).await
+    get_article(State(state), Path(slug), OptionalUser { user: Some(user) }).await
 }
 
 pub async fn delete_article(
@@ -917,6 +985,9 @@ pub async fn list_articles(
         params.push(libsql::Value::from(category.clone()));
     }
 
+    // Always filter out drafts in public listing
+    where_clauses.push("a.draft = 0");
+
     let where_clause = if where_clauses.is_empty() {
         String::new()
     } else {
@@ -928,7 +999,7 @@ pub async fn list_articles(
         SELECT
             a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
             u.username, u.bio, u.image,
-            c.slug as category_slug
+            c.slug as category_slug, a.draft
         FROM articles a
         JOIN users u ON a.author_id = u.id
         LEFT JOIN categories c ON a.category_id = c.id
@@ -981,6 +1052,10 @@ pub async fn list_articles(
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
+        let draft: i64 = row
+            .get(11)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
@@ -1054,6 +1129,7 @@ pub async fn list_articles(
             rendered_body: Some(rendered_body),
             tag_list: tag_names,
             category: category_slug,
+            draft: is_draft,
             created_at,
             updated_at,
             favorited: false,
@@ -1078,7 +1154,7 @@ pub async fn get_article_page(
     optional_user: OptionalUser,
 ) -> Result<impl IntoResponse, AppError> {
     // Get the article data using the existing API endpoint
-    let article_response = get_article(State(state.clone()), Path(slug.clone())).await?;
+    let article_response = get_article(State(state.clone()), Path(slug.clone()), OptionalUser { user: optional_user.user.clone() }).await?;
     let article = article_response.0.article;
 
     // Get user info if authenticated
@@ -1361,7 +1437,7 @@ async fn get_article_with_user_context(
             SELECT
                 a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
                 u.username, u.bio, u.image,
-                c.slug as category_slug
+                c.slug as category_slug, a.draft
             FROM articles a
             JOIN users u ON a.author_id = u.id
             LEFT JOIN categories c ON a.category_id = c.id
@@ -1408,6 +1484,10 @@ async fn get_article_with_user_context(
     let bio: Option<String> = article_row.get(9).ok();
     let image: Option<String> = article_row.get(10).ok();
     let category_slug: Option<String> = article_row.get(11).ok();
+    let draft: i64 = article_row
+        .get(12)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let is_draft = draft_int_to_bool(draft);
 
     // Parse the timestamps
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -1501,6 +1581,7 @@ async fn get_article_with_user_context(
         rendered_body: Some(rendered_body),
         tag_list: tag_names,
         category: category_slug,
+        draft: is_draft,
         created_at,
         updated_at,
         favorited,
@@ -1533,12 +1614,12 @@ pub async fn get_articles_feed(
         SELECT
             a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
             u.username, u.bio, u.image,
-            c.slug as category_slug
+            c.slug as category_slug, a.draft
         FROM articles a
         JOIN users u ON a.author_id = u.id
         LEFT JOIN categories c ON a.category_id = c.id
         JOIN user_follows uf ON a.author_id = uf.following_id
-        WHERE uf.follower_id = ?
+        WHERE uf.follower_id = ? AND a.draft = 0
         ORDER BY a.created_at DESC
         LIMIT ? OFFSET ?
         "#;
@@ -1584,6 +1665,10 @@ pub async fn get_articles_feed(
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
+        let draft: i64 = row
+            .get(11)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
@@ -1672,6 +1757,7 @@ pub async fn get_articles_feed(
             rendered_body: Some(rendered_body),
             tag_list: tag_names,
             category: category_slug,
+            draft: is_draft,
             created_at,
             updated_at,
             favorited,
