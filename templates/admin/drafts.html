@@ -55,7 +55,7 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <small class="text-muted">{{ draft.description|truncate(100) }}</small>
+                                            <small class="text-muted">{{ draft.description|truncate(length=100) }}</small>
                                         </td>
                                         <td>
                                             {% if draft.tagList and draft.tagList|length > 0 %}
