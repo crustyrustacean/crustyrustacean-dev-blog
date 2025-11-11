@@ -3,6 +3,7 @@
 use crate::auth::OptionalUser;
 use crate::errors::AppError;
 use crate::models::{ArticleResponse, UserProfile};
+use crate::routes::articles::draft_int_to_bool;
 use crate::state::AppState;
 use axum::{
     extract::{Query, State},
@@ -294,7 +295,7 @@ pub async fn search_articles(
                     rendered_body: None,
                     tag_list,
                     category: category_slug,
-                    draft: draft != 0,
+                    draft: draft_int_to_bool(draft),
                     created_at,
                     updated_at,
                     favorited,

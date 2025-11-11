@@ -20,6 +20,58 @@ use slug::slugify;
 use uuid::Uuid;
 use validator::Validate;
 
+/// Helper function to convert a boolean draft status to SQLite INTEGER (0 or 1)
+///
+/// SQLite doesn't have a native boolean type, so we use INTEGER where:
+/// - 0 = published (false)
+/// - 1 = draft (true)
+#[inline]
+pub(crate) fn draft_bool_to_int(draft: bool) -> i64 {
+    if draft { 1 } else { 0 }
+}
+
+/// Helper function to convert SQLite INTEGER to boolean draft status
+///
+/// Converts from SQLite's INTEGER representation to Rust bool:
+/// - 0 = published (false)
+/// - non-zero = draft (true)
+#[inline]
+pub(crate) fn draft_int_to_bool(draft: i64) -> bool {
+    draft != 0
+}
+
+/// Helper function to validate draft article visibility
+///
+/// Checks if a user is authorized to view a draft article.
+/// Only the article author can view their own drafts.
+///
+/// # Arguments
+/// * `is_draft` - Whether the article is a draft
+/// * `author_id` - The UUID of the article's author
+/// * `optional_user` - The optional authenticated user attempting to view the article
+///
+/// # Returns
+/// * `Ok(())` if the user is authorized to view the article
+/// * `Err(AppError::NotFound)` if the article is a draft and the user is not authorized
+fn check_draft_visibility(
+    is_draft: bool,
+    author_id: &str,
+    optional_user: &OptionalUser,
+) -> Result<(), AppError> {
+    if is_draft {
+        if let Some(auth_user) = &optional_user.user {
+            let author_uuid = Uuid::parse_str(author_id)
+                .map_err(|_| AppError::InternalServerError("Invalid author ID".to_string()))?;
+            if auth_user.user_id != author_uuid {
+                return Err(AppError::NotFound("Article not found".to_string()));
+            }
+        } else {
+            return Err(AppError::NotFound("Article not found".to_string()));
+        }
+    }
+    Ok(())
+}
+
 /// Helper function to handle tag association for articles
 ///
 /// This function handles the common logic for associating tags with articles:
@@ -191,7 +243,7 @@ pub async fn create_article(
             libsql::Value::Text(processed_body.clone()),
             libsql::Value::Text(user.user_id.to_string()),
             category_id_param,
-            libsql::Value::Integer(if article_data.draft { 1 } else { 0 }),
+            libsql::Value::Integer(draft_bool_to_int(article_data.draft)),
             libsql::Value::Text(now.to_rfc3339()),
             libsql::Value::Text(now.to_rfc3339()),
         ],
@@ -323,20 +375,10 @@ pub async fn get_article(
     let draft: i64 = article_row
         .get(11)
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let is_draft = draft != 0;
+    let is_draft = draft_int_to_bool(draft);
 
     // If article is a draft, only the author can see it
-    if is_draft {
-        if let Some(auth_user) = optional_user.user {
-            let author_uuid = Uuid::parse_str(&author_id_str)
-                .map_err(|_| AppError::InternalServerError("Invalid author ID".to_string()))?;
-            if auth_user.user_id != author_uuid {
-                return Err(AppError::NotFound("Article not found".to_string()));
-            }
-        } else {
-            return Err(AppError::NotFound("Article not found".to_string()));
-        }
-    }
+    check_draft_visibility(is_draft, &author_id_str, &optional_user)?;
 
     // Parse the timestamps
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -748,7 +790,7 @@ pub async fn update_article(
 
     if let Some(draft) = article_data.draft {
         updates.push("draft = ?");
-        params.push((if draft { 1 } else { 0 }).to_string());
+        params.push(draft_bool_to_int(draft).to_string());
     }
 
     // Handle category update if provided
@@ -1013,7 +1055,7 @@ pub async fn list_articles(
         let draft: i64 = row
             .get(11)
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-        let is_draft = draft != 0;
+        let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
@@ -1445,7 +1487,7 @@ async fn get_article_with_user_context(
     let draft: i64 = article_row
         .get(12)
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-    let is_draft = draft != 0;
+    let is_draft = draft_int_to_bool(draft);
 
     // Parse the timestamps
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -1626,7 +1668,7 @@ pub async fn get_articles_feed(
         let draft: i64 = row
             .get(11)
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-        let is_draft = draft != 0;
+        let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
