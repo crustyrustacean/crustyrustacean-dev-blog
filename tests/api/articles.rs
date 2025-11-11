@@ -1862,3 +1862,301 @@ async fn test_update_draft_status_authorization() {
     let get_body: Value = parse_json!(get_response);
     assert_eq!(get_body["article"]["draft"], true);
 }
+
+// ============================================================================
+// Markdown File Upload Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_upload_markdown_file_happy_path() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("mdauthor").await;
+
+    // Create a markdown file content
+    let markdown_content = r#"# My Amazing Article
+
+This is the first paragraph that serves as a description.
+
+## Introduction
+
+Here is the main content of the article with more details.
+
+- Point 1
+- Point 2
+- Point 3
+
+## Conclusion
+
+That's all folks!
+"#;
+
+    // Create a multipart form with the markdown file
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(markdown_content.as_bytes().to_vec())
+            .file_name("test-article.md")
+            .mime_str("text/markdown")
+            .unwrap(),
+    );
+
+    // Act
+    let response = app
+        .client
+        .post(format!("{}/api/articles/upload-markdown", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+
+    let response_body: Value = parse_json!(response);
+
+    assert_eq!(response_body["success"], true);
+    assert_eq!(response_body["title"], "My Amazing Article");
+    assert_eq!(
+        response_body["description"],
+        "This is the first paragraph that serves as a description."
+    );
+    assert_eq!(response_body["body"], markdown_content);
+    assert_eq!(response_body["filename"], "test-article.md");
+}
+
+#[tokio::test]
+async fn test_upload_markdown_without_title() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("mdauthor2").await;
+
+    // Markdown without H1 heading
+    let markdown_content = r#"This is just content without a title heading.
+
+It has multiple paragraphs and sections.
+
+## Section 1
+
+Some content here.
+"#;
+
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(markdown_content.as_bytes().to_vec())
+            .file_name("no-title.md")
+            .mime_str("text/markdown")
+            .unwrap(),
+    );
+
+    // Act
+    let response = app
+        .client
+        .post(format!("{}/api/articles/upload-markdown", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+
+    let response_body: Value = parse_json!(response);
+
+    assert_eq!(response_body["success"], true);
+    // Should default to "Untitled Article" when no H1 found
+    assert_eq!(response_body["title"], "Untitled Article");
+    // Should use first 200 chars as description
+    assert!(response_body["description"].as_str().unwrap().len() <= 200);
+}
+
+#[tokio::test]
+async fn test_upload_markdown_without_authentication() {
+    // Arrange
+    let app = spawn_app().await;
+
+    let markdown_content = "# Test\n\nContent";
+
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(markdown_content.as_bytes().to_vec())
+            .file_name("test.md")
+            .mime_str("text/markdown")
+            .unwrap(),
+    );
+
+    // Act
+    let response = app
+        .client
+        .post(format!("{}/api/articles/upload-markdown", &app.address))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should require authentication
+    assert_status!(response, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_upload_invalid_file_type() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("mdauthor3").await;
+
+    // Try to upload a non-markdown file
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(b"not markdown".to_vec())
+            .file_name("test.txt")
+            .mime_str("text/plain")
+            .unwrap(),
+    );
+
+    // Act
+    let response = app
+        .client
+        .post(format!("{}/api/articles/upload-markdown", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should reject non-markdown files
+    assert_status!(response, StatusCode::BAD_REQUEST);
+
+    let response_body: Value = parse_json!(response);
+    assert!(response_body["message"]
+        .as_str()
+        .unwrap()
+        .contains("markdown"));
+}
+
+#[tokio::test]
+async fn test_upload_markdown_file_too_large() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("mdauthor4").await;
+
+    // Create a file larger than 1MB
+    let large_content = "a".repeat(1024 * 1024 + 1); // 1MB + 1 byte
+
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(large_content.as_bytes().to_vec())
+            .file_name("large.md")
+            .mime_str("text/markdown")
+            .unwrap(),
+    );
+
+    // Act
+    let response = app
+        .client
+        .post(format!("{}/api/articles/upload-markdown", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should reject files over 1MB
+    assert_status!(response, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_upload_markdown_with_complex_formatting() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("mdauthor5").await;
+
+    // Markdown with complex formatting
+    let markdown_content = r#"# Advanced Rust Patterns
+
+Learn about advanced patterns in Rust programming.
+
+## Ownership and Borrowing
+
+Rust's ownership system is **unique** and *powerful*.
+
+```rust
+fn main() {
+    let x = String::from("hello");
+    println!("{}", x);
+}
+```
+
+### Code Examples
+
+- Ownership rules
+- Borrowing rules
+- Lifetimes
+
+> This is a quote about Rust
+
+[Link to docs](https://doc.rust-lang.org)
+"#;
+
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(markdown_content.as_bytes().to_vec())
+            .file_name("rust-patterns.md")
+            .mime_str("text/markdown")
+            .unwrap(),
+    );
+
+    // Act
+    let response = app
+        .client
+        .post(format!("{}/api/articles/upload-markdown", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+
+    let response_body: Value = parse_json!(response);
+
+    assert_eq!(response_body["success"], true);
+    assert_eq!(response_body["title"], "Advanced Rust Patterns");
+    assert_eq!(
+        response_body["description"],
+        "Learn about advanced patterns in Rust programming."
+    );
+    // Ensure the full content is preserved including code blocks
+    assert!(response_body["body"]
+        .as_str()
+        .unwrap()
+        .contains("```rust"));
+    assert!(response_body["body"]
+        .as_str()
+        .unwrap()
+        .contains("fn main()"));
+}
+
+#[tokio::test]
+async fn test_upload_markdown_no_file_provided() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("mdauthor6").await;
+
+    // Create empty form
+    let form = reqwest::multipart::Form::new();
+
+    // Act
+    let response = app
+        .client
+        .post(format!("{}/api/articles/upload-markdown", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::BAD_REQUEST);
+}

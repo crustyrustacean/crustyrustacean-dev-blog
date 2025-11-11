@@ -14,7 +14,8 @@ use crate::routes::{
     get_tags, get_tags_admin_page, get_terms, handle_404_simple, health_check, list_api_keys,
     list_articles, list_media, list_profiles, list_user_drafts, login_user, mobile_upload_article,
     register_user, search_articles, unfavorite_article, unfollow_user, update_article,
-    update_category, update_current_user, update_media_metadata, update_tag, upload_media,
+    update_category, update_current_user, update_media_metadata, update_tag, upload_markdown_file,
+    upload_media,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -100,6 +101,7 @@ impl App {
             .route("/api/articles", post(create_article).get(list_articles))
             .route("/api/articles/feed", get(get_articles_feed))
             .route("/api/articles/drafts", get(list_user_drafts))
+            .route("/api/articles/upload-markdown", post(upload_markdown_file))
             .route(
                 "/api/articles/{slug}",
                 get(get_article).put(update_article).delete(delete_article),
