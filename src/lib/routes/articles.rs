@@ -628,6 +628,7 @@ pub async fn get_edit_article_page(
             "description": article.description,
             "body": article.body,
             "tag_list": article.tag_list,
+            "draft": article.draft,
             "updated_at": article.updated_at
         },
         "is_edit": true,
