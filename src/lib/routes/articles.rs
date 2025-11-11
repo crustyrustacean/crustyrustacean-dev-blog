@@ -1262,20 +1262,89 @@ pub async fn get_articles_list_page(
         None
     };
 
-    // Fetch articles with default limit
+    // Pagination settings
+    let limit = query.limit.unwrap_or(10); // Default to 10 articles per page
+    let offset = query.offset.unwrap_or(0);
+    let current_page = ((offset / limit) + 1) as i64;
+
+    // Fetch articles with pagination
     let articles_query = ArticleQuery {
-        tag: query.tag,
-        author: query.author,
-        favorited: query.favorited,
-        category: query.category,
-        limit: Some(query.limit.unwrap_or(20)),
-        offset: query.offset,
+        tag: query.tag.clone(),
+        author: query.author.clone(),
+        favorited: query.favorited.clone(),
+        category: query.category.clone(),
+        limit: Some(limit),
+        offset: Some(offset),
     };
 
     let articles = match list_articles(State(state.clone()), Query(articles_query)).await {
         Ok(articles_response) => articles_response.0.articles,
         Err(_) => vec![], // If there's an error fetching articles, show empty list
     };
+
+    // Get total count of published articles for pagination
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Build WHERE clause for total count (same filters as list_articles)
+    let mut where_clauses = Vec::new();
+    let mut count_params = Vec::new();
+
+    if let Some(tag) = &query.tag {
+        where_clauses.push("EXISTS (SELECT 1 FROM article_tags at JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id AND t.name = ?)");
+        count_params.push(libsql::Value::from(tag.clone()));
+    }
+
+    if let Some(author) = &query.author {
+        where_clauses.push("u.username = ?");
+        count_params.push(libsql::Value::from(author.clone()));
+    }
+
+    if let Some(favorited_user) = &query.favorited {
+        where_clauses.push("EXISTS (SELECT 1 FROM user_favorites uf JOIN users fu ON uf.user_id = fu.id WHERE uf.article_id = a.id AND fu.username = ?)");
+        count_params.push(libsql::Value::from(favorited_user.clone()));
+    }
+
+    if let Some(category) = &query.category {
+        where_clauses.push("c.slug = ?");
+        count_params.push(libsql::Value::from(category.clone()));
+    }
+
+    // Always filter out drafts
+    where_clauses.push("a.draft = 0");
+
+    let where_clause = if where_clauses.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", where_clauses.join(" AND "))
+    };
+
+    let count_sql = format!(
+        r#"
+        SELECT COUNT(*)
+        FROM articles a
+        JOIN users u ON a.author_id = u.id
+        LEFT JOIN categories c ON a.category_id = c.id
+        {}
+        "#,
+        where_clause
+    );
+
+    let total_articles = match conn.query(&count_sql, count_params).await {
+        Ok(mut rows) => {
+            if let Ok(Some(row)) = rows.next().await {
+                let count: i64 = row.get(0).unwrap_or(0);
+                count
+            } else {
+                0
+            }
+        }
+        Err(_) => 0,
+    };
+
+    let total_pages = ((total_articles as f64) / (limit as f64)).ceil() as i64;
 
     // Convert articles to JSON with formatted dates
     let articles_json: Vec<Value> = articles
@@ -1291,12 +1360,6 @@ pub async fn get_articles_list_page(
             })
         })
         .collect();
-
-    // Get additional statistics for the sidebar
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
     // Count unique tags
     let tags_count = match conn
@@ -1329,6 +1392,16 @@ pub async fn get_articles_list_page(
         "articles": articles_json,
         "tags_count": tags_count,
         "latest_post_date": latest_post_date,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "total_articles": total_articles,
+            "limit": limit,
+            "has_prev": offset > 0,
+            "has_next": current_page < total_pages,
+            "prev_offset": if offset > 0 { offset - limit } else { 0 },
+            "next_offset": offset + limit
+        }
     });
 
     let html = state.templates
