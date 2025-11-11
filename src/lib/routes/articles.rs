@@ -2092,3 +2092,225 @@ pub async fn get_api_keys_admin_page(
 
     Ok(Html(html))
 }
+
+/// List draft articles for the authenticated user
+pub async fn list_user_drafts(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<MultipleArticlesResponse>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Query only draft articles for the current user
+    let sql = r#"
+        SELECT
+            a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
+            u.username, u.bio, u.image,
+            c.slug as category_slug, a.draft
+        FROM articles a
+        JOIN users u ON a.author_id = u.id
+        LEFT JOIN categories c ON a.category_id = c.id
+        WHERE a.author_id = ? AND a.draft = 1
+        ORDER BY a.updated_at DESC
+        "#;
+
+    let params = libsql::params![user.user_id.to_string()];
+
+    let mut article_rows = conn
+        .query(sql, params)
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut articles = Vec::new();
+
+    while let Some(row) = article_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let article_id: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let slug: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let title: String = row
+            .get(2)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let description: String = row
+            .get(3)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let body: String = row
+            .get(4)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let created_at_str: String = row
+            .get(5)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let updated_at_str: String = row
+            .get(6)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let username: String = row
+            .get(7)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(8).ok();
+        let image: Option<String> = row.get(9).ok();
+        let category_slug: Option<String> = row.get(10).ok();
+        let draft: i64 = row
+            .get(11)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let is_draft = draft_int_to_bool(draft);
+
+        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .with_timezone(&Utc);
+        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
+            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .with_timezone(&Utc);
+
+        // Get tags for this article
+        let mut tag_rows = conn
+            .query(
+                r#"
+                SELECT t.name
+                FROM tags t
+                JOIN article_tags at ON t.id = at.tag_id
+                WHERE at.article_id = ?
+                "#,
+                libsql::params![article_id.clone()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let mut tag_names = Vec::new();
+        while let Some(tag_row) = tag_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let tag_name: String = tag_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            tag_names.push(tag_name);
+        }
+
+        // Get favorites count (drafts won't have many, but for consistency)
+        let mut favorites_rows = conn
+            .query(
+                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
+                libsql::params![article_id],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let favorites_count = if let Some(fav_row) = favorites_rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let count: i64 = fav_row
+                .get(0)
+                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            count as i32
+        } else {
+            0
+        };
+
+        let author = UserProfile {
+            username,
+            bio,
+            image,
+            following: false,
+        };
+
+        let rendered_body = markdown_to_html(&body);
+
+        let article_response = ArticleResponse {
+            slug,
+            title,
+            description,
+            body,
+            rendered_body: Some(rendered_body),
+            tag_list: tag_names,
+            category: category_slug,
+            draft: is_draft,
+            created_at,
+            updated_at,
+            favorited: false,
+            favorites_count,
+            author,
+        };
+
+        articles.push(article_response);
+    }
+
+    let articles_count = articles.len() as i32;
+
+    Ok(Json(MultipleArticlesResponse {
+        articles,
+        articles_count,
+    }))
+}
+
+/// Admin page for managing draft articles
+pub async fn get_drafts_admin_page(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Get user info for template context
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        Some(json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image
+        }))
+    } else {
+        None
+    };
+
+    // Get draft articles for this user
+    let drafts_response = list_user_drafts(State(state.clone()), user.clone()).await?;
+    let drafts = drafts_response.0.articles;
+
+    let context: Value = json!({
+        "title": "Draft Articles - CrustyRustacean Dev Blog",
+        "page": "Drafts",
+        "current_year": Utc::now().year(),
+        "user": user_info,
+        "drafts": drafts,
+    });
+
+    let html = state.templates
+        .render("admin/drafts.html", &tera::Context::from_serialize(&context)?)
+        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+
+    Ok(Html(html))
+}

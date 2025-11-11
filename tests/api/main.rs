@@ -7,6 +7,7 @@ mod auth;
 mod authors;
 mod categories;
 mod comments;
+mod drafts;
 mod favorites;
 mod feed;
 mod feed_page;
