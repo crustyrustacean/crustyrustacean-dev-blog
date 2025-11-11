@@ -16,20 +16,33 @@ document.addEventListener('DOMContentLoaded', function() {
     if (saveDraftBtn) {
         saveDraftBtn.addEventListener('click', async function(e) {
             e.preventDefault();
+            console.log('Save Draft button clicked');
             await saveArticle(true); // true = save as draft
         });
     }
 
     // Handle publish/update button
-    articleForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        await saveArticle(false); // false = publish
-    });
+    if (articleForm) {
+        articleForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            console.log('Form submitted (Publish)');
+            await saveArticle(false); // false = publish
+        });
+    } else {
+        console.error('Article form not found!');
+    }
 
     async function saveArticle(asDraft) {
+        console.log('saveArticle called, asDraft:', asDraft);
+
         const targetBtn = asDraft ? saveDraftBtn : submitBtn;
         const targetText = asDraft ? draftText : submitText;
         const targetLoadingText = asDraft ? draftLoadingText : loadingText;
+
+        if (!targetBtn) {
+            console.error('Target button not found!');
+            return;
+        }
 
         // Show loading state
         targetBtn.disabled = true;
@@ -65,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const token = localStorage.getItem('authToken') || getAuthTokenFromCookies();
 
             if (!token) {
+                console.error('No auth token found');
                 showError('You must be logged in to save articles.');
                 resetButton(targetBtn, targetText, targetLoadingText);
                 return;
@@ -76,6 +90,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const url = isEditMode ? `/api/articles/${articleSlug}` : '/api/articles';
             const method = isEditMode ? 'PUT' : 'POST';
 
+            console.log('Making request:', { url, method, asDraft, articleData });
+
             const response = await fetch(url, {
                 method: method,
                 headers: {
@@ -84,6 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify(articleData)
             });
+
+            console.log('Response status:', response.status);
 
             if (response.ok) {
                 const data = await response.json();
@@ -108,12 +126,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }, 1500);
             } else {
-                const errorData = await response.json();
+                console.error('Request failed:', response.status);
+                const errorData = await response.json().catch(() => ({ message: null }));
+                console.error('Error data:', errorData);
                 const errorMessage = asDraft ? 'Failed to save draft. Please try again.' : 'Failed to publish article. Please try again.';
                 showError(errorData.message || errorMessage);
                 resetButton(targetBtn, targetText, targetLoadingText);
             }
         } catch (error) {
+            console.error('Fetch error:', error);
             showError('Network error. Please check your connection and try again.');
             resetButton(targetBtn, targetText, targetLoadingText);
         }
@@ -150,8 +171,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showAlert(message, type) {
-        // Remove existing alerts
-        const existingAlert = document.querySelector('.alert');
+        // Remove existing dynamic alerts (draft mode warning doesn't have alert-dismissible)
+        const existingAlert = document.querySelector('.alert.alert-dismissible');
         if (existingAlert) {
             existingAlert.remove();
         }
