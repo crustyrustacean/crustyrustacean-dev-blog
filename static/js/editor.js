@@ -250,6 +250,136 @@ document.addEventListener('DOMContentLoaded', function() {
     if (publishFromPreviewBtn) {
         publishFromPreviewBtn.addEventListener('click', publishFromPreview);
     }
+
+    // Markdown file upload functionality
+    const markdownFileInput = document.getElementById('markdownFile');
+    const uploadMarkdownBtn = document.getElementById('uploadMarkdownBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
+    const uploadProgressText = document.getElementById('uploadProgressText');
+    const uploadStatus = document.getElementById('uploadStatus');
+
+    // Enable/disable upload button based on file selection
+    if (markdownFileInput) {
+        markdownFileInput.addEventListener('change', function() {
+            uploadMarkdownBtn.disabled = !this.files.length;
+        });
+    }
+
+    // Handle markdown file upload
+    if (uploadMarkdownBtn) {
+        uploadMarkdownBtn.addEventListener('click', async function() {
+            const file = markdownFileInput.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!file.name.endsWith('.md') && !file.name.endsWith('.markdown')) {
+                showUploadError('Please select a valid markdown file (.md or .markdown)');
+                return;
+            }
+
+            // Disable button and show progress
+            uploadMarkdownBtn.disabled = true;
+            uploadProgress.classList.remove('d-none');
+            uploadStatus.innerHTML = '';
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Get auth token
+                const token = localStorage.getItem('authToken') || getAuthTokenFromCookies();
+                if (!token) {
+                    showUploadError('You must be logged in to upload files.');
+                    resetUploadUI();
+                    return;
+                }
+
+                // Simulate progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 10;
+                    if (progress <= 90) {
+                        updateUploadProgress(progress);
+                    }
+                }, 100);
+
+                // Upload file
+                const response = await fetch('/api/articles/upload-markdown', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                updateUploadProgress(100);
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Populate form fields with parsed data
+                    document.getElementById('title').value = data.title || '';
+                    document.getElementById('description').value = data.description || '';
+                    document.getElementById('body').value = data.body || '';
+
+                    // Trigger input events to update character counters
+                    document.getElementById('title').dispatchEvent(new Event('input'));
+                    document.getElementById('description').dispatchEvent(new Event('input'));
+
+                    // Show success message
+                    showUploadSuccess(`File "${data.filename}" uploaded and parsed successfully!`);
+
+                    // Reset upload UI after a delay
+                    setTimeout(() => {
+                        resetUploadUI();
+                        markdownFileInput.value = '';
+                    }, 2000);
+                } else {
+                    const errorData = await response.json().catch(() => ({ message: null }));
+                    showUploadError(errorData.message || 'Failed to upload and parse file. Please try again.');
+                    resetUploadUI();
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showUploadError('Network error. Please check your connection and try again.');
+                resetUploadUI();
+            }
+        });
+    }
+
+    function updateUploadProgress(percent) {
+        uploadProgressBar.style.width = percent + '%';
+        uploadProgressText.textContent = Math.round(percent) + '%';
+    }
+
+    function resetUploadUI() {
+        uploadMarkdownBtn.disabled = false;
+        uploadProgress.classList.add('d-none');
+        updateUploadProgress(0);
+    }
+
+    function showUploadError(message) {
+        uploadStatus.innerHTML = `
+            <div class="alert alert-danger alert-dismissible fade show mb-0" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+
+    function showUploadSuccess(message) {
+        uploadStatus.innerHTML = `
+            <div class="alert alert-success alert-dismissible fade show mb-0" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
 });
 
 // Function to be called from preview modal

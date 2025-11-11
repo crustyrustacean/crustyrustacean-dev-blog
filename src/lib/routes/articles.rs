@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Json},
 };
@@ -2035,6 +2035,139 @@ pub async fn mobile_upload_article(
         "url": article_url,
         "id": article_id.to_string(),
     })))
+}
+
+/// Upload and parse a markdown file for article creation
+/// POST /api/articles/upload-markdown
+pub async fn upload_markdown_file(
+    _state: State<AppState>,
+    _user: AuthenticatedUser,
+    mut multipart: Multipart,
+) -> Result<Json<Value>, AppError> {
+    let mut filename: Option<String> = None;
+    let mut file_content: Option<String> = None;
+
+    // Process multipart form data
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Failed to read multipart field: {}", e)))?
+    {
+        let field_name = field.name().unwrap_or("").to_string();
+
+        if field_name == "file" {
+            filename = field.file_name().map(|s| s.to_string());
+
+            // Read file content as text
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Failed to read file data: {}", e)))?;
+
+            file_content = Some(
+                String::from_utf8(bytes.to_vec())
+                    .map_err(|_| AppError::BadRequest("File must be valid UTF-8 text".to_string()))?,
+            );
+        }
+    }
+
+    // Validate we have a file
+    let filename = filename.ok_or_else(|| AppError::BadRequest("No file provided".to_string()))?;
+
+    // Validate file extension
+    if !filename.ends_with(".md") && !filename.ends_with(".markdown") {
+        return Err(AppError::BadRequest(
+            "Only markdown files (.md or .markdown) are allowed".to_string(),
+        ));
+    }
+
+    let content = file_content
+        .ok_or_else(|| AppError::BadRequest("No file content provided".to_string()))?;
+
+    // Check file size (1MB limit for markdown files)
+    const MAX_FILE_SIZE: usize = 1024 * 1024;
+    if content.len() > MAX_FILE_SIZE {
+        return Err(AppError::BadRequest(
+            "File size exceeds 1MB limit".to_string(),
+        ));
+    }
+
+    // Parse the markdown content to extract title and description
+    let (title, description) = parse_markdown_metadata(&content);
+
+    // Return the parsed data
+    Ok(Json(json!({
+        "success": true,
+        "title": title,
+        "description": description,
+        "body": content,
+        "filename": filename,
+    })))
+}
+
+/// Helper function to parse markdown content and extract title and description
+///
+/// Extracts:
+/// - Title: First H1 heading (# Title) if present
+/// - Description: First paragraph after the title
+///
+/// Returns (title, description)
+fn parse_markdown_metadata(content: &str) -> (String, String) {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut title = String::new();
+    let mut description = String::new();
+    let mut found_title = false;
+    let mut skip_empty = true;
+
+    for line in lines {
+        let trimmed = line.trim();
+
+        // Skip empty lines at the beginning
+        if skip_empty && trimmed.is_empty() {
+            continue;
+        }
+        skip_empty = false;
+
+        // Extract title from first H1 heading
+        if !found_title && trimmed.starts_with("# ") {
+            title = trimmed.strip_prefix("# ").unwrap_or("").trim().to_string();
+            found_title = true;
+            continue;
+        }
+
+        // Extract description from first non-empty paragraph
+        if found_title && description.is_empty() {
+            // Skip empty lines after title
+            if trimmed.is_empty() {
+                continue;
+            }
+            // Skip other headings
+            if trimmed.starts_with('#') {
+                continue;
+            }
+            // This is the first paragraph - use it as description
+            description = trimmed.to_string();
+            break;
+        }
+    }
+
+    // If no title found, use filename or default
+    if title.is_empty() {
+        title = "Untitled Article".to_string();
+    }
+
+    // If no description found, use first 200 chars of content
+    if description.is_empty() {
+        description = content
+            .chars()
+            .filter(|c| !c.is_whitespace() || *c == ' ')
+            .take(200)
+            .collect::<String>()
+            .trim()
+            .to_string();
+    }
+
+    (title, description)
 }
 
 // API Keys admin page
