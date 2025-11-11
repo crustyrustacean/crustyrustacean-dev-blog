@@ -8,17 +8,36 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('submitBtn');
     const submitText = document.getElementById('submitText');
     const loadingText = document.getElementById('loadingText');
+    const saveDraftBtn = document.getElementById('saveDraftBtn');
+    const draftText = document.getElementById('draftText');
+    const draftLoadingText = document.getElementById('draftLoadingText');
 
+    // Handle save draft button
+    if (saveDraftBtn) {
+        saveDraftBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            await saveArticle(true); // true = save as draft
+        });
+    }
+
+    // Handle publish/update button
     articleForm.addEventListener('submit', async function(e) {
         e.preventDefault();
-        
-        // Show loading state
-        submitBtn.disabled = true;
-        submitText.classList.add('d-none');
-        loadingText.classList.remove('d-none');
+        await saveArticle(false); // false = publish
+    });
 
-        const formData = new FormData(this);
-        
+    async function saveArticle(asDraft) {
+        const targetBtn = asDraft ? saveDraftBtn : submitBtn;
+        const targetText = asDraft ? draftText : submitText;
+        const targetLoadingText = asDraft ? draftLoadingText : loadingText;
+
+        // Show loading state
+        targetBtn.disabled = true;
+        targetText.classList.add('d-none');
+        targetLoadingText.classList.remove('d-none');
+
+        const formData = new FormData(articleForm);
+
         // Parse tags
         const tagsInput = formData.get('tags');
         const tagList = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : [];
@@ -31,7 +50,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: formData.get('title'),
                 description: formData.get('description'),
                 body: formData.get('body'),
-                tagList: tagList
+                tagList: tagList,
+                draft: asDraft
             }
         };
 
@@ -43,16 +63,16 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // Get auth token from localStorage or cookies
             const token = localStorage.getItem('authToken') || getAuthTokenFromCookies();
-            
+
             if (!token) {
-                showError('You must be logged in to publish articles.');
-                resetSubmitButton();
+                showError('You must be logged in to save articles.');
+                resetButton(targetBtn, targetText, targetLoadingText);
                 return;
             }
 
             const isEditMode = articleForm.getAttribute('data-edit-mode') === 'true';
             const articleSlug = articleForm.getAttribute('data-article-slug');
-            
+
             const url = isEditMode ? `/api/articles/${articleSlug}` : '/api/articles';
             const method = isEditMode ? 'PUT' : 'POST';
 
@@ -67,30 +87,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok) {
                 const data = await response.json();
+
                 // Show success message
-                const successMessage = isEditMode ? 'Article updated successfully!' : 'Article published successfully!';
+                let successMessage;
+                if (asDraft) {
+                    successMessage = isEditMode ? 'Draft updated successfully!' : 'Draft saved successfully!';
+                } else {
+                    successMessage = isEditMode ? 'Article published successfully!' : 'Article published successfully!';
+                }
                 showSuccess(successMessage);
-                
-                // Redirect to the article page after a short delay
+
+                // Redirect based on draft status
                 setTimeout(() => {
-                    window.location.href = `/articles/${data.article.slug}`;
+                    if (asDraft) {
+                        // Redirect to drafts admin page
+                        window.location.href = '/admin/drafts';
+                    } else {
+                        // Redirect to the published article page
+                        window.location.href = `/articles/${data.article.slug}`;
+                    }
                 }, 1500);
             } else {
                 const errorData = await response.json();
-                const errorMessage = isEditMode ? 'Failed to update article. Please try again.' : 'Failed to publish article. Please try again.';
+                const errorMessage = asDraft ? 'Failed to save draft. Please try again.' : 'Failed to publish article. Please try again.';
                 showError(errorData.message || errorMessage);
-                resetSubmitButton();
+                resetButton(targetBtn, targetText, targetLoadingText);
             }
         } catch (error) {
             showError('Network error. Please check your connection and try again.');
-            resetSubmitButton();
+            resetButton(targetBtn, targetText, targetLoadingText);
         }
-    });
+    }
+
+    function resetButton(btn, textEl, loadingEl) {
+        btn.disabled = false;
+        textEl.classList.remove('d-none');
+        loadingEl.classList.add('d-none');
+    }
 
     function resetSubmitButton() {
-        submitBtn.disabled = false;
-        submitText.classList.remove('d-none');
-        loadingText.classList.add('d-none');
+        resetButton(submitBtn, submitText, loadingText);
     }
 
     function getAuthTokenFromCookies() {
