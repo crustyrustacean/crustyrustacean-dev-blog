@@ -644,3 +644,197 @@ async fn test_homepage_shows_total_article_count() {
     // Verify "Published Articles" label is present
     assert!(body.contains("Published Articles"));
 }
+
+// ===== Draft Widget Tests =====
+
+#[tokio::test]
+async fn test_homepage_shows_draft_widget_for_authenticated_user() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("draftuser").await;
+
+    // Create 3 draft articles and 2 published articles
+    for i in 1..=3 {
+        let article_data = json!({
+            "article": {
+                "title": format!("Draft Article {}", i),
+                "description": "This is a draft article",
+                "body": "Draft content",
+                "draft": true
+            }
+        });
+
+        app.client
+            .post(format!("{}/api/articles", &app.address))
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&article_data)
+            .send()
+            .await
+            .expect("Failed to create draft article");
+    }
+
+    for i in 1..=2 {
+        app.create_article_simple(&token, &format!("Published Article {}", i))
+            .await;
+    }
+
+    // Act - Access the homepage while authenticated
+    let response = app
+        .client
+        .get(&app.address)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Verify draft widget is shown with count of 3
+    assert!(body.contains("Draft Articles"));
+    assert!(body.contains(">3<") || body.contains("> 3 <"));
+
+    // Verify link to drafts page
+    assert!(body.contains("/admin/drafts"));
+    assert!(body.contains("View Drafts"));
+}
+
+#[tokio::test]
+async fn test_homepage_draft_widget_hidden_for_guest_user() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("draftuser2").await;
+
+    // Create 5 draft articles
+    for i in 1..=5 {
+        let article_data = json!({
+            "article": {
+                "title": format!("Draft Article {}", i),
+                "description": "This is a draft article",
+                "body": "Draft content",
+                "draft": true
+            }
+        });
+
+        app.client
+            .post(format!("{}/api/articles", &app.address))
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&article_data)
+            .send()
+            .await
+            .expect("Failed to create draft article");
+    }
+
+    // Act - Access the homepage without authentication
+    let response = app
+        .client
+        .get(&app.address)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Verify draft widget is NOT shown for unauthenticated users
+    assert!(!body.contains("Draft Articles"));
+}
+
+#[tokio::test]
+async fn test_homepage_draft_widget_shows_zero_when_no_drafts() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("nodrafts").await;
+
+    // Create only published articles, no drafts
+    for i in 1..=3 {
+        app.create_article_simple(&token, &format!("Published Article {}", i))
+            .await;
+    }
+
+    // Act - Access the homepage while authenticated
+    let response = app
+        .client
+        .get(&app.address)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Verify draft widget is shown with count of 0
+    assert!(body.contains("Draft Articles"));
+    assert!(body.contains(">0<") || body.contains("> 0 <"));
+
+    // Verify "View Drafts" link is NOT shown when count is 0
+    assert!(!body.contains("View Drafts"));
+}
+
+#[tokio::test]
+async fn test_homepage_separates_published_and_draft_counts() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("separatecounts").await;
+
+    // Create 5 published articles
+    for i in 1..=5 {
+        app.create_article_simple(&token, &format!("Published Article {}", i))
+            .await;
+    }
+
+    // Create 3 draft articles
+    for i in 1..=3 {
+        let article_data = json!({
+            "article": {
+                "title": format!("Draft Article {}", i),
+                "description": "This is a draft article",
+                "body": "Draft content",
+                "draft": true
+            }
+        });
+
+        app.client
+            .post(format!("{}/api/articles", &app.address))
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&article_data)
+            .send()
+            .await
+            .expect("Failed to create draft article");
+    }
+
+    // Act - Access the homepage while authenticated
+    let response = app
+        .client
+        .get(&app.address)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Verify the page shows both counts separately
+    // Published count should be 5, NOT 8 (should exclude drafts)
+    assert!(body.contains("Published Articles"));
+
+    // Draft count should be 3
+    assert!(body.contains("Draft Articles"));
+
+    // Verify that the total count shown is for published only (5), not including drafts
+    // The published articles widget should show 5, not 8
+    let published_section = body.split("Published Articles").next().unwrap_or("");
+    assert!(
+        published_section.contains(">5<") || published_section.contains("> 5 <"),
+        "Published articles count should be 5, not including drafts"
+    );
+}

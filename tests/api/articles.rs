@@ -2154,3 +2154,171 @@ async fn test_upload_markdown_no_file_provided() {
     // Assert
     assert_status!(response, StatusCode::BAD_REQUEST);
 }
+
+// ===== Pagination Tests =====
+
+#[tokio::test]
+async fn test_articles_page_default_pagination() {
+    // Arrange - Create 15 articles to test pagination
+    let app = spawn_app().await;
+    let token = app.register_user_default("paginationtest").await;
+
+    // Create 15 articles
+    for i in 1..=15 {
+        app.create_article_simple(&token, &format!("Article {}", i))
+            .await;
+    }
+
+    // Act - Request the articles page without pagination params (should default to 10 per page)
+    let response = app
+        .client
+        .get(format!("{}/articles", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Should show pagination controls since we have more than 10 articles
+    assert!(body.contains("pagination"));
+    assert!(body.contains("Next"));
+}
+
+#[tokio::test]
+async fn test_articles_pagination_with_limit_and_offset() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("paginationtest2").await;
+
+    // Create 25 articles to test multiple pages
+    for i in 1..=25 {
+        app.create_article_simple(&token, &format!("Test Article {}", i))
+            .await;
+    }
+
+    // Act - Request first page with limit=10
+    let response = app
+        .client
+        .get(format!("{}/articles?limit=10&offset=0", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert first page
+    assert_status!(response, StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Should show pagination controls
+    assert!(body.contains("Page 1 of 3"));
+    assert!(body.contains("Next"));
+
+    // Act - Request second page with limit=10
+    let response = app
+        .client
+        .get(format!("{}/articles?limit=10&offset=10", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert second page
+    assert_status!(response, StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Should show page 2
+    assert!(body.contains("Page 2 of 3"));
+    assert!(body.contains("Previous"));
+    assert!(body.contains("Next"));
+
+    // Act - Request third page with limit=10
+    let response = app
+        .client
+        .get(format!("{}/articles?limit=10&offset=20", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert third page
+    assert_status!(response, StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Should show page 3 (last page)
+    assert!(body.contains("Page 3 of 3"));
+    assert!(body.contains("Previous"));
+}
+
+#[tokio::test]
+async fn test_articles_pagination_api_endpoint() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("apipaginationtest").await;
+
+    // Create 15 articles
+    for i in 1..=15 {
+        app.create_article_simple(&token, &format!("API Article {}", i))
+            .await;
+    }
+
+    // Act - Request first page of articles via API
+    let response = app
+        .client
+        .get(format!("{}/api/articles?limit=10&offset=0", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+
+    // Should return 10 articles
+    assert!(response_body["articles"].is_array());
+    assert_eq!(response_body["articles"].as_array().unwrap().len(), 10);
+    assert_eq!(response_body["articlesCount"], 10);
+
+    // Act - Request second page
+    let response = app
+        .client
+        .get(format!("{}/api/articles?limit=10&offset=10", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let response_body: Value = parse_json!(response);
+
+    // Should return remaining 5 articles
+    assert_eq!(response_body["articles"].as_array().unwrap().len(), 5);
+    assert_eq!(response_body["articlesCount"], 5);
+}
+
+#[tokio::test]
+async fn test_articles_no_pagination_controls_with_few_articles() {
+    // Arrange - Create only 5 articles (less than default page size)
+    let app = spawn_app().await;
+    let token = app.register_user_default("fewartices").await;
+
+    // Create 5 articles
+    for i in 1..=5 {
+        app.create_article_simple(&token, &format!("Few Article {}", i))
+            .await;
+    }
+
+    // Act
+    let response = app
+        .client
+        .get(format!("{}/articles", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_status!(response, StatusCode::OK);
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Should NOT show pagination controls since we have less than 10 articles
+    // The pagination section should not appear at all
+    assert!(!body.contains("Page 1 of 1"));
+}

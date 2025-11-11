@@ -18,21 +18,33 @@
         <!-- Blog Summary Section -->
         <section class="blog-summary mb-5">
             <div class="row">
-                <div class="col-md-4 text-center mb-3">
+                <div class="col-md-3 text-center mb-3">
                     <div class="bg-light p-4 rounded">
                         <i class="fas fa-newspaper fa-2x text-primary mb-2"></i>
                         <h4 class="mb-1">{% if total_articles_count %}{{ total_articles_count }}{% else %}0{% endif %}</h4>
                         <p class="text-muted mb-0">Published Articles</p>
                     </div>
                 </div>
-                <div class="col-md-4 text-center mb-3">
+                {% if user %}
+                <div class="col-md-3 text-center mb-3">
+                    <div class="bg-light p-4 rounded">
+                        <i class="fas fa-file-alt fa-2x text-warning mb-2"></i>
+                        <h4 class="mb-1">{% if draft_count %}{{ draft_count }}{% else %}0{% endif %}</h4>
+                        <p class="text-muted mb-0">Draft Articles</p>
+                        {% if draft_count and draft_count > 0 %}
+                            <a href="/admin/drafts" class="btn btn-sm btn-outline-warning mt-2">View Drafts</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                <div class="col-md-{% if user %}3{% else %}4{% endif %} text-center mb-3">
                     <div class="bg-light p-4 rounded">
                         <i class="fas fa-tags fa-2x text-success mb-2"></i>
                         <h4 class="mb-1">{% if tags_count %}{{ tags_count }}{% else %}0{% endif %}</h4>
                         <p class="text-muted mb-0">Topics Covered</p>
                     </div>
                 </div>
-                <div class="col-md-4 text-center mb-3">
+                <div class="col-md-{% if user %}3{% else %}4{% endif %} text-center mb-3">
                     <div class="bg-light p-4 rounded">
                         <i class="fas fa-calendar-alt fa-2x text-info mb-2"></i>
                         <h4 class="mb-1">{% if latest_post_date %}{{ latest_post_date }}{% else %}Never{% endif %}</h4>

@@ -24,8 +24,9 @@ pub async fn get_index(
 ) -> Result<impl IntoResponse, AppError> {
     let current_year = chrono::Utc::now().year();
 
-    // Get user info if authenticated
-    let user_info = if let Some(auth_user) = optional_user.user {
+    // Get user info and ID if authenticated
+    let user_id_opt = optional_user.user.as_ref().map(|u| u.user_id);
+    let user_info = if let Some(auth_user) = optional_user.user.as_ref() {
         // Fetch user details from database
         let conn = state
             .db
@@ -103,9 +104,9 @@ pub async fn get_index(
         .connect()
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
-    // Count total articles
+    // Count total published articles (exclude drafts)
     let total_articles_count = match conn
-        .query("SELECT COUNT(*) FROM articles", libsql::params![])
+        .query("SELECT COUNT(*) FROM articles WHERE draft = 0", libsql::params![])
         .await
     {
         Ok(mut rows) => {
@@ -117,6 +118,29 @@ pub async fn get_index(
             }
         }
         Err(_) => 0,
+    };
+
+    // Count draft articles for authenticated user
+    let draft_count = if let Some(user_id) = user_id_opt {
+        match conn
+            .query(
+                "SELECT COUNT(*) FROM articles WHERE draft = 1 AND author_id = ?",
+                libsql::params![user_id.to_string()],
+            )
+            .await
+        {
+            Ok(mut rows) => {
+                if let Ok(Some(row)) = rows.next().await {
+                    let count: i64 = row.get(0).unwrap_or(0);
+                    count
+                } else {
+                    0
+                }
+            }
+            Err(_) => 0,
+        }
+    } else {
+        0
     };
 
     // Count unique tags
@@ -149,6 +173,7 @@ pub async fn get_index(
         "user": user_info,
         "articles": articles_json,
         "total_articles_count": total_articles_count,
+        "draft_count": draft_count,
         "tags_count": tags_count,
         "latest_post_date": latest_post_date,
         "flash_message": null,
