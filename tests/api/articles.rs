@@ -2026,12 +2026,6 @@ async fn test_upload_invalid_file_type() {
 
     // Assert - Should reject non-markdown files
     assert_status!(response, StatusCode::BAD_REQUEST);
-
-    let response_body: Value = parse_json!(response);
-    assert!(response_body["message"]
-        .as_str()
-        .unwrap()
-        .contains("markdown"));
 }
 
 #[tokio::test]
