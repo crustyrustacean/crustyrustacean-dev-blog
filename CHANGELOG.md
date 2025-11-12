@@ -2,6 +2,74 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [2.8.0] - 2025-11-12
+
+### Added - Article Preview Modal
+- **Publishing Preview Feature**:
+  - Preview button in article editor with eye icon
+  - Large modal (modal-xl) showing formatted article preview
+  - Client-side markdown rendering using marked.js library
+  - Real-time preview of article exactly as it will appear when published
+  - Displays formatted title, description, tags, and rendered body content
+  - HTML escaping for security (title, description, tags)
+  - Scrollable content for long articles
+  - Close button to return to editing
+
+- **Implementation Details**:
+  - `showPreview()` JavaScript function for rendering preview
+  - Integration with existing editor workflow
+  - No server-side processing needed for preview
+  - Maintains draft status during preview
+
+### Benefits
+- **Author Confidence**: See exactly how article will look before publishing
+- **Quality Assurance**: Catch formatting issues before going live
+- **User Experience**: Seamless preview without leaving the editor
+- **Performance**: Fast client-side rendering with no API calls
+
+### Technical Details
+- **Library**: marked.js for markdown-to-HTML conversion
+- **Security**: HTML escaping prevents XSS attacks in preview
+- **Responsive**: Large modal adapts to different screen sizes
+- **Integration**: Works with both new articles and edits
+
+## [2.7.0] - 2025-11-11
+
+### Fixed - Admin Dashboard Pagination Bug
+- **Draft Articles Pagination Issue**:
+  - Fixed bug where pagination on admin dashboard caused errors with draft articles
+  - Resolved database query issues when mixing published and draft articles
+  - Improved filtering logic for draft status in paginated queries
+  - Enhanced error handling for edge cases
+
+### Technical Details
+- **Issue**: Pagination broke when users had both published and draft articles
+- **Solution**: Updated query logic to properly handle draft filtering with pagination
+- **Testing**: Added test coverage for pagination with mixed article types
+- **Impact**: Admin dashboard now reliably displays all articles with correct pagination
+
+## [2.6.0] - 2025-11-11
+
+### Added - Admin Dashboard Pagination
+- **Paginated Article Management**:
+  - Added pagination controls to admin dashboard
+  - Displays articles in manageable chunks for better performance
+  - Navigation controls for browsing through multiple pages
+  - Consistent with articles listing pagination pattern
+  - Improved layout and user experience on dashboard
+
+- **Benefits**:
+  - Faster page load times for users with many articles
+  - Better organization of content management interface
+  - Consistent pagination experience across the application
+  - Improved usability for high-volume content creators
+
+### Technical Details
+- **Implementation**: Follows same pagination pattern as `/articles` page
+- **Performance**: Reduces initial load time by limiting displayed articles
+- **User Experience**: Easy navigation between pages of articles
+- **Integration**: Seamlessly integrated with existing admin dashboard
+
 ## [2.5.0] - 2025-11-11
 
 ### Added - Pagination and Draft Widget

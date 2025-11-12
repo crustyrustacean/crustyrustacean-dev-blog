@@ -8,7 +8,7 @@ The CrustyRustacean Dev Blog is a production-ready Rust web application built wi
 - **Backend**: Axum web framework with libSQL/Turso database
 - **Frontend**: Tera templating with Bootstrap and modular JavaScript
 - **Deployment**: Shuttle platform
-- **Testing**: Comprehensive test suite (241 tests: 222 integration + 19 unit)
+- **Testing**: Comprehensive test suite (242 tests: 223 integration + 19 unit)
 
 ## Development Workflow
 
@@ -336,9 +336,23 @@ This project emphasizes:
 - **Security**: Industry best practices
 - **Documentation**: Keep docs up-to-date
 
-### 13. Current Status (v2.5.0)
+### 13. Current Status (v2.8.0)
 
 #### Recently Completed (Nov 2025)
+- ✅ **Article Preview Modal**: Publishing preview feature
+  - Real-time preview of articles before publishing
+  - Client-side markdown rendering with marked.js
+  - Large modal showing formatted article as it will appear
+  - Preview title, description, tags, and rendered body content
+  - HTML escaping for security
+  - Fast preview without server-side processing
+
+- ✅ **Admin Dashboard Pagination**: Paginated article management
+  - Pagination controls on admin dashboard for better performance
+  - Consistent navigation experience across the application
+  - Improved layout and user experience
+  - Fixed pagination bug with draft articles
+
 - ✅ **Pagination System**: Articles listing pagination (10 per page)
   - Bootstrap-styled pagination controls
   - Page navigation with query parameters
@@ -412,7 +426,7 @@ This project emphasizes:
   - Favorites system with dedicated page
 
 - ✅ **Test Coverage**: Comprehensive test suite
-  - 241 total tests (222 integration + 19 unit)
+  - 242 total tests (223 integration + 19 unit)
   - All features tested following TDD methodology
   - 100% passing test suite
 

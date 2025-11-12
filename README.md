@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 222+ integration tests and 19 unit tests
+- **Comprehensive test suite** with 223 integration tests and 19 unit tests (242 total)
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -131,6 +131,18 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Page number display with previous/next navigation
   - Query parameter support: `?page=N`
   - 4 comprehensive pagination tests
+- **Admin Dashboard Pagination**:
+  - Paginated article management in admin dashboard
+  - Consistent navigation controls across the application
+  - Improved performance for users with many articles
+  - Enhanced layout and user experience
+- **Article Preview Modal**:
+  - Real-time preview of articles before publishing
+  - Client-side markdown rendering with marked.js
+  - Large modal showing formatted article exactly as it will appear
+  - Preview title, description, tags, and rendered body content
+  - HTML escaping for security
+  - Fast preview without server-side processing
 
 ### 🚧 Planned
 - Image processing and optimization
@@ -256,7 +268,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (241 total: 222 integration + 19 unit)
+cargo test              # Run all tests (242 total: 223 integration + 19 unit)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -449,7 +461,7 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 241 total tests (222 integration + 19 unit) covering happy path and failure scenarios
+- **Comprehensive Testing**: 242 total tests (223 integration + 19 unit) covering happy path and failure scenarios
 - **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, Drafts, and Media Library features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
