@@ -87,7 +87,7 @@ pub struct MultipleArticlesResponse {
 }
 
 // struct type to represent a query for an article
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ArticleQuery {
     pub tag: Option<String>,
     pub author: Option<String>,
