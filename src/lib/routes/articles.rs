@@ -699,10 +699,11 @@ pub async fn get_admin_dashboard(
     let articles = articles_response.0.articles;
     tracing::info!("Found {} articles for dashboard", articles.len());
 
-    // Get total count of all articles (including drafts) for pagination
+    // Get total count of published articles (excluding drafts) for pagination
+    // This must match the filtering done by list_articles
     let total_articles = match conn
         .query(
-            "SELECT COUNT(*) FROM articles",
+            "SELECT COUNT(*) FROM articles WHERE draft = 0",
             libsql::params![]
         )
         .await

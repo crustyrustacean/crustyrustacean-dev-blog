@@ -406,3 +406,98 @@ async fn test_admin_dashboard_does_not_show_description_in_table() {
         "Should not show description in table to keep rows compact"
     );
 }
+
+#[tokio::test]
+async fn test_admin_dashboard_pagination_excludes_drafts_from_count() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("draftcountuser").await;
+
+    // Create 12 published articles
+    for i in 1..=12 {
+        let slug = app
+            .create_article_simple(&token, &format!("Published Article {}", i))
+            .await;
+
+        // Don't set as draft - they're published by default
+        let _ = slug;
+    }
+
+    // Create 8 draft articles
+    for i in 1..=8 {
+        app.client
+            .post(format!("{}/api/articles", &app.address))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&serde_json::json!({
+                "article": {
+                    "title": format!("Draft Article {}", i),
+                    "description": "This is a draft",
+                    "body": "Draft content",
+                    "draft": true
+                }
+            }))
+            .send()
+            .await
+            .expect("Failed to create draft article");
+    }
+
+    // Total: 12 published + 8 drafts = 20 articles
+    // But pagination should only count the 12 published articles
+
+    // Act - Access admin dashboard page 1
+    let response = app
+        .client
+        .get(format!("{}/admin", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should show pagination based on published articles only
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.assert_html_response().await;
+
+    // Should show 2 pages (12 published / 10 per page = 2 pages)
+    // NOT 3 pages (20 total / 10 per page = 2 pages)
+    assert_body_contains(
+        &body,
+        &[
+            "Showing 10 of 12 articles", // Should count only published articles
+            "Page 1 of 2",                // Should have 2 pages, not 3
+        ],
+    );
+
+    // Act - Access page 2 (last page)
+    let response_page2 = app
+        .client
+        .get(format!("{}/admin?offset=10&limit=10", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Page 2 should show 2 remaining articles and NO next button
+    assert_eq!(response_page2.status(), StatusCode::OK);
+    let body_page2 = response_page2.assert_html_response().await;
+
+    assert_body_contains(
+        &body_page2,
+        &[
+            "Showing 2 of 12 articles", // Only 2 articles on last page
+            "Page 2 of 2",               // This is the last page
+        ],
+    );
+
+    // Next button should be DISABLED
+    assert!(
+        !body_page2.contains(r#"<a class="page-link" href="/admin?offset=20"#),
+        "Next button should not be clickable on last page"
+    );
+
+    // Should show disabled next button
+    assert!(
+        body_page2.contains(r#"<li class="page-item disabled">"#)
+            && body_page2.contains(r#"<span class="page-link">Next &raquo;</span>"#),
+        "Next button should be disabled on last page"
+    );
+}
