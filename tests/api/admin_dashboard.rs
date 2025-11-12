@@ -237,3 +237,172 @@ async fn test_admin_dashboard_displays_multiple_article_slugs() {
         slug3
     );
 }
+
+#[tokio::test]
+async fn test_admin_dashboard_pagination_with_more_than_10_articles() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("paginationuser").await;
+
+    // Create 15 articles to trigger pagination (default limit is 10)
+    for i in 1..=15 {
+        app.create_article_simple(&token, &format!("Article {}", i))
+            .await;
+    }
+
+    // Act - Access admin dashboard page 1
+    let response = app
+        .client
+        .get(format!("{}/admin", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should show pagination controls
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.assert_html_response().await;
+
+    // Should contain pagination info
+    assert_body_contains(
+        &body,
+        &[
+            "Showing 10 of 15 articles",
+            "Page 1 of 2",
+            "Next &raquo;",
+        ],
+    );
+
+    // Should have page 2 link
+    assert!(
+        body.contains("/admin?offset=10&limit=10"),
+        "Should have link to page 2"
+    );
+}
+
+#[tokio::test]
+async fn test_admin_dashboard_pagination_page_2() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("page2user").await;
+
+    // Create 15 articles
+    for i in 1..=15 {
+        app.create_article_simple(&token, &format!("Article {}", i))
+            .await;
+    }
+
+    // Act - Access admin dashboard page 2
+    let response = app
+        .client
+        .get(format!("{}/admin?offset=10&limit=10", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should show page 2 with correct pagination
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.assert_html_response().await;
+
+    // Should contain pagination info for page 2
+    assert_body_contains(
+        &body,
+        &[
+            "Showing 5 of 15 articles",
+            "Page 2 of 2",
+            "&laquo; Previous",
+        ],
+    );
+
+    // Should have previous page link
+    assert!(
+        body.contains("/admin?offset=0&limit=10"),
+        "Should have link to page 1"
+    );
+
+    // Should show active page 2
+    assert!(
+        body.contains(r#"<li class="page-item active">"#),
+        "Should have active page indicator"
+    );
+}
+
+#[tokio::test]
+async fn test_admin_dashboard_no_pagination_with_less_than_10_articles() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("nopaginationuser").await;
+
+    // Create only 5 articles (less than the 10 per page limit)
+    for i in 1..=5 {
+        app.create_article_simple(&token, &format!("Article {}", i))
+            .await;
+    }
+
+    // Act - Access admin dashboard
+    let response = app
+        .client
+        .get(format!("{}/admin", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Should NOT show pagination controls
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.assert_html_response().await;
+
+    // Should NOT contain pagination controls
+    assert!(
+        !body.contains("Page 1 of"),
+        "Should not show pagination with less than 10 articles"
+    );
+    assert!(
+        !body.contains("Next &raquo;"),
+        "Should not show next button"
+    );
+}
+
+#[tokio::test]
+async fn test_admin_dashboard_does_not_show_description_in_table() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("descriptiontest").await;
+
+    // Create an article with a long description
+    app.create_article(
+        &token,
+        "Test Article",
+        "This is a very long description that should not appear in the admin dashboard table to keep rows compact",
+        "Body content",
+        vec!["test"],
+    )
+    .await;
+
+    // Act - Access admin dashboard
+    let response = app
+        .client
+        .get(format!("{}/admin", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Description should not be in the table
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.assert_html_response().await;
+
+    // Should contain the title
+    assert!(
+        body.contains("Test Article"),
+        "Should contain article title"
+    );
+
+    // Should NOT contain the description in a small text-muted element
+    // (The description text itself might appear elsewhere, but not in the table row)
+    assert!(
+        !body.contains(r#"<small class="text-muted">This is a very long description"#),
+        "Should not show description in table to keep rows compact"
+    );
+}

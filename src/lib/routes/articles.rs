@@ -646,7 +646,7 @@ pub async fn get_edit_article_page(
 pub async fn get_admin_dashboard(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-    Query(query): Query<ArticleQuery>,
+    Query(mut query): Query<ArticleQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     tracing::info!("Admin dashboard accessed by user: {}", user.user_id);
 
@@ -688,18 +688,55 @@ pub async fn get_admin_dashboard(
         None
     };
 
+    // Override limit to 10 for admin dashboard pagination
+    let limit = query.limit.unwrap_or(10).min(100);
+    query.limit = Some(limit);
+    let offset = query.offset.unwrap_or(0);
+
     // Get all articles for the dashboard
     tracing::info!("Fetching articles for dashboard");
-    let articles_response = list_articles(State(state.clone()), Query(query)).await?;
+    let articles_response = list_articles(State(state.clone()), Query(query.clone())).await?;
     let articles = articles_response.0.articles;
     tracing::info!("Found {} articles for dashboard", articles.len());
+
+    // Get total count of all articles (including drafts) for pagination
+    let total_articles = match conn
+        .query(
+            "SELECT COUNT(*) FROM articles",
+            libsql::params![]
+        )
+        .await
+    {
+        Ok(mut rows) => {
+            if let Ok(Some(row)) = rows.next().await {
+                let count: i64 = row.get(0).unwrap_or(0);
+                count
+            } else {
+                0
+            }
+        }
+        Err(_) => 0,
+    };
+
+    let total_pages = ((total_articles as f64) / (limit as f64)).ceil() as i64;
+    let current_page = ((offset / limit) + 1) as i64;
 
     let context: Value = json!({
         "title": "Admin Dashboard",
         "page": "Admin",
         "current_year": chrono::Utc::now().year(),
         "user": user_info,
-        "articles": articles
+        "articles": articles,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "total_articles": total_articles,
+            "limit": limit,
+            "has_prev": offset > 0,
+            "has_next": current_page < total_pages,
+            "prev_offset": if offset > 0 { offset - limit } else { 0 },
+            "next_offset": offset + limit
+        }
     });
 
     tracing::info!("Rendering admin dashboard template");

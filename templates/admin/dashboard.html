@@ -39,10 +39,7 @@
                                     {% for article in articles %}
                                     <tr>
                                         <td>
-                                            <div class="d-flex flex-column">
-                                                <strong>{{ article.title }}</strong>
-                                                <small class="text-muted">{{ article.description }}</small>
-                                            </div>
+                                            <strong>{{ article.title }}</strong>
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
@@ -104,6 +101,62 @@
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- Pagination Controls -->
+                        {% if pagination and pagination.total_pages > 1 %}
+                            <nav aria-label="Article pagination" class="mt-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <small class="text-muted">
+                                        Showing {{ articles|length }} of {{ pagination.total_articles }} articles
+                                        (Page {{ pagination.current_page }} of {{ pagination.total_pages }})
+                                    </small>
+                                </div>
+                                <ul class="pagination justify-content-center">
+                                    <!-- Previous Button -->
+                                    {% if pagination.has_prev %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="/admin?offset={{ pagination.prev_offset }}&limit={{ pagination.limit }}" aria-label="Previous">
+                                                <span aria-hidden="true">&laquo; Previous</span>
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">&laquo; Previous</span>
+                                        </li>
+                                    {% endif %}
+
+                                    <!-- Page Numbers -->
+                                    {% for page_num in range(start=1, end=pagination.total_pages + 1) %}
+                                        {% if page_num == pagination.current_page %}
+                                            <li class="page-item active">
+                                                <span class="page-link">{{ page_num }}</span>
+                                            </li>
+                                        {% elif page_num == 1 or page_num == pagination.total_pages or (page_num >= pagination.current_page - 2 and page_num <= pagination.current_page + 2) %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="/admin?offset={{ (page_num - 1) * pagination.limit }}&limit={{ pagination.limit }}">{{ page_num }}</a>
+                                            </li>
+                                        {% elif page_num == pagination.current_page - 3 or page_num == pagination.current_page + 3 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    <!-- Next Button -->
+                                    {% if pagination.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="/admin?offset={{ pagination.next_offset }}&limit={{ pagination.limit }}" aria-label="Next">
+                                                <span aria-hidden="true">Next &raquo;</span>
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">Next &raquo;</span>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        {% endif %}
                     {% else %}
                         <div class="text-center py-5">
                             <i class="fas fa-newspaper fa-5x text-muted mb-3"></i>
