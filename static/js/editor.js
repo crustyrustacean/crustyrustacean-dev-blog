@@ -245,10 +245,10 @@ document.addEventListener('DOMContentLoaded', function() {
     addCharacterCounter(titleInput, 200);
     addCharacterCounter(descriptionInput, 500);
 
-    // Handle publish from preview button
-    const publishFromPreviewBtn = document.getElementById('publishFromPreviewBtn');
-    if (publishFromPreviewBtn) {
-        publishFromPreviewBtn.addEventListener('click', publishFromPreview);
+    // Handle preview button
+    const previewBtn = document.getElementById('previewBtn');
+    if (previewBtn) {
+        previewBtn.addEventListener('click', showPreview);
     }
 
     // Markdown file upload functionality
@@ -382,11 +382,56 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Function to be called from preview modal
-function publishFromPreview() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
-    modal.hide();
-    document.getElementById('articleForm').dispatchEvent(new Event('submit'));
+// Function to show preview modal
+function showPreview() {
+    // Get form data
+    const title = document.getElementById('title').value || 'Untitled Article';
+    const description = document.getElementById('description').value || 'No description provided';
+    const body = document.getElementById('body').value || 'No content yet';
+    const tagsInput = document.getElementById('tags').value;
+    const tags = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : [];
+
+    // Render markdown to HTML
+    const bodyHtml = marked.parse(body);
+
+    // Build preview HTML
+    let previewHtml = `
+        <article class="preview-article">
+            <header class="mb-4">
+                <h1 class="display-4 mb-3">${escapeHtml(title)}</h1>
+                <p class="lead text-muted">${escapeHtml(description)}</p>
+    `;
+
+    // Add tags if present
+    if (tags.length > 0) {
+        previewHtml += `
+            <div class="mb-3">
+                ${tags.map(tag => `<span class="badge bg-secondary me-1">${escapeHtml(tag)}</span>`).join('')}
+            </div>
+        `;
+    }
+
+    previewHtml += `
+            </header>
+            <div class="article-body">
+                ${bodyHtml}
+            </div>
+        </article>
+    `;
+
+    // Update preview content
+    document.getElementById('previewContent').innerHTML = previewHtml;
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Load categories from API and populate dropdown
