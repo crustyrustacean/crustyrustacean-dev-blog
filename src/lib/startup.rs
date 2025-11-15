@@ -144,9 +144,18 @@ impl App {
             .route("/api/search", get(search_articles))
             .nest_service(
                 "/static",
-                ServeDir::new("static")
-                    .precompressed_gzip()
-                    .precompressed_br()
+                // Static file service with aggressive caching for versioned assets
+                tower::ServiceBuilder::new()
+                    .layer(SetResponseHeaderLayer::if_not_present(
+                        header::CACHE_CONTROL,
+                        HeaderValue::from_static("public, max-age=31536000, immutable"),
+                    ))
+                    .service(
+                        ServeDir::new("static")
+                            .precompressed_gzip()
+                            .precompressed_br()
+                            .append_index_html_on_directories(false)
+                    )
             )
             .fallback(handle_404_simple)
             .with_state(state)
@@ -169,10 +178,6 @@ impl App {
             .layer(SetResponseHeaderLayer::if_not_present(
                 header::STRICT_TRANSPORT_SECURITY,
                 HeaderValue::from_static("max-age=31536000; includeSubDomains"),
-            ))
-            .layer(SetResponseHeaderLayer::if_not_present(
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("public, max-age=31536000, immutable"),
             ))
     }
 
