@@ -1038,11 +1038,18 @@ pub async fn list_articles(
         SELECT
             a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
             u.username, u.bio, u.image,
-            c.slug as category_slug, a.draft
+            c.slug as category_slug, a.draft,
+            GROUP_CONCAT(DISTINCT t.name) as tag_list,
+            COUNT(DISTINCT uf.user_id) as favorites_count
         FROM articles a
         JOIN users u ON a.author_id = u.id
         LEFT JOIN categories c ON a.category_id = c.id
+        LEFT JOIN article_tags at ON a.id = at.article_id
+        LEFT JOIN tags t ON at.tag_id = t.id
+        LEFT JOIN user_favorites uf ON a.id = uf.article_id
         {}
+        GROUP BY a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
+                 u.username, u.bio, u.image, c.slug, a.draft
         ORDER BY a.created_at DESC
         LIMIT ? OFFSET ?
         "#,
@@ -1064,7 +1071,7 @@ pub async fn list_articles(
         .await
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
     {
-        let article_id: String = row
+        let _article_id: String = row
             .get(0)
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
         let slug: String = row
@@ -1096,60 +1103,24 @@ pub async fn list_articles(
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
         let is_draft = draft_int_to_bool(draft);
 
+        // Get tags from GROUP_CONCAT result (comma-separated string)
+        let tag_list_str: Option<String> = row.get(12).ok();
+        let tag_names: Vec<String> = tag_list_str
+            .map(|s| s.split(',').map(|t| t.to_string()).collect())
+            .unwrap_or_else(Vec::new);
+
+        // Get favorites count from the query
+        let favorites_count: i64 = row
+            .get(13)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let favorites_count = favorites_count as i32;
+
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
             .with_timezone(&Utc);
         let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
             .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
             .with_timezone(&Utc);
-
-        // Get tags for this article
-        let mut tag_rows = conn
-            .query(
-                r#"
-                SELECT t.name
-                FROM tags t
-                JOIN article_tags at ON t.id = at.tag_id
-                WHERE at.article_id = ?
-                "#,
-                libsql::params![article_id.clone()],
-            )
-            .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-
-        let mut tag_names = Vec::new();
-        while let Some(tag_row) = tag_rows
-            .next()
-            .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        {
-            let tag_name: String = tag_row
-                .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-            tag_names.push(tag_name);
-        }
-
-        // Get favorites count
-        let mut favorites_rows = conn
-            .query(
-                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
-                libsql::params![article_id],
-            )
-            .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-
-        let favorites_count = if let Some(fav_row) = favorites_rows
-            .next()
-            .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        {
-            let count: i64 = fav_row
-                .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-            count as i32
-        } else {
-            0
-        };
 
         let author = UserProfile {
             username,

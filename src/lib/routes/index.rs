@@ -98,65 +98,64 @@ pub async fn get_index(
         })
         .collect();
 
-    // Get additional statistics for the homepage summary
+    // Get additional statistics for the homepage summary in a single optimized query
     let conn = state
         .db
         .connect()
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
-    // Count total published articles (exclude drafts)
-    let total_articles_count = match conn
-        .query("SELECT COUNT(*) FROM articles WHERE draft = 0", libsql::params![])
-        .await
-    {
-        Ok(mut rows) => {
-            if let Ok(Some(row)) = rows.next().await {
-                let count: i64 = row.get(0).unwrap_or(0);
-                count
-            } else {
-                0
-            }
-        }
-        Err(_) => 0,
-    };
-
-    // Count draft articles for authenticated user
-    let draft_count = if let Some(user_id) = user_id_opt {
-        match conn
+    let (total_articles_count, draft_count, tags_count) = if let Some(user_id) = user_id_opt {
+        // Combine all counts in a single query for authenticated users
+        let mut rows = conn
             .query(
-                "SELECT COUNT(*) FROM articles WHERE draft = 1 AND author_id = ?",
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM articles WHERE draft = 0) as total_articles,
+                    (SELECT COUNT(*) FROM articles WHERE draft = 1 AND author_id = ?) as draft_count,
+                    (SELECT COUNT(DISTINCT name) FROM tags) as tags_count
+                "#,
                 libsql::params![user_id.to_string()],
             )
             .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
         {
-            Ok(mut rows) => {
-                if let Ok(Some(row)) = rows.next().await {
-                    let count: i64 = row.get(0).unwrap_or(0);
-                    count
-                } else {
-                    0
-                }
-            }
-            Err(_) => 0,
+            let total: i64 = row.get(0).unwrap_or(0);
+            let drafts: i64 = row.get(1).unwrap_or(0);
+            let tags: i64 = row.get(2).unwrap_or(0);
+            (total, drafts, tags)
+        } else {
+            (0, 0, 0)
         }
     } else {
-        0
-    };
+        // Combine counts for unauthenticated users (no draft count needed)
+        let mut rows = conn
+            .query(
+                r#"
+                SELECT
+                    (SELECT COUNT(*) FROM articles WHERE draft = 0) as total_articles,
+                    (SELECT COUNT(DISTINCT name) FROM tags) as tags_count
+                "#,
+                libsql::params![],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
-    // Count unique tags
-    let tags_count = match conn
-        .query("SELECT COUNT(DISTINCT name) FROM tags", libsql::params![])
-        .await
-    {
-        Ok(mut rows) => {
-            if let Ok(Some(row)) = rows.next().await {
-                let count: i64 = row.get(0).unwrap_or(0);
-                count
-            } else {
-                0
-            }
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        {
+            let total: i64 = row.get(0).unwrap_or(0);
+            let tags: i64 = row.get(1).unwrap_or(0);
+            (total, 0, tags)
+        } else {
+            (0, 0, 0)
         }
-        Err(_) => 0,
     };
 
     // Get latest post date from the articles we already fetched

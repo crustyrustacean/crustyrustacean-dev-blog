@@ -199,6 +199,30 @@ impl DatabaseConnection {
         .await?;
 
         conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags (tag_id)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_draft ON articles (draft)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_created_at ON articles (created_at DESC)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_draft_created_at ON articles (draft, created_at DESC)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_user_favorites_user_id ON user_favorites (user_id)",
             (),
         )
