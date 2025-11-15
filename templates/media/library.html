@@ -3,7 +3,7 @@
 {% block title %}Media Library - CrustyRustacean Dev Blog{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/media-library.css">
+<link rel="stylesheet" href="{{ versioned_asset(path='/static/css/media-library.css') }}">
 
 <div class="container mt-5">
     <div class="row">
@@ -240,6 +240,6 @@
     </div>
 </div>
 
-<script src="/static/js/utils.js"></script>
-<script src="/static/js/media-library.js"></script>
+<script src="{{ versioned_asset(path='/static/js/utils.js') }}"></script>
+<script src="{{ versioned_asset(path='/static/js/media-library.js') }}"></script>
 {% endblock %}

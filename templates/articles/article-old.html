@@ -185,7 +185,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/article-page.js"></script>
+<script src="{{ versioned_asset(path='/static/js/article-page.js') }}"></script>
 {% if user %}
     <div style="display: none;" data-current-user="{{ user.username | escape }}"></div>
 {% endif %}

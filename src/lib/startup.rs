@@ -142,7 +142,12 @@ impl App {
             )
             .route("/api/media/{id}/download", get(download_media))
             .route("/api/search", get(search_articles))
-            .nest_service("/static", ServeDir::new("static"))
+            .nest_service(
+                "/static",
+                ServeDir::new("static")
+                    .precompressed_gzip()
+                    .precompressed_br()
+            )
             .fallback(handle_404_simple)
             .with_state(state)
             .layer(CompressionLayer::new())
@@ -164,6 +169,10 @@ impl App {
             .layer(SetResponseHeaderLayer::if_not_present(
                 header::STRICT_TRANSPORT_SECURITY,
                 HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+            ))
+            .layer(SetResponseHeaderLayer::if_not_present(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
             ))
     }
 
