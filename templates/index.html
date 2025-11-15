@@ -7,7 +7,7 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="overflow-hidden rounded">
-            <img src="/static/hero.jpg" class="w-100" alt="CrustyRustacean Hero" style="object-fit: cover; height: 400px;">
+            <img src="{{ versioned_asset(path='/static/hero.jpg') }}" class="w-100" alt="CrustyRustacean Hero" style="object-fit: cover; height: 400px;">
         </div>
     </div>
 </div>
@@ -178,6 +178,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/utils.js"></script>
-<script src="/static/js/homepage.js"></script>
+<script src="{{ versioned_asset(path='/static/js/utils.js') }}"></script>
+<script src="{{ versioned_asset(path='/static/js/homepage.js') }}"></script>
 {% endblock %}

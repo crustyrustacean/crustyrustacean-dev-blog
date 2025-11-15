@@ -86,8 +86,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/utils.js"></script>
-<script src="/static/js/comments.js"></script>
-<script src="/static/js/article.js"></script>
-<script src="/static/js/article-init.js"></script>
+<script src="{{ versioned_asset(path='/static/js/utils.js') }}"></script>
+<script src="{{ versioned_asset(path='/static/js/comments.js') }}"></script>
+<script src="{{ versioned_asset(path='/static/js/article.js') }}"></script>
+<script src="{{ versioned_asset(path='/static/js/article-init.js') }}"></script>
 {% endblock %}

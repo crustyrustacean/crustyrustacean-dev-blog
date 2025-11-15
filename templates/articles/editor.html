@@ -218,5 +218,5 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="/static/js/editor.js"></script>
+<script src="{{ versioned_asset(path='/static/js/editor.js') }}"></script>
 {% endblock %}

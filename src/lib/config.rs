@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub templates_dir: String,
     pub external_stylesheet: String,
     pub override_stylesheet: String,
+    pub app_version: String,
 }
 
 // implement the TryFrom trait for the AppConfig type
@@ -34,11 +35,15 @@ impl TryFrom<&SecretStore> for AppConfig {
             .get("OVERRIDE_STYLESHEET")
             .ok_or_else(|| anyhow!("Missing required configuration secret: OVERRIDE_STYLESHEET"))?;
 
+        // Get version from Cargo.toml at compile time
+        let app_version = env!("CARGO_PKG_VERSION").to_string();
+
         Ok(Self {
             jwt_secret,
             templates_dir,
             external_stylesheet,
             override_stylesheet,
+            app_version,
         })
     }
 }

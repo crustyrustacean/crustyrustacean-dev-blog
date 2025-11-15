@@ -65,7 +65,24 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
                 Ok(Value::String(url.to_string()))
             },
         );
-        
+
+        // Register cache-busting function for static assets
+        let app_version = config.app_version.clone();
+        tera.register_function(
+            "versioned_asset",
+            move |args: &HashMap<String, Value>| -> tera::Result<Value> {
+                use tera::from_value;
+
+                let path = args
+                    .get("path")
+                    .and_then(|v| from_value::<String>(v.clone()).ok())
+                    .ok_or_else(|| tera::Error::msg("versioned_asset requires a 'path' argument"))?;
+
+                let versioned_url = format!("{}?v={}", path, app_version);
+                Ok(Value::String(versioned_url))
+            },
+        );
+
         Ok(tera)
     })
 }
@@ -103,6 +120,7 @@ mod tests {
             templates_dir: "templates/**/*".to_string(),
             external_stylesheet: "https://cdn.example.com/bootstrap.css".to_string(),
             override_stylesheet: "/static/overrides.css".to_string(),
+            app_version: "2.9.0".to_string(),
         }
     }
 
@@ -141,6 +159,7 @@ mod tests {
             templates_dir: "templates/**/*".to_string(),
             external_stylesheet: "".to_string(),
             override_stylesheet: "".to_string(),
+            app_version: "2.9.0".to_string(),
         };
         let _temp_dir = setup_test_templates_dir();
 
@@ -159,6 +178,7 @@ mod tests {
             templates_dir: "templates/**/*".to_string(),
             external_stylesheet: "https://example.com/style.css?v=1.0&theme=dark".to_string(),
             override_stylesheet: "/static/override-theme.css".to_string(),
+            app_version: "2.9.0".to_string(),
         };
         let _temp_dir = setup_test_templates_dir();
 
