@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -86,15 +87,19 @@ impl NewsletterStatus {
             NewsletterStatus::Failed => "failed",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Self {
+impl FromStr for NewsletterStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "draft" => NewsletterStatus::Draft,
-            "scheduled" => NewsletterStatus::Scheduled,
-            "sending" => NewsletterStatus::Sending,
-            "sent" => NewsletterStatus::Sent,
-            "failed" => NewsletterStatus::Failed,
-            _ => NewsletterStatus::Draft,
+            "draft" => Ok(NewsletterStatus::Draft),
+            "scheduled" => Ok(NewsletterStatus::Scheduled),
+            "sending" => Ok(NewsletterStatus::Sending),
+            "sent" => Ok(NewsletterStatus::Sent),
+            "failed" => Ok(NewsletterStatus::Failed),
+            _ => Err(format!("Invalid newsletter status: {}", s)),
         }
     }
 }
@@ -155,14 +160,18 @@ impl DeliveryStatus {
             DeliveryStatus::Bounced => "bounced",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Self {
+impl FromStr for DeliveryStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "pending" => DeliveryStatus::Pending,
-            "sent" => DeliveryStatus::Sent,
-            "failed" => DeliveryStatus::Failed,
-            "bounced" => DeliveryStatus::Bounced,
-            _ => DeliveryStatus::Pending,
+            "pending" => Ok(DeliveryStatus::Pending),
+            "sent" => Ok(DeliveryStatus::Sent),
+            "failed" => Ok(DeliveryStatus::Failed),
+            "bounced" => Ok(DeliveryStatus::Bounced),
+            _ => Err(format!("Invalid delivery status: {}", s)),
         }
     }
 }
