@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Newsletter Subscription - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-envelope fa-4x text-primary mb-3"></i>
+                    <h1 class="h2">Subscribe to Our Newsletter</h1>
+                    <p class="text-muted">Get the latest articles, tutorials, and Rust tips delivered to your inbox!</p>
+                </div>
+
+                <!-- Success Message (hidden by default) -->
+                <div id="success-message" class="alert alert-success d-none" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <span id="success-text"></span>
+                </div>
+
+                <!-- Error Message (hidden by default) -->
+                <div id="error-message" class="alert alert-danger d-none" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <span id="error-text"></span>
+                </div>
+
+                <!-- Subscription Form -->
+                <form id="newsletter-form">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name (Optional)</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="name"
+                            name="name"
+                            placeholder="Your name"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
+                        <input
+                            type="email"
+                            class="form-control"
+                            id="email"
+                            name="email"
+                            placeholder="you@example.com"
+                            required
+                        />
+                        <div class="form-text">We'll never share your email with anyone else.</div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="subscribe-btn">
+                            <i class="fas fa-paper-plane me-2"></i>
+                            Subscribe
+                        </button>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+
+                <div class="text-center">
+                    <h5 class="mb-3">What You'll Get</h5>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <i class="fas fa-book-open fa-2x text-primary mb-2"></i>
+                            <p class="small mb-0"><strong>New Articles</strong><br>Latest posts and tutorials</p>
+                        </div>
+                        <div class="col-md-4">
+                            <i class="fas fa-lightbulb fa-2x text-warning mb-2"></i>
+                            <p class="small mb-0"><strong>Tips & Tricks</strong><br>Rust best practices</p>
+                        </div>
+                        <div class="col-md-4">
+                            <i class="fas fa-code fa-2x text-success mb-2"></i>
+                            <p class="small mb-0"><strong>Code Examples</strong><br>Real-world solutions</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <p class="small text-muted">
+                        We respect your privacy. You can unsubscribe at any time.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>
+                Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('newsletter-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const btn = document.getElementById('subscribe-btn');
+    const originalText = btn.innerHTML;
+    const successMsg = document.getElementById('success-message');
+    const errorMsg = document.getElementById('error-message');
+    const successText = document.getElementById('success-text');
+    const errorText = document.getElementById('error-text');
+
+    // Hide previous messages
+    successMsg.classList.add('d-none');
+    errorMsg.classList.add('d-none');
+
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Subscribing...';
+
+    const formData = {
+        email: document.getElementById('email').value,
+        name: document.getElementById('name').value || null
+    };
+
+    try {
+        const response = await fetch('/api/newsletters/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            successText.textContent = result.data.message;
+            successMsg.classList.remove('d-none');
+
+            // Clear form
+            document.getElementById('newsletter-form').reset();
+
+            // Scroll to success message
+            successMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            const errorMessage = result.errors?.body?.[0] || 'An error occurred. Please try again.';
+            errorText.textContent = errorMessage;
+            errorMsg.classList.remove('d-none');
+
+            // Scroll to error message
+            errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    } catch (error) {
+        errorText.textContent = 'Network error. Please check your connection and try again.';
+        errorMsg.classList.remove('d-none');
+        errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } finally {
+        // Re-enable button
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+</script>
+{% endblock %}

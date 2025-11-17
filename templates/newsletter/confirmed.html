@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Subscription Confirmed - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-5 text-center">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle fa-5x text-success"></i>
+                </div>
+
+                <h1 class="h2 mb-3">You're All Set!</h1>
+                <p class="lead text-muted mb-4">
+                    Your subscription to the CrustyRustacean Dev Blog newsletter has been confirmed.
+                </p>
+
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>{{ email }}</strong> has been added to our mailing list.
+                </div>
+
+                <p class="mb-4">
+                    You'll receive our latest articles, tutorials, and Rust programming tips directly in your inbox.
+                </p>
+
+                <div class="d-grid gap-2">
+                    <a href="/" class="btn btn-primary btn-lg">
+                        <i class="fas fa-home me-2"></i>
+                        Go to Homepage
+                    </a>
+                    <a href="/articles" class="btn btn-outline-primary">
+                        <i class="fas fa-newspaper me-2"></i>
+                        Browse Articles
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

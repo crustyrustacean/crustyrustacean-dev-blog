@@ -4,9 +4,7 @@ use crate::auth::AuthenticatedUser;
 use crate::errors::AppError;
 use crate::state::AppState;
 use crate::models::{
-    ConfirmationResponse, CreateNewsletterIssue, DeliveryStatus, NewsletterDeliveryLog,
-    NewsletterIssue, NewsletterIssueResponse, NewsletterStats, NewsletterStatus,
-    NewsletterSubscriber, SubscribeRequest, SubscribeResponse, UnsubscribeResponse,
+    CreateNewsletterIssue, NewsletterIssueResponse, NewsletterStats, SubscribeRequest,
     UpdateNewsletterIssue,
 };
 use crate::response::ApiResponse;
@@ -19,7 +17,6 @@ use axum::{
 use chrono::Utc;
 use libsql::params;
 use serde_json::json;
-use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -206,7 +203,7 @@ pub async fn unsubscribe(
 /// List all newsletter issues (admin only)
 /// GET /api/admin/newsletters
 pub async fn list_newsletters(
-    auth_user: AuthenticatedUser,
+    _auth_user: AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.db.connect()?;
@@ -294,7 +291,7 @@ pub async fn create_newsletter(
 /// Get single newsletter issue (admin only)
 /// GET /api/admin/newsletters/:id
 pub async fn get_newsletter(
-    auth_user: AuthenticatedUser,
+    _auth_user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -345,7 +342,7 @@ pub async fn get_newsletter(
 /// Update newsletter issue (admin only)
 /// PUT /api/admin/newsletters/:id
 pub async fn update_newsletter(
-    auth_user: AuthenticatedUser,
+    _auth_user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(payload): Json<UpdateNewsletterIssue>,
@@ -424,7 +421,7 @@ pub async fn update_newsletter(
 /// Delete newsletter issue (admin only)
 /// DELETE /api/admin/newsletters/:id
 pub async fn delete_newsletter(
-    auth_user: AuthenticatedUser,
+    _auth_user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -449,7 +446,7 @@ pub async fn delete_newsletter(
 /// Send newsletter to all confirmed subscribers (admin only)
 /// POST /api/admin/newsletters/:id/send
 pub async fn send_newsletter(
-    auth_user: AuthenticatedUser,
+    _auth_user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -525,7 +522,7 @@ pub async fn send_newsletter(
 /// Get newsletter statistics (admin only)
 /// GET /api/admin/newsletters/stats
 pub async fn get_newsletter_stats(
-    auth_user: AuthenticatedUser,
+    _auth_user: AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.db.connect()?;
@@ -575,44 +572,95 @@ pub async fn get_newsletter_stats(
 
 /// Newsletter subscription page
 /// GET /newsletter
-pub async fn newsletter_page() -> Result<Html<String>, AppError> {
-    // This will be implemented with a proper template
-    // For now, return a simple HTML page
-    let html = r#"
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Newsletter Subscription - CrustyRustacean Dev Blog</title>
-    </head>
-    <body>
-        <h1>Newsletter Subscription</h1>
-        <p>Subscribe to receive updates from CrustyRustacean Dev Blog!</p>
-    </body>
-    </html>
-    "#;
+pub async fn newsletter_page(State(state): State<AppState>) -> Result<Html<String>, AppError> {
+    let mut context = tera::Context::new();
+    context.insert("title", "Newsletter Subscription");
 
-    Ok(Html(html.to_string()))
+    let html = state
+        .templates
+        .render("newsletter/subscribe.html", &context)?;
+
+    Ok(Html(html))
+}
+
+/// Newsletter confirmation success page
+/// GET /newsletter/confirmed (used via redirect from API)
+pub async fn newsletter_confirmed_page(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> Result<Html<String>, AppError> {
+    let conn = state.db.connect()?;
+
+    // Get subscriber email from token
+    let mut rows = conn
+        .query(
+            "SELECT email FROM newsletter_subscribers WHERE confirmation_token = ?",
+            params![token],
+        )
+        .await?;
+
+    let email = if let Some(row) = rows.next().await? {
+        row.get::<String>(0)?
+    } else {
+        return Err(AppError::NotFound("Invalid confirmation link".to_string()));
+    };
+
+    let mut context = tera::Context::new();
+    context.insert("title", "Subscription Confirmed");
+    context.insert("email", &email);
+
+    let html = state
+        .templates
+        .render("newsletter/confirmed.html", &context)?;
+
+    Ok(Html(html))
+}
+
+/// Newsletter unsubscribe success page
+/// GET /newsletter/unsubscribed (used via redirect from API)
+pub async fn newsletter_unsubscribed_page(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> Result<Html<String>, AppError> {
+    let conn = state.db.connect()?;
+
+    // Get subscriber email from token
+    let mut rows = conn
+        .query(
+            "SELECT email FROM newsletter_subscribers WHERE unsubscribe_token = ?",
+            params![token],
+        )
+        .await?;
+
+    let email = if let Some(row) = rows.next().await? {
+        row.get::<String>(0)?
+    } else {
+        return Err(AppError::NotFound("Invalid unsubscribe link".to_string()));
+    };
+
+    let mut context = tera::Context::new();
+    context.insert("title", "Unsubscribed");
+    context.insert("email", &email);
+
+    let html = state
+        .templates
+        .render("newsletter/unsubscribed.html", &context)?;
+
+    Ok(Html(html))
 }
 
 /// Admin newsletter management page
 /// GET /admin/newsletters
 pub async fn admin_newsletters_page(
-    auth_user: AuthenticatedUser,
+    _auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
 ) -> Result<Html<String>, AppError> {
-    // This will be implemented with a proper template
-    // For now, return a simple HTML page
-    let html = r#"
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Newsletter Management - CrustyRustacean Dev Blog</title>
-    </head>
-    <body>
-        <h1>Newsletter Management</h1>
-        <p>Admin dashboard for managing newsletters</p>
-    </body>
-    </html>
-    "#;
+    let mut context = tera::Context::new();
+    context.insert("title", "Newsletter Management");
 
-    Ok(Html(html.to_string()))
+    let html = state
+        .templates
+        .render("admin/newsletters.html", &context)?;
+
+    Ok(Html(html))
 }
