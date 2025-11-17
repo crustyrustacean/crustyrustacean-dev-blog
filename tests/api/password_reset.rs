@@ -29,7 +29,7 @@ async fn password_reset_request_with_valid_email_returns_success() {
         .await
         .expect("Failed to deserialize response");
 
-    assert!(body["message"]
+    assert!(body["data"]["message"]
         .as_str()
         .unwrap()
         .contains("password reset instructions"));
@@ -57,7 +57,7 @@ async fn password_reset_request_with_nonexistent_email_returns_success() {
         .await
         .expect("Failed to deserialize response");
 
-    assert!(body["message"]
+    assert!(body["data"]["message"]
         .as_str()
         .unwrap()
         .contains("password reset instructions"));
@@ -97,22 +97,29 @@ async fn password_reset_page_with_valid_token_loads_successfully() {
         .expect("Failed to execute request");
 
     // Get the token from database
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
-            (),
-        )
-        .await
-        .expect("Failed to query token");
+    let token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
+                (),
+            )
+            .await
+            .expect("Failed to query token");
 
-    let token: String = rows
-        .next()
-        .await
-        .expect("Failed to get row")
-        .expect("No token found")
-        .get(0)
-        .expect("Failed to get token");
+        let token: String = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No token found")
+            .get(0)
+            .expect("Failed to get token");
+
+        // Drop rows and conn before continuing
+        drop(rows);
+        drop(conn);
+        token
+    };
 
     // Act - Load password reset page
     let response = app
@@ -166,22 +173,29 @@ async fn complete_password_reset_with_valid_token_succeeds() {
         .expect("Failed to execute request");
 
     // Get the token from database
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
-            (),
-        )
-        .await
-        .expect("Failed to query token");
+    let token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
+                (),
+            )
+            .await
+            .expect("Failed to query token");
 
-    let token: String = rows
-        .next()
-        .await
-        .expect("Failed to get row")
-        .expect("No token found")
-        .get(0)
-        .expect("Failed to get token");
+        let token: String = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No token found")
+            .get(0)
+            .expect("Failed to get token");
+
+        // Drop rows and conn before continuing
+        drop(rows);
+        drop(conn);
+        token
+    };
 
     // Act - Complete password reset
     let response = app
@@ -244,22 +258,29 @@ async fn password_reset_token_can_only_be_used_once() {
         .expect("Failed to execute request");
 
     // Get the token from database
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
-            (),
-        )
-        .await
-        .expect("Failed to query token");
+    let token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
+                (),
+            )
+            .await
+            .expect("Failed to query token");
 
-    let token: String = rows
-        .next()
-        .await
-        .expect("Failed to get row")
-        .expect("No token found")
-        .get(0)
-        .expect("Failed to get token");
+        let token: String = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No token found")
+            .get(0)
+            .expect("Failed to get token");
+
+        // Drop rows and conn before continuing
+        drop(rows);
+        drop(conn);
+        token
+    };
 
     // Act - Use the token once
     let response = app
@@ -287,7 +308,7 @@ async fn password_reset_token_can_only_be_used_once() {
         .json()
         .await
         .expect("Failed to deserialize response");
-    assert!(body["message"]
+    assert!(body["errors"]["body"][0]
         .as_str()
         .unwrap()
         .contains("already been used"));
@@ -309,22 +330,29 @@ async fn password_reset_with_too_short_password_fails() {
         .expect("Failed to execute request");
 
     // Get the token from database
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
-            (),
-        )
-        .await
-        .expect("Failed to query token");
+    let token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
+                (),
+            )
+            .await
+            .expect("Failed to query token");
 
-    let token: String = rows
-        .next()
-        .await
-        .expect("Failed to get row")
-        .expect("No token found")
-        .get(0)
-        .expect("Failed to get token");
+        let token: String = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No token found")
+            .get(0)
+            .expect("Failed to get token");
+
+        // Drop rows and conn before continuing
+        drop(rows);
+        drop(conn);
+        token
+    };
 
     // Act - Try to reset with too short password
     let response = app
