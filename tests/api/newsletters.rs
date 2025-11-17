@@ -28,8 +28,8 @@ async fn test_subscribe_to_newsletter_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["message"], "Please check your email to confirm your subscription.");
-    assert_eq!(response_body["email"], "subscriber@example.com");
+    assert_eq!(response_body["data"]["message"], "Please check your email to confirm your subscription.");
+    assert_eq!(response_body["data"]["email"], "subscriber@example.com");
 }
 
 #[tokio::test]
@@ -91,7 +91,7 @@ async fn test_subscribe_duplicate_email_returns_success() {
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
     // Should receive confirmation message
-    assert!(response_body["message"].as_str().unwrap().contains("confirmation"));
+    assert!(response_body["data"]["message"].as_str().unwrap().contains("confirmation"));
 }
 
 #[tokio::test]
@@ -115,17 +115,19 @@ async fn test_confirm_subscription_success() {
         .expect("Failed to execute request");
 
     // Get the confirmation token from the database
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'confirm@example.com'",
-            libsql::params![],
-        )
-        .await
-        .expect("Failed to query database");
+    let token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'confirm@example.com'",
+                libsql::params![],
+            )
+            .await
+            .expect("Failed to query database");
 
-    let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
-    let token: String = row.get(0).expect("Failed to get token");
+        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        row.get::<String>(0).expect("Failed to get token")
+    }; // Connection is dropped here
 
     // Act - Confirm subscription
     let response = app
@@ -139,8 +141,8 @@ async fn test_confirm_subscription_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["message"], "Thank you! Your subscription has been confirmed.");
-    assert_eq!(response_body["email"], "confirm@example.com");
+    assert_eq!(response_body["data"]["message"], "Thank you! Your subscription has been confirmed.");
+    assert_eq!(response_body["data"]["email"], "confirm@example.com");
 }
 
 #[tokio::test]
@@ -181,17 +183,19 @@ async fn test_confirm_already_confirmed_subscription() {
         .expect("Failed to execute request");
 
     // Get confirmation token
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'already-confirmed@example.com'",
-            libsql::params![],
-        )
-        .await
-        .expect("Failed to query database");
+    let token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'already-confirmed@example.com'",
+                libsql::params![],
+            )
+            .await
+            .expect("Failed to query database");
 
-    let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
-    let token: String = row.get(0).expect("Failed to get token");
+        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        row.get::<String>(0).expect("Failed to get token")
+    }; // Connection is dropped here
 
     // First confirmation
     let _ = app
@@ -213,7 +217,7 @@ async fn test_confirm_already_confirmed_subscription() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["message"], "Your subscription is already confirmed!");
+    assert_eq!(response_body["data"]["message"], "Your subscription is already confirmed!");
 }
 
 #[tokio::test]
@@ -236,17 +240,19 @@ async fn test_unsubscribe_success() {
         .expect("Failed to execute request");
 
     // Get unsubscribe token
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT unsubscribe_token FROM newsletter_subscribers WHERE email = 'unsubscribe@example.com'",
-            libsql::params![],
-        )
-        .await
-        .expect("Failed to query database");
+    let token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT unsubscribe_token FROM newsletter_subscribers WHERE email = 'unsubscribe@example.com'",
+                libsql::params![],
+            )
+            .await
+            .expect("Failed to query database");
 
-    let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
-    let token: String = row.get(0).expect("Failed to get token");
+        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        row.get::<String>(0).expect("Failed to get token")
+    }; // Connection is dropped here
 
     // Act - Unsubscribe
     let response = app
@@ -260,7 +266,7 @@ async fn test_unsubscribe_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["message"], "You have been successfully unsubscribed from our newsletter.");
+    assert_eq!(response_body["data"]["message"], "You have been successfully unsubscribed from our newsletter.");
 }
 
 #[tokio::test]
@@ -333,8 +339,8 @@ async fn test_create_newsletter_success() {
     assert_eq!(response.status(), StatusCode::CREATED);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["message"], "Newsletter created successfully");
-    assert!(response_body["id"].is_string());
+    assert_eq!(response_body["data"]["message"], "Newsletter created successfully");
+    assert!(response_body["data"]["id"].is_string());
 }
 
 #[tokio::test]
@@ -390,8 +396,8 @@ async fn test_list_newsletters_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert!(response_body["newsletters"].is_array());
-    let newsletters = response_body["newsletters"].as_array().unwrap();
+    assert!(response_body["data"]["newsletters"].is_array());
+    let newsletters = response_body["data"]["newsletters"].as_array().unwrap();
     assert_eq!(newsletters.len(), 1);
     assert_eq!(newsletters[0]["title"], "Test Newsletter");
 }
@@ -430,8 +436,8 @@ async fn test_get_newsletter_stats() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert!(response_body["stats"].is_object());
-    let stats = &response_body["stats"];
+    assert!(response_body["data"]["stats"].is_object());
+    let stats = &response_body["data"]["stats"];
     assert_eq!(stats["total_subscribers"], 1);
     assert_eq!(stats["confirmed_subscribers"], 0); // Not confirmed yet
 }
@@ -458,17 +464,19 @@ async fn test_send_newsletter_success() {
         .expect("Failed to execute request");
 
     // Confirm the subscription
-    let conn = app.db.connect().expect("Failed to connect to database");
-    let mut rows = conn
-        .query(
-            "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'sendtest@example.com'",
-            libsql::params![],
-        )
-        .await
-        .expect("Failed to query database");
+    let confirm_token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'sendtest@example.com'",
+                libsql::params![],
+            )
+            .await
+            .expect("Failed to query database");
 
-    let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
-    let confirm_token: String = row.get(0).expect("Failed to get token");
+        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        row.get::<String>(0).expect("Failed to get token")
+    }; // Connection is dropped here
 
     let _ = app
         .client
@@ -495,7 +503,7 @@ async fn test_send_newsletter_success() {
         .expect("Failed to execute request");
 
     let create_body: Value = create_response.json().await.expect("Failed to parse response");
-    let newsletter_id = create_body["id"].as_str().unwrap();
+    let newsletter_id = create_body["data"]["id"].as_str().unwrap();
 
     // Act - Send newsletter
     let response = app
@@ -510,8 +518,8 @@ async fn test_send_newsletter_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert!(response_body["message"].as_str().unwrap().contains("sent to 1 subscribers"));
-    assert_eq!(response_body["recipient_count"], 1);
+    assert!(response_body["data"]["message"].as_str().unwrap().contains("sent to 1 subscribers"));
+    assert_eq!(response_body["data"]["recipient_count"], 1);
 }
 
 #[tokio::test]
