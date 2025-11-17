@@ -142,10 +142,10 @@ pub async fn confirm_subscription(
         })));
     }
 
-    // Update subscriber to confirmed
+    // Update subscriber to confirmed (keep confirmation_token for idempotency)
     let now = Utc::now().to_rfc3339();
     conn.execute(
-        "UPDATE newsletter_subscribers SET confirmed = 1, confirmed_at = ?, confirmation_token = NULL, updated_at = ? WHERE id = ?",
+        "UPDATE newsletter_subscribers SET confirmed = 1, confirmed_at = ?, updated_at = ? WHERE id = ?",
         params![now.clone(), now.clone(), id],
     )
     .await?;
