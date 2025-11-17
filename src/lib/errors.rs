@@ -34,6 +34,34 @@ pub enum AppError {
     Tera(#[from] tera::Error),
 }
 
+// Implement From for validator::ValidationErrors
+impl From<validator::ValidationErrors> for AppError {
+    fn from(err: validator::ValidationErrors) -> Self {
+        AppError::BadRequest(err.to_string())
+    }
+}
+
+// Implement From for libsql::Error
+impl From<libsql::Error> for AppError {
+    fn from(err: libsql::Error) -> Self {
+        AppError::InternalServerError(err.to_string())
+    }
+}
+
+// Implement From for uuid::Error
+impl From<uuid::Error> for AppError {
+    fn from(err: uuid::Error) -> Self {
+        AppError::BadRequest(err.to_string())
+    }
+}
+
+// Implement From for chrono::ParseError
+impl From<chrono::ParseError> for AppError {
+    fn from(err: chrono::ParseError) -> Self {
+        AppError::BadRequest(err.to_string())
+    }
+}
+
 #[derive(Serialize)]
 struct ErrorResponse {
     errors: ErrorBody,

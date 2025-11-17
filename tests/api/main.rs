@@ -15,6 +15,7 @@ mod health_check;
 mod helpers;
 mod markdown_integration;
 mod media;
+mod newsletters;
 mod robots;
 mod rss;
 mod search;
