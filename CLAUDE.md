@@ -221,6 +221,9 @@ Key tables and relationships:
 - **favorites**: User article favorites
 - **follows**: User following relationships
 - **media_library**: Uploaded media files with metadata
+- **newsletter_subscribers**: Email subscribers with confirmation/unsubscribe tokens
+- **newsletter_issues**: Newsletter content and metadata
+- **newsletter_delivery_logs**: Tracking newsletter deliveries
 
 ### 7. Authentication & Security
 
@@ -243,6 +246,10 @@ GET    /admin                         # Admin dashboard (protected)
 GET    /admin/drafts                  # Drafts management page (protected)
 GET    /admin/categories              # Categories management page (protected)
 GET    /admin/media                   # Media library page (protected)
+GET    /admin/newsletters             # Newsletter management page (protected)
+GET    /newsletter                    # Newsletter subscription page
+GET    /newsletter/confirmed/{token}  # Subscription confirmation page
+GET    /newsletter/unsubscribed/{token} # Unsubscribe confirmation page
 GET    /search                        # Search results page
 
 # Articles API
@@ -275,6 +282,20 @@ GET    /api/media/:id                 # Get media metadata (protected)
 PUT    /api/media/:id                 # Update media metadata (protected)
 DELETE /api/media/:id                 # Delete media (protected)
 GET    /api/media/:id/download        # Download media file
+
+# Newsletter API
+POST   /api/newsletters/subscribe           # Subscribe to newsletter
+POST   /api/newsletters/confirm/{token}     # Confirm subscription
+GET    /api/newsletters/confirm/{token}     # Confirm subscription (GET support)
+POST   /api/newsletters/unsubscribe/{token} # Unsubscribe from newsletter
+GET    /api/newsletters/unsubscribe/{token} # Unsubscribe from newsletter (GET support)
+POST   /api/admin/newsletters               # Create newsletter issue (protected)
+GET    /api/admin/newsletters               # List newsletter issues (protected)
+GET    /api/admin/newsletters/{id}          # Get newsletter issue (protected)
+PUT    /api/admin/newsletters/{id}          # Update newsletter issue (protected)
+DELETE /api/admin/newsletters/{id}          # Delete newsletter issue (protected)
+POST   /api/admin/newsletters/{id}/send     # Send newsletter (protected)
+GET    /api/admin/newsletters/stats         # Get newsletter statistics (protected)
 ```
 
 ### 9. Common Tasks
@@ -336,9 +357,19 @@ This project emphasizes:
 - **Security**: Industry best practices
 - **Documentation**: Keep docs up-to-date
 
-### 13. Current Status (v2.8.0)
+### 13. Current Status (v2.9.0)
 
 #### Recently Completed (Nov 2025)
+- ✅ **Newsletter Subscription and Delivery Service**: Complete newsletter system
+  - Email subscription with double opt-in confirmation
+  - Newsletter creation and management (admin only)
+  - Send newsletters to confirmed subscribers
+  - Newsletter statistics dashboard
+  - Public subscription page at `/newsletter`
+  - Admin management page at `/admin/newsletters`
+  - Re-subscription support for unsubscribed users
+  - 16 comprehensive integration tests
+
 - ✅ **Article Preview Modal**: Publishing preview feature
   - Real-time preview of articles before publishing
   - Client-side markdown rendering with marked.js
@@ -426,7 +457,7 @@ This project emphasizes:
   - Favorites system with dedicated page
 
 - ✅ **Test Coverage**: Comprehensive test suite
-  - 242 total tests (223 integration + 19 unit)
+  - 258 total tests (239 integration + 19 unit)
   - All features tested following TDD methodology
   - 100% passing test suite
 

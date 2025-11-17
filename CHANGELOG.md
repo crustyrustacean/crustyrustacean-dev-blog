@@ -2,6 +2,68 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [2.9.0] - 2025-11-17
+
+### Added - Newsletter Subscription and Delivery Service
+- **Newsletter Subscription System** (TDD Implementation):
+  - Email subscription with comprehensive validation
+  - Double opt-in confirmation pattern for GDPR compliance
+  - Unique confirmation and unsubscribe tokens (UUID-based)
+  - Support for re-subscription after unsubscribing
+  - Idempotent confirmation handling
+  - Public subscription page at `/newsletter` with responsive Bootstrap UI
+  - Confirmation success page at `/newsletter/confirmed/{token}`
+  - Unsubscribe success page at `/newsletter/unsubscribed/{token}` with re-subscribe option
+
+- **Newsletter Management** (Admin Features):
+  - Create, read, update, delete newsletter issues
+  - Draft and sent status tracking
+  - Scheduled newsletter support (scheduled_at field)
+  - Admin dashboard at `/admin/newsletters` with statistics
+  - Real-time newsletter statistics (total subscribers, confirmed subscribers, issues sent)
+  - Send newsletters to all confirmed subscribers
+  - Delivery logging for each newsletter send
+  - Recipient count tracking
+
+- **Database Schema**:
+  - `newsletter_subscribers` table with confirmation/unsubscribe tokens
+  - `newsletter_issues` table for newsletter content and metadata
+  - `newsletter_delivery_logs` table for tracking deliveries
+  - Proper indexes for performance optimization
+
+- **API Endpoints**:
+  - Public: `/api/newsletters/subscribe`, `/api/newsletters/confirm/{token}`, `/api/newsletters/unsubscribe/{token}`
+  - Admin (protected): `/api/admin/newsletters` (CRUD), `/api/admin/newsletters/{id}/send`, `/api/admin/newsletters/stats`
+  - Both POST and GET support for confirmation and unsubscribe links (email-friendly)
+
+### Test Coverage
+- Added 16 comprehensive integration tests:
+  - Newsletter subscription with validation
+  - Duplicate subscription handling
+  - Confirmation flow with double opt-in
+  - Already confirmed subscription handling (idempotent)
+  - Unsubscribe functionality
+  - Invalid token handling
+  - Newsletter creation (authentication required)
+  - Newsletter listing and retrieval
+  - Newsletter statistics
+  - Sending newsletters to confirmed subscribers
+  - Page accessibility tests (newsletter and admin pages)
+
+### Technical Details
+- **Security**: Email validation, token-based confirmation, authentication for admin endpoints
+- **User Experience**: Responsive Bootstrap templates, AJAX form submission, clear success/error messages
+- **Data Integrity**: Unique constraints, proper foreign keys, transaction safety
+- **Performance**: Indexed queries for subscriber and newsletter lookups
+- **Code Quality**: Zero compiler warnings, comprehensive error handling
+
+### Benefits
+- **Audience Engagement**: Build and manage email subscriber list
+- **Content Distribution**: Send newsletters to confirmed subscribers
+- **Privacy Compliance**: Double opt-in pattern respects user consent
+- **Analytics**: Track subscriber counts and newsletter delivery
+- **Professional UX**: Polished subscription and management interfaces
+
 ## [2.8.0] - 2025-11-12
 
 ### Added - Article Preview Modal

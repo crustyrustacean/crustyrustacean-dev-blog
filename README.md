@@ -11,7 +11,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Protected API endpoints** with Bearer token authentication
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 223 integration tests and 19 unit tests (242 total)
+- **Comprehensive test suite** with 239 integration tests and 19 unit tests (258 total)
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -143,6 +143,17 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Preview title, description, tags, and rendered body content
   - HTML escaping for security
   - Fast preview without server-side processing
+- **Newsletter Subscription and Delivery Service** (TDD implementation):
+  - Newsletter subscription with email validation
+  - Double opt-in confirmation pattern
+  - Subscriber management (subscribe, confirm, unsubscribe)
+  - Newsletter creation and management (admin only)
+  - Send newsletters to confirmed subscribers
+  - Newsletter statistics dashboard
+  - Subscription page with responsive UI
+  - Admin newsletter management page
+  - Re-subscription support for unsubscribed users
+  - 16 comprehensive integration tests
 
 ### 🚧 Planned
 - Image processing and optimization
@@ -166,7 +177,7 @@ src/
     startup.rs      # App initialization and router setup
     state.rs        # Shared application state
     telemetry.rs    # Tracing/logging setup
-    models/         # Database entities (User, Article, Comment, Tag, Category, Media)
+    models/         # Database entities (User, Article, Comment, Tag, Category, Media, Newsletter)
     routes/         # HTTP route handlers
     shortcodes.rs   # Shortcode parsing for internal article links
       health_check.rs # Health check endpoint
@@ -177,6 +188,7 @@ src/
       profile.rs    # User profile management
       tags.rs       # Tags API endpoint
       categories.rs # Categories management endpoints
+      newsletters.rs# Newsletter subscription and delivery endpoints
       rss.rs        # RSS feed generation
       error_pages.rs# Error handling pages
       mod.rs        # Routes module
@@ -223,6 +235,11 @@ templates/          # Tera templates for HTML rendering
     categories.html # Categories management page
     drafts.html     # Drafts management page
     media.html      # Media library page
+    newsletters.html # Newsletter management page
+  newsletter/
+    subscribe.html  # Newsletter subscription page
+    confirmed.html  # Subscription confirmation page
+    unsubscribed.html # Unsubscribe confirmation page
   profile/
     profile.html    # User profile page
     favorites.html  # User favorites page
@@ -244,6 +261,7 @@ tests/
     drafts.rs       # Drafts management integration tests (8 tests)
     media.rs        # Media library integration tests
     shortcodes.rs   # Shortcodes system integration tests (15+ tests)
+    newsletters.rs  # Newsletter subscription and delivery integration tests (16 tests)
     admin_dashboard.rs # Admin dashboard integration tests
     template_rendering.rs # Template rendering integration tests
     health_check.rs # Health check tests
@@ -268,7 +286,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (242 total: 223 integration + 19 unit)
+cargo test              # Run all tests (258 total: 239 integration + 19 unit)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -281,6 +299,7 @@ cargo test search       # Run search API tests only
 cargo test media        # Run media library tests only
 cargo test drafts       # Run drafts management tests only
 cargo test shortcodes   # Run shortcodes system tests only
+cargo test newsletters  # Run newsletter subscription tests only
 cargo test api::        # Run all API integration tests
 ```
 
@@ -304,6 +323,8 @@ The test suite includes comprehensive testing:
 - ✅ Comments API with authorization and validation
 - ✅ Search API with full-text querying across articles
 - ✅ Media library with file upload and storage operations
+- ✅ Newsletter subscription with double opt-in confirmation
+- ✅ Newsletter management and delivery to confirmed subscribers
 - ✅ Template rendering with authentication state validation
 - ✅ Idempotent operations and multi-user scenarios
 
@@ -329,6 +350,10 @@ GET  /admin                        # Admin dashboard (protected)
 GET  /admin/categories             # Categories management page (protected)
 GET  /admin/drafts                 # Drafts management page (protected)
 GET  /admin/media                  # Media library admin page (protected)
+GET  /admin/newsletters            # Newsletter management page (protected)
+GET  /newsletter                   # Newsletter subscription page
+GET  /newsletter/confirmed/{token} # Subscription confirmation page
+GET  /newsletter/unsubscribed/{token} # Unsubscribe confirmation page
 GET  /profiles/{username}          # User profile page
 GET  /profiles                     # Authors discovery page (protected)
 GET  /feed                         # Personal feed page (protected)
@@ -408,6 +433,25 @@ DELETE /api/media/:id              # Delete media file (protected)
 GET    /api/media/:id/download     # Download/display media file
 ```
 
+### Newsletter API
+```
+# Public subscription endpoints
+POST   /api/newsletters/subscribe           # Subscribe to newsletter
+POST   /api/newsletters/confirm/{token}     # Confirm subscription
+GET    /api/newsletters/confirm/{token}     # Confirm subscription (GET support)
+POST   /api/newsletters/unsubscribe/{token} # Unsubscribe from newsletter
+GET    /api/newsletters/unsubscribe/{token} # Unsubscribe from newsletter (GET support)
+
+# Admin newsletter management endpoints (protected)
+POST   /api/admin/newsletters               # Create new newsletter issue
+GET    /api/admin/newsletters               # List all newsletter issues
+GET    /api/admin/newsletters/{id}          # Get specific newsletter issue
+PUT    /api/admin/newsletters/{id}          # Update newsletter issue
+DELETE /api/admin/newsletters/{id}          # Delete newsletter issue
+POST   /api/admin/newsletters/{id}/send     # Send newsletter to confirmed subscribers
+GET    /api/admin/newsletters/stats         # Get newsletter statistics
+```
+
 ### System
 ```
 GET /health_check                  # Health check endpoint
@@ -436,7 +480,8 @@ The application now includes a complete blog system:
 17. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
 18. **Comments System**: Add, view, and delete comments on articles with proper authorization
 19. **Media Library**: Upload and manage media files with cloud storage integration
-20. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+20. **Newsletter System**: Email subscription with double opt-in, newsletter creation and delivery management
+21. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -461,8 +506,8 @@ The application now includes a complete blog system:
 
 - **Unified Error Handling**: Consolidated error architecture eliminates duplication
 - **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 242 total tests (223 integration + 19 unit) covering happy path and failure scenarios
-- **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, Drafts, and Media Library features built with TDD approach
+- **Comprehensive Testing**: 258 total tests (239 integration + 19 unit) covering happy path and failure scenarios
+- **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, Drafts, Media Library, and Newsletter features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 - **Cloud-Native Storage**: OpenDAL integration for flexible storage backend options

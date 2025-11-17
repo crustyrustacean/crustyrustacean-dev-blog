@@ -15,7 +15,8 @@ use crate::routes::{
     get_robots_txt, get_rss_feed, get_sitemap, get_tags, get_tags_admin_page, get_terms,
     handle_404_simple, health_check, list_api_keys, list_articles, list_media, list_newsletters,
     list_profiles, list_user_drafts, login_user, mobile_upload_article, newsletter_page,
-    admin_newsletters_page, register_user, search_articles, subscribe, confirm_subscription,
+    newsletter_confirmed_page, newsletter_unsubscribed_page, admin_newsletters_page,
+    register_user, search_articles, subscribe, confirm_subscription,
     unsubscribe, unfavorite_article, unfollow_user, update_article, update_category,
     update_current_user, update_media_metadata, update_newsletter, update_tag,
     upload_markdown_file, upload_media, send_newsletter,
@@ -93,6 +94,8 @@ impl App {
             .route("/admin/drafts", get(get_drafts_admin_page))
             .route("/admin/newsletters", get(admin_newsletters_page))
             .route("/newsletter", get(newsletter_page))
+            .route("/newsletter/confirmed/{token}", get(newsletter_confirmed_page))
+            .route("/newsletter/unsubscribed/{token}", get(newsletter_unsubscribed_page))
             // API routes
             .route("/api/users", post(register_user))
             .route("/api/users/login", post(login_user))
