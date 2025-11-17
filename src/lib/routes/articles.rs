@@ -1107,7 +1107,7 @@ pub async fn list_articles(
         let tag_list_str: Option<String> = row.get(12).ok();
         let tag_names: Vec<String> = tag_list_str
             .map(|s| s.split(',').map(|t| t.to_string()).collect())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
 
         // Get favorites count from the query
         let favorites_count: i64 = row
