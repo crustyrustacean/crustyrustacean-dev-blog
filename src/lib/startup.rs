@@ -3,23 +3,25 @@
 // dependencies
 use crate::config::AppConfig;
 use crate::routes::{
-    add_comment, create_api_key, create_article, create_category, create_newsletter, delete_api_key,
-    delete_article, delete_category, delete_comment, delete_media, delete_newsletter, delete_tag,
-    download_media, favorite_article, follow_user, get_about, get_admin_dashboard,
-    get_api_keys_admin_page, get_article, get_article_page, get_articles_feed,
-    get_articles_feed_page, get_articles_list_page, get_authors_page, get_categories,
-    get_categories_admin_page, get_category, get_comments, get_current_user,
-    get_drafts_admin_page, get_edit_article_page, get_editor_page, get_index, get_login_page,
-    get_media_library_page, get_media_metadata, get_my_favorites_page, get_newsletter,
-    get_newsletter_stats, get_privacy, get_profile, get_profile_page, get_register_page,
-    get_robots_txt, get_rss_feed, get_sitemap, get_tags, get_tags_admin_page, get_terms,
-    handle_404_simple, health_check, list_api_keys, list_articles, list_media, list_newsletters,
-    list_profiles, list_user_drafts, login_user, mobile_upload_article, newsletter_page,
-    newsletter_confirmed_page, newsletter_unsubscribed_page, admin_newsletters_page,
-    register_user, search_articles, subscribe, confirm_subscription,
-    unsubscribe, unfavorite_article, unfollow_user, update_article, update_category,
-    update_current_user, update_media_metadata, update_newsletter, update_tag,
-    upload_markdown_file, upload_media, send_newsletter,
+    add_comment, change_password, complete_password_reset, create_api_key, create_article,
+    create_category, create_newsletter, delete_api_key, delete_article, delete_category,
+    delete_comment, delete_media, delete_newsletter, delete_tag, download_media,
+    favorite_article, follow_user, get_about, get_admin_dashboard, get_api_keys_admin_page,
+    get_article, get_article_page, get_articles_feed, get_articles_feed_page,
+    get_articles_list_page, get_authors_page, get_categories, get_categories_admin_page,
+    get_category, get_comments, get_current_user, get_drafts_admin_page, get_edit_article_page,
+    get_editor_page, get_index, get_login_page, get_media_library_page, get_media_metadata,
+    get_my_favorites_page, get_newsletter, get_newsletter_stats, get_password_reset_page,
+    get_password_reset_request_page, get_privacy, get_profile, get_profile_page, get_register_page,
+    get_robots_txt, get_rss_feed,
+    get_sitemap, get_tags, get_tags_admin_page, get_terms, handle_404_simple, health_check,
+    list_api_keys, list_articles, list_media, list_newsletters, list_profiles, list_user_drafts,
+    login_user, mobile_upload_article, newsletter_confirmed_page, newsletter_page,
+    newsletter_unsubscribed_page, admin_newsletters_page, register_user,
+    request_password_reset, search_articles, subscribe, confirm_subscription, unsubscribe,
+    unfavorite_article, unfollow_user, update_article, update_category, update_current_user,
+    update_media_metadata, update_newsletter, update_tag, upload_markdown_file, upload_media,
+    send_newsletter,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -78,6 +80,7 @@ impl App {
             // HTML page routes
             .route("/login", get(get_login_page))
             .route("/register", get(get_register_page))
+            .route("/password-reset/request", get(get_password_reset_request_page))
             .route("/profiles/{username}", get(get_profile_page))
             .route("/profiles", get(get_authors_page))
             .route("/favorites", get(get_my_favorites_page))
@@ -163,6 +166,11 @@ impl App {
                     .delete(delete_newsletter),
             )
             .route("/api/admin/newsletters/{id}/send", post(send_newsletter))
+            // Password reset routes
+            .route("/api/password-reset/request", post(request_password_reset))
+            .route("/password-reset/{token}", get(get_password_reset_page))
+            .route("/api/password-reset/{token}", post(complete_password_reset))
+            .route("/api/account/password", post(change_password))
             .nest_service(
                 "/static",
                 // Static file service with aggressive caching for versioned assets

@@ -16,6 +16,7 @@ mod helpers;
 mod markdown_integration;
 mod media;
 mod newsletters;
+mod password_reset;
 mod robots;
 mod rss;
 mod search;

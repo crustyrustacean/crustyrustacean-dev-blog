@@ -86,3 +86,23 @@ pub struct ProfilesQuery {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
 }
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct PasswordResetRequest {
+    #[validate(email)]
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct PasswordResetComplete {
+    #[validate(length(min = 6))]
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ChangePasswordRequest {
+    #[validate(length(min = 6))]
+    pub current_password: String,
+    #[validate(length(min = 6))]
+    pub new_password: String,
+}

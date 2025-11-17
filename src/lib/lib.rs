@@ -7,6 +7,7 @@
 pub mod auth;
 pub mod config;
 pub mod database;
+pub mod email;
 pub mod errors;
 pub mod markdown;
 pub mod models;
@@ -22,6 +23,7 @@ pub mod telemetry;
 pub use auth::*;
 pub use config::*;
 pub use database::*;
+pub use email::*;
 pub use errors::*;
 pub use markdown::*;
 pub use models::*;
