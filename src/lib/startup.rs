@@ -5,9 +5,9 @@ use crate::config::AppConfig;
 use crate::routes::{
     add_comment, change_password, complete_password_reset, create_api_key, create_article,
     create_category, create_newsletter, delete_api_key, delete_article, delete_category,
-    delete_comment, delete_media, delete_newsletter, delete_tag, download_media,
+    delete_comment, delete_media, delete_newsletter, delete_tag, delete_user_admin, download_media,
     favorite_article, follow_user, get_about, get_account_page, get_admin_dashboard,
-    get_api_keys_admin_page, get_article, get_article_page, get_articles_feed,
+    get_admin_users_page, get_api_keys_admin_page, get_article, get_article_page, get_articles_feed,
     get_articles_feed_page, get_articles_list_page, get_authors_page, get_categories,
     get_categories_admin_page, get_category, get_comments, get_current_user,
     get_drafts_admin_page, get_edit_article_page,
@@ -15,13 +15,13 @@ use crate::routes::{
     get_my_favorites_page, get_newsletter, get_newsletter_stats, get_password_reset_page,
     get_password_reset_request_page, get_privacy, get_profile, get_profile_page, get_register_page,
     get_robots_txt, get_rss_feed,
-    get_sitemap, get_tags, get_tags_admin_page, get_terms, handle_404_simple, health_check,
-    list_api_keys, list_articles, list_media, list_newsletters, list_profiles, list_user_drafts,
+    get_sitemap, get_tags, get_tags_admin_page, get_terms, get_user_admin, handle_404_simple, health_check,
+    list_api_keys, list_articles, list_media, list_newsletters, list_profiles, list_user_drafts, list_users_admin,
     login_user, mobile_upload_article, newsletter_confirmed_page, newsletter_page,
     newsletter_unsubscribed_page, admin_newsletters_page, register_user,
     request_password_reset, search_articles, subscribe, confirm_subscription, unsubscribe,
     unfavorite_article, unfollow_user, update_article, update_category, update_current_user,
-    update_media_metadata, update_newsletter, update_tag, upload_markdown_file, upload_media,
+    update_media_metadata, update_newsletter, update_tag, update_user_admin, upload_markdown_file, upload_media,
     send_newsletter,
 };
 use crate::state::AppState;
@@ -98,6 +98,7 @@ impl App {
             .route("/admin/media", get(get_media_library_page))
             .route("/admin/drafts", get(get_drafts_admin_page))
             .route("/admin/newsletters", get(admin_newsletters_page))
+            .route("/admin/users", get(get_admin_users_page))
             .route("/newsletter", get(newsletter_page))
             .route("/newsletter/confirmed/{token}", get(newsletter_confirmed_page))
             .route("/newsletter/unsubscribed/{token}", get(newsletter_unsubscribed_page))
@@ -168,6 +169,14 @@ impl App {
                     .delete(delete_newsletter),
             )
             .route("/api/admin/newsletters/{id}/send", post(send_newsletter))
+            // Admin user management routes
+            .route("/api/admin/users", get(list_users_admin))
+            .route(
+                "/api/admin/users/{id}",
+                get(get_user_admin)
+                    .put(update_user_admin)
+                    .delete(delete_user_admin),
+            )
             // Password reset routes
             .route("/api/password-reset/request", post(request_password_reset))
             .route("/password-reset/{token}", get(get_password_reset_page))

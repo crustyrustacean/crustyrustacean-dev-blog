@@ -2,6 +2,7 @@
 
 // modules
 pub mod account;
+pub mod admin_users;
 pub mod api_keys;
 pub mod articles;
 pub mod auth;
@@ -23,6 +24,7 @@ pub mod users;
 
 // re-exports
 pub use account::*;
+pub use admin_users::*;
 pub use api_keys::*;
 pub use articles::*;
 pub use auth::*;

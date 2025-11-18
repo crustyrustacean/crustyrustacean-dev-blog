@@ -2,6 +2,7 @@
 
 mod account;
 mod admin_dashboard;
+mod admin_users;
 mod api_keys;
 mod articles;
 mod auth;

@@ -29,6 +29,7 @@ impl DatabaseConnection {
                 password_hash TEXT NOT NULL,
                 bio TEXT,
                 image TEXT,
+                disabled INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -36,6 +37,14 @@ impl DatabaseConnection {
             (),
         )
         .await?;
+
+        // Add disabled column to existing users table (for backward compatibility)
+        let _ = conn.execute(
+            r"ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0",
+            (),
+        )
+        .await;
+        // Ignore error if column already exists
 
         // Create articles table
         conn.execute(
