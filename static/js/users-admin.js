@@ -41,7 +41,7 @@ async function loadUsers() {
         loadingIndicator.style.display = 'block';
         usersList.innerHTML = '';
 
-        const token = localStorage.getItem('authToken');
+        const token = getAuthToken();
         if (!token) {
             window.location.href = '/login';
             return;
@@ -200,7 +200,7 @@ async function saveUser() {
     }
 
     try {
-        const token = localStorage.getItem('authToken');
+        const token = getAuthToken();
         if (!token) {
             window.location.href = '/login';
             return;
@@ -241,7 +241,7 @@ async function toggleUserStatus(id, disabled) {
     }
 
     try {
-        const token = localStorage.getItem('authToken');
+        const token = getAuthToken();
         if (!token) {
             window.location.href = '/login';
             return;
@@ -275,7 +275,7 @@ async function deleteUser() {
     if (!currentUserToDelete) return;
 
     try {
-        const token = localStorage.getItem('authToken');
+        const token = getAuthToken();
         if (!token) {
             window.location.href = '/login';
             return;
