@@ -1,6 +1,7 @@
 // src/lib/routes/mod.rs
 
 // modules
+pub mod account;
 pub mod api_keys;
 pub mod articles;
 pub mod auth;
@@ -21,6 +22,7 @@ pub mod tags;
 pub mod users;
 
 // re-exports
+pub use account::*;
 pub use api_keys::*;
 pub use articles::*;
 pub use auth::*;
