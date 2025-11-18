@@ -1,5 +1,6 @@
 // tests/api/main.rs
 
+mod account;
 mod admin_dashboard;
 mod api_keys;
 mod articles;

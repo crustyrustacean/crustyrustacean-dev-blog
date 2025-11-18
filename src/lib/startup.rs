@@ -6,10 +6,11 @@ use crate::routes::{
     add_comment, change_password, complete_password_reset, create_api_key, create_article,
     create_category, create_newsletter, delete_api_key, delete_article, delete_category,
     delete_comment, delete_media, delete_newsletter, delete_tag, download_media,
-    favorite_article, follow_user, get_about, get_admin_dashboard, get_api_keys_admin_page,
-    get_article, get_article_page, get_articles_feed, get_articles_feed_page,
-    get_articles_list_page, get_authors_page, get_categories, get_categories_admin_page,
-    get_category, get_comments, get_current_user, get_drafts_admin_page, get_edit_article_page,
+    favorite_article, follow_user, get_about, get_account_page, get_admin_dashboard,
+    get_api_keys_admin_page, get_article, get_article_page, get_articles_feed,
+    get_articles_feed_page, get_articles_list_page, get_authors_page, get_categories,
+    get_categories_admin_page, get_category, get_comments, get_current_user,
+    get_drafts_admin_page, get_edit_article_page,
     get_editor_page, get_index, get_login_page, get_media_library_page, get_media_metadata,
     get_my_favorites_page, get_newsletter, get_newsletter_stats, get_password_reset_page,
     get_password_reset_request_page, get_privacy, get_profile, get_profile_page, get_register_page,
@@ -81,6 +82,7 @@ impl App {
             .route("/login", get(get_login_page))
             .route("/register", get(get_register_page))
             .route("/password-reset/request", get(get_password_reset_request_page))
+            .route("/account", get(get_account_page))
             .route("/profiles/{username}", get(get_profile_page))
             .route("/profiles", get(get_authors_page))
             .route("/favorites", get(get_my_favorites_page))
