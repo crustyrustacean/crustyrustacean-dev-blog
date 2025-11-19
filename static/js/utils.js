@@ -4,9 +4,12 @@
  * Get authentication token from localStorage or cookies
  */
 function getAuthToken() {
-    const token = localStorage.getItem('authToken');
-    if (token) return token;
-    
+    // Check localStorage first
+    const localToken = localStorage.getItem('authToken');
+    if (localToken) {
+        return localToken;
+    }
+
     // Fallback to cookies
     const cookies = document.cookie.split(';');
     for (let cookie of cookies) {

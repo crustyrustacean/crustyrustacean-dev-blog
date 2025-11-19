@@ -12,13 +12,14 @@ use axum::{
     response::{Html, IntoResponse},
     Json,
 };
+use chrono::Datelike;
 use validator::Validate;
 
 /// Admin Users Page
 /// GET /admin/users
 pub async fn get_admin_users_page(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state
         .db
@@ -41,12 +42,47 @@ pub async fn get_admin_users_page(
         0
     };
 
+    // Get user info for template
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        serde_json::json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image,
+        })
+    } else {
+        serde_json::json!(null)
+    };
+
     let html = state
         .templates
         .render(
             "admin/users.html",
             &tera::Context::from_serialize(serde_json::json!({
+                "user": user_info,
                 "user_count": user_count,
+                "current_year": chrono::Utc::now().year(),
             }))
             .map_err(|e| AppError::InternalServerError(e.to_string()))?,
         )

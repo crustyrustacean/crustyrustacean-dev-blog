@@ -5,6 +5,7 @@ use axum::{
     extract::State,
     response::{Html, IntoResponse},
 };
+use chrono::Datelike;
 use serde_json::json;
 
 /// Get account settings page
@@ -33,16 +34,25 @@ pub async fn get_account_page(
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
 
+    let user_info = json!({
+        "username": username.clone(),
+        "email": email.clone(),
+        "bio": bio.clone(),
+        "image": image.clone(),
+    });
+
     let template = state
         .templates
         .render(
             "account/settings.html",
             &tera::Context::from_serialize(json!({
+                "user": user_info,
                 "username": username,
                 "email": email,
                 "bio": bio,
                 "image": image,
                 "authenticated": true,
+                "current_year": chrono::Utc::now().year(),
             }))
             .map_err(|e| AppError::InternalServerError(e.to_string()))?,
         )
