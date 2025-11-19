@@ -108,21 +108,8 @@ async fn list_users_api_filters_by_status() {
     let app = spawn_app().await;
 
     let token = app.register_user_default("alice").await;
-    let user2_token = app.register_user_default("bob").await;
+    app.register_user_default("bob").await;
 
-    // Get Bob's user ID
-    let user_response = app
-        .client
-        .get(format!("{}/api/user", &app.address))
-        .header("Authorization", format!("Bearer {}", user2_token))
-        .send()
-        .await
-        .expect("Failed to get user");
-
-    let user_body: serde_json::Value = user_response.json().await.expect("Failed to parse user");
-    // Note: The regular user endpoint doesn't return the ID, so we'll need to get it from the admin list
-
-    // First disable bob via admin API
     // Get all users to find Bob's ID
     let list_response = app
         .client
