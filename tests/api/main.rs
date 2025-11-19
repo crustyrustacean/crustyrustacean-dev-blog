@@ -12,6 +12,7 @@ mod categories;
 mod comments;
 mod cookie_persistence;
 mod drafts;
+mod full_auth_flow;
 mod favorites;
 mod feed;
 mod feed_page;

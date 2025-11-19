@@ -125,6 +125,11 @@
 <script>
 const authToken = getAuthToken();
 
+// Redirect to login if no auth token found
+if (!authToken) {
+    window.location.href = '/login';
+}
+
 async function loadStats() {
     try {
         const response = await fetch('/api/admin/newsletters/stats', {
