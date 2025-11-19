@@ -30,6 +30,7 @@ impl DatabaseConnection {
                 bio TEXT,
                 image TEXT,
                 disabled INTEGER NOT NULL DEFAULT 0,
+                role TEXT NOT NULL DEFAULT 'subscriber',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -41,6 +42,14 @@ impl DatabaseConnection {
         // Add disabled column to existing users table (for backward compatibility)
         let _ = conn.execute(
             r"ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0",
+            (),
+        )
+        .await;
+        // Ignore error if column already exists
+
+        // Add role column to existing users table (for backward compatibility)
+        let _ = conn.execute(
+            r"ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'subscriber'",
             (),
         )
         .await;

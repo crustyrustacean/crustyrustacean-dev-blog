@@ -2,7 +2,7 @@
 
 use crate::{
     AppError, AppState,
-    auth::{ApiKeyUser, AuthenticatedUser, OptionalUser},
+    auth::{ApiKeyUser, AuthenticatedUser, AuthorUser, OptionalUser},
     markdown::markdown_to_html,
     models::{
         ArticleQuery, ArticleResponse, CreateArticle, FeedQuery, MultipleArticlesResponse,
@@ -137,7 +137,7 @@ async fn associate_tags_with_article(
 
 pub async fn create_article(
     State(state): State<AppState>,
-    user: AuthenticatedUser,
+    user: AuthorUser,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<(StatusCode, Json<SingleArticleResponse>), AppError> {
     let article_data: CreateArticle = serde_json::from_value(
@@ -750,7 +750,7 @@ pub async fn get_admin_dashboard(
 
 pub async fn update_article(
     State(state): State<AppState>,
-    user: AuthenticatedUser,
+    user: AuthorUser,
     Path(slug): Path<String>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<SingleArticleResponse>, AppError> {
@@ -916,12 +916,17 @@ pub async fn update_article(
     }
 
     // Return the updated article
-    get_article(State(state), Path(slug), OptionalUser { user: Some(user) }).await
+    // Convert AuthorUser to AuthenticatedUser for get_article
+    let auth_user = AuthenticatedUser {
+        user_id: user.user_id,
+        role: user.role,
+    };
+    get_article(State(state), Path(slug), OptionalUser { user: Some(auth_user) }).await
 }
 
 pub async fn delete_article(
     State(state): State<AppState>,
-    user: AuthenticatedUser,
+    user: AuthorUser,
     Path(slug): Path<String>,
 ) -> Result<StatusCode, AppError> {
     let conn = state

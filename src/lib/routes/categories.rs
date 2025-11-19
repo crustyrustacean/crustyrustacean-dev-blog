@@ -2,7 +2,7 @@
 
 use crate::{
     AppError, AppState,
-    auth::AuthenticatedUser,
+    auth::{AuthenticatedUser, AuthorUser},
     models::{CategoriesResponse, CategoryResponse, CreateCategory, SingleCategoryResponse, UpdateCategory},
 };
 use axum::{
@@ -81,7 +81,7 @@ pub async fn get_categories(State(state): State<AppState>) -> Result<Json<Catego
 /// POST /api/categories - Create a new category
 pub async fn create_category(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    _user: AuthorUser,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<(StatusCode, Json<SingleCategoryResponse>), AppError> {
     let create_data: CreateCategory = serde_json::from_value(
@@ -208,7 +208,7 @@ pub async fn get_category(
 pub async fn update_category(
     State(state): State<AppState>,
     Path(old_slug): Path<String>,
-    _user: AuthenticatedUser,
+    _user: AuthorUser,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<SingleCategoryResponse>, AppError> {
     let update_data: UpdateCategory = serde_json::from_value(
@@ -318,7 +318,7 @@ pub async fn update_category(
 pub async fn delete_category(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-    _user: AuthenticatedUser,
+    _user: AuthorUser,
 ) -> Result<StatusCode, AppError> {
     let conn = state
         .db

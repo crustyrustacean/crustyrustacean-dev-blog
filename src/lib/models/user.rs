@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
+use super::Role;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
@@ -14,6 +16,7 @@ pub struct User {
     pub bio: Option<String>,
     pub image: Option<String>,
     pub disabled: bool,
+    pub role: Role,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -67,6 +70,7 @@ pub struct UserData {
     pub username: String,
     pub bio: Option<String>,
     pub image: Option<String>,
+    pub role: Role,
 }
 
 #[derive(Debug, Serialize)]
@@ -118,6 +122,7 @@ pub struct AdminUserData {
     pub bio: Option<String>,
     pub image: Option<String>,
     pub disabled: bool,
+    pub role: Role,
     pub created_at: String,
     pub article_count: i32,
 }
@@ -144,6 +149,7 @@ pub struct AdminUserUpdate {
     pub bio: Option<String>,
     pub image: Option<String>,
     pub disabled: Option<bool>,
+    pub role: Option<Role>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
