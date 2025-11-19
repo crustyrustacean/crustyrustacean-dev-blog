@@ -1,7 +1,7 @@
 // tests/api/auth_navigation.rs
 // Tests for authentication during browser navigation (using cookies)
 
-use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::helpers::spawn_app;
 
 #[tokio::test]
 async fn navigation_to_admin_users_with_cookie_auth() {
