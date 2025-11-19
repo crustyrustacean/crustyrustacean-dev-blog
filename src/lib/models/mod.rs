@@ -7,6 +7,7 @@ pub mod category;
 pub mod comment;
 pub mod media;
 pub mod newsletter;
+pub mod role;
 pub mod tag;
 pub mod user;
 
@@ -17,5 +18,6 @@ pub use category::*;
 pub use comment::*;
 pub use media::*;
 pub use newsletter::*;
+pub use role::*;
 pub use tag::*;
 pub use user::*;

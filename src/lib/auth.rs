@@ -70,6 +70,7 @@ impl From<AuthError> for AppError {
 #[derive(Clone)]
 pub struct AuthenticatedUser {
     pub user_id: Uuid,
+    pub role: crate::models::Role,
 }
 
 // Optional authentication - doesn't fail if no token present
@@ -109,7 +110,33 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         let user_id =
             Uuid::parse_str(&token_data.claims.sub).map_err(|_| AuthError::InvalidToken)?;
 
-        Ok(AuthenticatedUser { user_id })
+        // Fetch user role from database
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let row = conn
+            .query(
+                "SELECT role FROM users WHERE id = ? AND disabled = 0",
+                libsql::params![user_id.to_string()],
+            )
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .next()
+            .await
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .ok_or(AuthError::InvalidToken)?;
+
+        let role_str: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+        let role = role_str
+            .parse::<crate::models::Role>()
+            .map_err(|_| AppError::InternalServerError("Invalid role in database".to_string()))?;
+
+        Ok(AuthenticatedUser { user_id, role })
     }
 }
 
@@ -188,6 +215,63 @@ pub fn hash_api_key(key: &str) -> Result<String, AuthError> {
 
 pub fn verify_api_key(key: &str, hash: &str) -> Result<bool, AuthError> {
     verify_password(key, hash)
+}
+
+// Role-based authentication extractors
+#[derive(Clone)]
+pub struct AdminUser {
+    pub user_id: Uuid,
+    pub role: crate::models::Role,
+}
+
+impl FromRequestParts<crate::AppState> for AdminUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+
+        if !user.role.is_admin() {
+            return Err(AppError::Forbidden(
+                "Admin access required".to_string(),
+            ));
+        }
+
+        Ok(AdminUser {
+            user_id: user.user_id,
+            role: user.role,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct AuthorUser {
+    pub user_id: Uuid,
+    pub role: crate::models::Role,
+}
+
+impl FromRequestParts<crate::AppState> for AuthorUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+
+        if !user.role.is_author() {
+            return Err(AppError::Forbidden(
+                "Author access required".to_string(),
+            ));
+        }
+
+        Ok(AuthorUser {
+            user_id: user.user_id,
+            role: user.role,
+        })
+    }
 }
 
 // Extractor for API key authentication

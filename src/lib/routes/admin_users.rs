@@ -1,9 +1,9 @@
 // src/lib/routes/admin_users.rs
 
 use crate::{
-    auth::AuthenticatedUser,
+    auth::{AdminUser, AuthenticatedUser},
     errors::AppError,
-    models::{AdminUserData, AdminUserUpdate, AdminUsersQuery, AdminUsersResponse, AdminUserResponse},
+    models::{AdminUserData, AdminUserUpdate, AdminUsersQuery, AdminUsersResponse, AdminUserResponse, Role},
     response::ApiResponse,
     state::AppState,
 };
@@ -95,7 +95,7 @@ pub async fn get_admin_users_page(
 /// GET /api/admin/users?search=query&status=active&limit=20&offset=0
 pub async fn list_users_admin(
     State(state): State<AppState>,
-    _user: AuthenticatedUser, // Require authentication
+    _user: AdminUser, // Require admin authentication
     Query(query): Query<AdminUsersQuery>,
 ) -> Result<Json<ApiResponse<AdminUsersResponse>>, AppError> {
     let conn = state
@@ -133,7 +133,7 @@ pub async fn list_users_admin(
 
     // Fetch users with article count
     let query_str = format!(
-        "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.created_at,
+        "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.role, u.created_at,
                 COUNT(a.id) as article_count
          FROM users u
          LEFT JOIN articles a ON u.id = a.author_id
@@ -168,6 +168,11 @@ pub async fn list_users_admin(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
     {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
+        let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
+        let role = role_str
+            .parse::<Role>()
+            .unwrap_or(Role::Subscriber);
+
         users.push(AdminUserData {
             id: row.get(0).unwrap(),
             username: row.get(1).unwrap(),
@@ -175,8 +180,9 @@ pub async fn list_users_admin(
             bio: row.get(3).ok(),
             image: row.get(4).ok(),
             disabled: disabled_int != 0,
-            created_at: row.get(6).unwrap(),
-            article_count: row.get::<i32>(7).unwrap_or(0),
+            role,
+            created_at: row.get(7).unwrap(),
+            article_count: row.get::<i32>(8).unwrap_or(0),
         });
     }
 
@@ -217,7 +223,7 @@ pub async fn list_users_admin(
 /// GET /api/admin/users/:id
 pub async fn get_user_admin(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    _user: AdminUser,
     Path(id): Path<String>,
 ) -> Result<Json<ApiResponse<AdminUserResponse>>, AppError> {
     let conn = state
@@ -227,7 +233,7 @@ pub async fn get_user_admin(
 
     let mut rows = conn
         .query(
-            "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.created_at,
+            "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.role, u.created_at,
                     COUNT(a.id) as article_count
              FROM users u
              LEFT JOIN articles a ON u.id = a.author_id
@@ -244,6 +250,11 @@ pub async fn get_user_admin(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?
     {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
+        let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
+        let role = role_str
+            .parse::<Role>()
+            .unwrap_or(Role::Subscriber);
+
         let user_data = AdminUserData {
             id: row.get(0).unwrap(),
             username: row.get(1).unwrap(),
@@ -251,8 +262,9 @@ pub async fn get_user_admin(
             bio: row.get(3).ok(),
             image: row.get(4).ok(),
             disabled: disabled_int != 0,
-            created_at: row.get(6).unwrap(),
-            article_count: row.get::<i32>(7).unwrap_or(0),
+            role,
+            created_at: row.get(7).unwrap(),
+            article_count: row.get::<i32>(8).unwrap_or(0),
         };
 
         Ok(Json(ApiResponse::success(AdminUserResponse {
@@ -267,7 +279,7 @@ pub async fn get_user_admin(
 /// PUT /api/admin/users/:id
 pub async fn update_user_admin(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    _user: AdminUser,
     Path(id): Path<String>,
     Json(payload): Json<AdminUserUpdate>,
 ) -> Result<Json<ApiResponse<AdminUserResponse>>, AppError> {
@@ -329,6 +341,10 @@ pub async fn update_user_admin(
         updates.push("disabled = ?");
         params.push(libsql::Value::Integer(if disabled { 1 } else { 0 }));
     }
+    if let Some(role) = &payload.role {
+        updates.push("role = ?");
+        params.push(libsql::Value::Text(role.to_string()));
+    }
 
     if updates.is_empty() {
         return Err(AppError::BadRequest("No fields to update".to_string()));
@@ -367,7 +383,7 @@ pub async fn update_user_admin(
 /// DELETE /api/admin/users/:id
 pub async fn delete_user_admin(
     State(state): State<AppState>,
-    current_user: AuthenticatedUser,
+    current_user: AdminUser,
     Path(id): Path<String>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     // Prevent admin from deleting themselves
