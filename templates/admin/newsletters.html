@@ -121,8 +121,14 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ versioned_asset(path='/static/js/utils.js') }}"></script>
 <script>
-const authToken = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1];
+const authToken = getAuthToken();
+
+// Redirect to login if no auth token found
+if (!authToken) {
+    window.location.href = '/login';
+}
 
 async function loadStats() {
     try {

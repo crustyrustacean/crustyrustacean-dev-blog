@@ -141,10 +141,10 @@ class AuthManager {
      */
     storeAuthToken(token) {
         if (!token) return;
-        
+
         // Store in localStorage
         localStorage.setItem('authToken', token);
-        
+
         // Store in cookie with 24 hour expiration
         const expires = new Date();
         expires.setTime(expires.getTime() + (24 * 60 * 60 * 1000)); // 24 hours

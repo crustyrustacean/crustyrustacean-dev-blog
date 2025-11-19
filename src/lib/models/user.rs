@@ -13,6 +13,7 @@ pub struct User {
     pub password_hash: String,
     pub bio: Option<String>,
     pub image: Option<String>,
+    pub disabled: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -105,4 +106,50 @@ pub struct ChangePasswordRequest {
     pub current_password: String,
     #[validate(length(min = 6))]
     pub new_password: String,
+}
+
+// Admin user management models
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminUserData {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub bio: Option<String>,
+    pub image: Option<String>,
+    pub disabled: bool,
+    pub created_at: String,
+    pub article_count: i32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminUsersResponse {
+    pub users: Vec<AdminUserData>,
+    pub users_count: i32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminUserResponse {
+    pub user: AdminUserData,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct AdminUserUpdate {
+    #[validate(length(min = 3, max = 50))]
+    pub username: Option<String>,
+    #[validate(email)]
+    pub email: Option<String>,
+    pub bio: Option<String>,
+    pub image: Option<String>,
+    pub disabled: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AdminUsersQuery {
+    pub search: Option<String>,
+    pub status: Option<String>, // "active", "disabled", or "all"
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
 }

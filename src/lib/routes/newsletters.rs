@@ -14,7 +14,7 @@ use axum::{
     response::{Html, IntoResponse},
     Json,
 };
-use chrono::Utc;
+use chrono::{Datelike, Utc};
 use libsql::params;
 use serde_json::json;
 use uuid::Uuid;
@@ -652,11 +652,51 @@ pub async fn newsletter_unsubscribed_page(
 /// Admin newsletter management page
 /// GET /admin/newsletters
 pub async fn admin_newsletters_page(
-    _auth_user: AuthenticatedUser,
+    auth_user: AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<Html<String>, AppError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // Get user info for template
+    let mut user_rows = conn
+        .query(
+            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            libsql::params![auth_user.user_id.to_string()],
+        )
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let user_info = if let Some(row) = user_rows
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+    {
+        let username: String = row
+            .get(0)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let email: String = row
+            .get(1)
+            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        let bio: Option<String> = row.get(2).ok();
+        let image: Option<String> = row.get(3).ok();
+
+        serde_json::json!({
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image,
+        })
+    } else {
+        serde_json::json!(null)
+    };
+
     let mut context = tera::Context::new();
     context.insert("title", "Newsletter Management");
+    context.insert("user", &user_info);
+    context.insert("current_year", &chrono::Utc::now().year());
 
     let html = state
         .templates

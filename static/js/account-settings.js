@@ -2,7 +2,7 @@
 (function() {
     'use strict';
 
-    const authToken = localStorage.getItem('authToken');
+    const authToken = getAuthToken();
     if (!authToken) {
         window.location.href = '/login';
         return;
