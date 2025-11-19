@@ -1,6 +1,6 @@
 // tests/api/media.rs
 
-use crate::helpers::{TestUserBuilder, spawn_app};
+use crate::helpers::{TestUserBuilder, TestFixture, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::{
     StatusCode,
@@ -15,10 +15,14 @@ use serde_json::{Value, json};
 #[tokio::test]
 async fn upload_media_succeeds_with_valid_image() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("testuser", "test@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("testuser")
+        .await
+        .promote_to_author("testuser")
         .await;
+
+    let token = fixture.get_token("testuser");
 
     // Create a simple 1x1 PNG image (smallest possible PNG)
     let png_bytes = vec![
@@ -37,9 +41,9 @@ async fn upload_media_succeeds_with_valid_image() {
     let form = Form::new().part("file", part);
 
     // Act
-    let response = app
+    let response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -62,10 +66,14 @@ async fn upload_media_succeeds_with_valid_image() {
 #[tokio::test]
 async fn upload_media_with_metadata() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("metauser", "meta@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("metauser")
+        .await
+        .promote_to_author("metauser")
         .await;
+
+    let token = fixture.get_token("metauser");
 
     let png_bytes = vec![
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
@@ -88,9 +96,9 @@ async fn upload_media_with_metadata() {
         .text("description", "This is a test image upload with metadata");
 
     // Act
-    let response = app
+    let response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -113,10 +121,14 @@ async fn upload_media_with_metadata() {
 #[tokio::test]
 async fn upload_media_fails_with_non_image_file() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("textuser", "text@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("textuser")
+        .await
+        .promote_to_author("textuser")
         .await;
+
+    let token = fixture.get_token("textuser");
 
     let part = Part::text("not an image")
         .file_name("test.txt")
@@ -126,9 +138,9 @@ async fn upload_media_fails_with_non_image_file() {
     let form = Form::new().part("file", part);
 
     // Act
-    let response = app
+    let response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -175,17 +187,21 @@ async fn upload_media_fails_without_authentication() {
 #[tokio::test]
 async fn upload_media_fails_with_no_file() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("nofile", "nofile@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("nofile")
+        .await
+        .promote_to_author("nofile")
         .await;
+
+    let token = fixture.get_token("nofile");
 
     let form = Form::new();
 
     // Act
-    let response = app
+    let response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -203,10 +219,14 @@ async fn upload_media_fails_with_no_file() {
 #[tokio::test]
 async fn list_media_returns_users_media() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("listuser", "list@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("listuser")
+        .await
+        .promote_to_author("listuser")
         .await;
+
+    let token = fixture.get_token("listuser");
 
     // Upload a test image first
     let png_bytes = vec![
@@ -224,9 +244,9 @@ async fn list_media_returns_users_media() {
 
     let form = Form::new().part("file", part);
 
-    let _ = app
+    let _ = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -234,7 +254,7 @@ async fn list_media_returns_users_media() {
         .expect("Failed to upload media");
 
     // Act
-    let response = bearer_request!(get & app, format!("{}/api/media", &app.address), &token)
+    let response = bearer_request!(get & fixture.app, format!("{}/api/media", &fixture.app.address), &token)
         .expect("Failed to execute request");
 
     // Assert
@@ -297,10 +317,14 @@ async fn list_media_with_pagination() {
 #[tokio::test]
 async fn get_media_metadata_succeeds_for_owner() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("metaowner", "metaowner@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("metaowner")
+        .await
+        .promote_to_author("metaowner")
         .await;
+
+    let token = fixture.get_token("metaowner");
 
     // Upload media
     let png_bytes = vec![
@@ -318,9 +342,9 @@ async fn get_media_metadata_succeeds_for_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -332,8 +356,8 @@ async fn get_media_metadata_succeeds_for_owner() {
 
     // Act
     let response = bearer_request!(
-        get & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        get & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token
     )
     .expect("Failed to execute request");
@@ -350,13 +374,19 @@ async fn get_media_metadata_succeeds_for_owner() {
 #[tokio::test]
 async fn get_media_metadata_fails_for_non_owner() {
     // Arrange
-    let app = spawn_app().await;
-    let owner_token = app
-        .register_user("owner", "owner@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("owner")
+        .await
+        .with_user_default("other")
+        .await
+        .promote_to_author("owner")
+        .await
+        .promote_to_author("other")
         .await;
-    let other_token = app
-        .register_user("other", "other@example.com", "password123")
-        .await;
+
+    let owner_token = fixture.get_token("owner");
+    let other_token = fixture.get_token("other");
 
     // Owner uploads media
     let png_bytes = vec![
@@ -374,9 +404,9 @@ async fn get_media_metadata_fails_for_non_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .multipart(form)
         .send()
@@ -388,8 +418,8 @@ async fn get_media_metadata_fails_for_non_owner() {
 
     // Act - other user tries to access
     let response = bearer_request!(
-        get & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        get & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &other_token
     )
     .expect("Failed to execute request");
@@ -426,10 +456,14 @@ async fn get_media_metadata_fails_for_nonexistent_media() {
 #[tokio::test]
 async fn update_media_metadata_succeeds() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("updater", "updater@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("updater")
+        .await
+        .promote_to_author("updater")
         .await;
+
+    let token = fixture.get_token("updater");
 
     // Upload media
     let png_bytes = vec![
@@ -447,9 +481,9 @@ async fn update_media_metadata_succeeds() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -468,8 +502,8 @@ async fn update_media_metadata_succeeds() {
     });
 
     let response = bearer_request!(
-        put & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        put & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token,
         update_data
     )
@@ -488,13 +522,19 @@ async fn update_media_metadata_succeeds() {
 #[tokio::test]
 async fn update_media_metadata_fails_for_non_owner() {
     // Arrange
-    let app = spawn_app().await;
-    let owner_token = app
-        .register_user("metaowner2", "metaowner2@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("metaowner2")
+        .await
+        .with_user_default("metaother")
+        .await
+        .promote_to_author("metaowner2")
+        .await
+        .promote_to_author("metaother")
         .await;
-    let other_token = app
-        .register_user("metaother", "metaother@example.com", "password123")
-        .await;
+
+    let owner_token = fixture.get_token("metaowner2");
+    let other_token = fixture.get_token("metaother");
 
     // Owner uploads media
     let png_bytes = vec![
@@ -512,9 +552,9 @@ async fn update_media_metadata_fails_for_non_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .multipart(form)
         .send()
@@ -530,8 +570,8 @@ async fn update_media_metadata_fails_for_non_owner() {
     });
 
     let response = bearer_request!(
-        put & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        put & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &other_token,
         update_data
     )
@@ -548,10 +588,14 @@ async fn update_media_metadata_fails_for_non_owner() {
 #[tokio::test]
 async fn delete_media_succeeds_for_owner() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("deleter", "deleter@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("deleter")
+        .await
+        .promote_to_author("deleter")
         .await;
+
+    let token = fixture.get_token("deleter");
 
     // Upload media
     let png_bytes = vec![
@@ -569,9 +613,9 @@ async fn delete_media_succeeds_for_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -583,8 +627,8 @@ async fn delete_media_succeeds_for_owner() {
 
     // Act
     let response = bearer_request!(
-        delete & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        delete & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token
     )
     .expect("Failed to execute request");
@@ -594,8 +638,8 @@ async fn delete_media_succeeds_for_owner() {
 
     // Verify media is gone
     let get_response = bearer_request!(
-        get & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        get & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token
     )
     .expect("Failed to execute get request");
@@ -606,13 +650,19 @@ async fn delete_media_succeeds_for_owner() {
 #[tokio::test]
 async fn delete_media_fails_for_non_owner() {
     // Arrange
-    let app = spawn_app().await;
-    let owner_token = app
-        .register_user("delowner", "delowner@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("delowner")
+        .await
+        .with_user_default("delother")
+        .await
+        .promote_to_author("delowner")
+        .await
+        .promote_to_author("delother")
         .await;
-    let other_token = app
-        .register_user("delother", "delother@example.com", "password123")
-        .await;
+
+    let owner_token = fixture.get_token("delowner");
+    let other_token = fixture.get_token("delother");
 
     // Owner uploads media
     let png_bytes = vec![
@@ -630,9 +680,9 @@ async fn delete_media_fails_for_non_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .multipart(form)
         .send()
@@ -644,8 +694,8 @@ async fn delete_media_fails_for_non_owner() {
 
     // Act - other user tries to delete
     let response = bearer_request!(
-        delete & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        delete & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &other_token
     )
     .expect("Failed to execute request");
@@ -682,10 +732,14 @@ async fn delete_media_fails_for_nonexistent_media() {
 #[tokio::test]
 async fn download_media_succeeds() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("downloader", "downloader@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("downloader")
+        .await
+        .promote_to_author("downloader")
         .await;
+
+    let token = fixture.get_token("downloader");
 
     let png_bytes = vec![
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
@@ -702,9 +756,9 @@ async fn download_media_succeeds() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -715,9 +769,9 @@ async fn download_media_succeeds() {
     let media_id = upload_body["media"]["id"].as_str().unwrap();
 
     // Act
-    let response = app
+    let response = fixture.app
         .client
-        .get(format!("{}/api/media/{}/download", &app.address, media_id))
+        .get(format!("{}/api/media/{}/download", &fixture.app.address, media_id))
         .send()
         .await
         .expect("Failed to execute request");
@@ -755,10 +809,14 @@ async fn download_media_fails_for_nonexistent_media() {
 #[tokio::test]
 async fn complete_media_lifecycle_workflow() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app
-        .register_user("lifecycle", "lifecycle@example.com", "password123")
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("lifecycle")
+        .await
+        .promote_to_author("lifecycle")
         .await;
+
+    let token = fixture.get_token("lifecycle");
 
     let png_bytes = vec![
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
@@ -778,9 +836,9 @@ async fn complete_media_lifecycle_workflow() {
         .part("file", part)
         .text("title", "Lifecycle Test");
 
-    let upload_response = app
+    let upload_response = fixture.app
         .client
-        .post(format!("{}/api/media", &app.address))
+        .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()
@@ -792,7 +850,7 @@ async fn complete_media_lifecycle_workflow() {
     let media_id = upload_body["media"]["id"].as_str().unwrap();
 
     // Step 2: List and verify it's there
-    let list_response = bearer_request!(get & app, format!("{}/api/media", &app.address), &token)
+    let list_response = bearer_request!(get & fixture.app, format!("{}/api/media", &fixture.app.address), &token)
         .expect("Failed to list");
 
     assert_status!(list_response, StatusCode::OK);
@@ -801,8 +859,8 @@ async fn complete_media_lifecycle_workflow() {
 
     // Step 3: Get metadata
     let meta_response = bearer_request!(
-        get & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        get & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token
     )
     .expect("Failed to get metadata");
@@ -816,8 +874,8 @@ async fn complete_media_lifecycle_workflow() {
     });
 
     let update_response = bearer_request!(
-        put & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        put & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token,
         update_data
     )
@@ -828,9 +886,9 @@ async fn complete_media_lifecycle_workflow() {
     assert_eq!(update_body["media"]["title"], "Updated Lifecycle Test");
 
     // Step 5: Download
-    let download_response = app
+    let download_response = fixture.app
         .client
-        .get(format!("{}/api/media/{}/download", &app.address, media_id))
+        .get(format!("{}/api/media/{}/download", &fixture.app.address, media_id))
         .send()
         .await
         .expect("Failed to download");
@@ -844,8 +902,8 @@ async fn complete_media_lifecycle_workflow() {
 
     // Step 6: Delete
     let delete_response = bearer_request!(
-        delete & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        delete & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token
     )
     .expect("Failed to delete");
@@ -854,8 +912,8 @@ async fn complete_media_lifecycle_workflow() {
 
     // Step 7: Verify it's gone
     let verify_response = bearer_request!(
-        get & app,
-        format!("{}/api/media/{}", &app.address, media_id),
+        get & fixture.app,
+        format!("{}/api/media/{}", &fixture.app.address, media_id),
         &token
     )
     .expect("Failed to verify deletion");
