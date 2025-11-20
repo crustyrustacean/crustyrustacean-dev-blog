@@ -82,6 +82,7 @@
                                 <tr>
                                     <th>Username</th>
                                     <th>Email</th>
+                                    <th>Role</th>
                                     <th>Articles</th>
                                     <th>Created</th>
                                     <th>Status</th>
@@ -122,6 +123,21 @@
                     <div class="mb-3">
                         <label for="editEmail" class="form-label">Email *</label>
                         <input type="email" class="form-control" id="editEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRole" class="form-label">Role *</label>
+                        <select class="form-select" id="editRole" required>
+                            <option value="subscriber">Subscriber</option>
+                            <option value="author">Author</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <div class="form-text">
+                            <small>
+                                <strong>Subscriber:</strong> Can read and comment<br>
+                                <strong>Author:</strong> Can create articles and manage media<br>
+                                <strong>Admin:</strong> Full access including user management
+                            </small>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="editBio" class="form-label">Bio</label>

@@ -1,8 +1,8 @@
 // tests/api/newsletters.rs
 
-use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::helpers::{TestUserBuilder, spawn_app};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_subscribe_to_newsletter_success() {
@@ -28,7 +28,10 @@ async fn test_subscribe_to_newsletter_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["data"]["message"], "Please check your email to confirm your subscription.");
+    assert_eq!(
+        response_body["data"]["message"],
+        "Please check your email to confirm your subscription."
+    );
     assert_eq!(response_body["data"]["email"], "subscriber@example.com");
 }
 
@@ -91,7 +94,12 @@ async fn test_subscribe_duplicate_email_returns_success() {
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
     // Should receive confirmation message
-    assert!(response_body["data"]["message"].as_str().unwrap().contains("confirmation"));
+    assert!(
+        response_body["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("confirmation")
+    );
 }
 
 #[tokio::test]
@@ -125,14 +133,21 @@ async fn test_confirm_subscription_success() {
             .await
             .expect("Failed to query database");
 
-        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        let row = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No subscriber found");
         row.get::<String>(0).expect("Failed to get token")
     }; // Connection is dropped here
 
     // Act - Confirm subscription
     let response = app
         .client
-        .post(format!("{}/api/newsletters/confirm/{}", &app.address, token))
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, token
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -141,7 +156,10 @@ async fn test_confirm_subscription_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["data"]["message"], "Thank you! Your subscription has been confirmed.");
+    assert_eq!(
+        response_body["data"]["message"],
+        "Thank you! Your subscription has been confirmed."
+    );
     assert_eq!(response_body["data"]["email"], "confirm@example.com");
 }
 
@@ -154,7 +172,10 @@ async fn test_confirm_subscription_with_invalid_token_fails() {
     // Act
     let response = app
         .client
-        .post(format!("{}/api/newsletters/confirm/{}", &app.address, invalid_token))
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, invalid_token
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -193,14 +214,21 @@ async fn test_confirm_already_confirmed_subscription() {
             .await
             .expect("Failed to query database");
 
-        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        let row = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No subscriber found");
         row.get::<String>(0).expect("Failed to get token")
     }; // Connection is dropped here
 
     // First confirmation
     let _ = app
         .client
-        .post(format!("{}/api/newsletters/confirm/{}", &app.address, token))
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, token
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -208,7 +236,10 @@ async fn test_confirm_already_confirmed_subscription() {
     // Act - Second confirmation
     let response = app
         .client
-        .post(format!("{}/api/newsletters/confirm/{}", &app.address, token))
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, token
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -217,7 +248,10 @@ async fn test_confirm_already_confirmed_subscription() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["data"]["message"], "Your subscription is already confirmed!");
+    assert_eq!(
+        response_body["data"]["message"],
+        "Your subscription is already confirmed!"
+    );
 }
 
 #[tokio::test]
@@ -250,14 +284,21 @@ async fn test_unsubscribe_success() {
             .await
             .expect("Failed to query database");
 
-        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        let row = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No subscriber found");
         row.get::<String>(0).expect("Failed to get token")
     }; // Connection is dropped here
 
     // Act - Unsubscribe
     let response = app
         .client
-        .post(format!("{}/api/newsletters/unsubscribe/{}", &app.address, token))
+        .post(format!(
+            "{}/api/newsletters/unsubscribe/{}",
+            &app.address, token
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -266,7 +307,10 @@ async fn test_unsubscribe_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["data"]["message"], "You have been successfully unsubscribed from our newsletter.");
+    assert_eq!(
+        response_body["data"]["message"],
+        "You have been successfully unsubscribed from our newsletter."
+    );
 }
 
 #[tokio::test]
@@ -278,7 +322,10 @@ async fn test_unsubscribe_with_invalid_token_fails() {
     // Act
     let response = app
         .client
-        .post(format!("{}/api/newsletters/unsubscribe/{}", &app.address, invalid_token))
+        .post(format!(
+            "{}/api/newsletters/unsubscribe/{}",
+            &app.address, invalid_token
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -339,7 +386,10 @@ async fn test_create_newsletter_success() {
     assert_eq!(response.status(), StatusCode::CREATED);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert_eq!(response_body["data"]["message"], "Newsletter created successfully");
+    assert_eq!(
+        response_body["data"]["message"],
+        "Newsletter created successfully"
+    );
     assert!(response_body["data"]["id"].is_string());
 }
 
@@ -474,13 +524,20 @@ async fn test_send_newsletter_success() {
             .await
             .expect("Failed to query database");
 
-        let row = rows.next().await.expect("Failed to get row").expect("No subscriber found");
+        let row = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No subscriber found");
         row.get::<String>(0).expect("Failed to get token")
     }; // Connection is dropped here
 
     let _ = app
         .client
-        .post(format!("{}/api/newsletters/confirm/{}", &app.address, confirm_token))
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, confirm_token
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -502,13 +559,19 @@ async fn test_send_newsletter_success() {
         .await
         .expect("Failed to execute request");
 
-    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let create_body: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let newsletter_id = create_body["data"]["id"].as_str().unwrap();
 
     // Act - Send newsletter
     let response = app
         .client
-        .post(format!("{}/api/admin/newsletters/{}/send", &app.address, newsletter_id))
+        .post(format!(
+            "{}/api/admin/newsletters/{}/send",
+            &app.address, newsletter_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -518,7 +581,12 @@ async fn test_send_newsletter_success() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: Value = response.json().await.expect("Failed to parse response");
 
-    assert!(response_body["data"]["message"].as_str().unwrap().contains("sent to 1 subscribers"));
+    assert!(
+        response_body["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("sent to 1 subscribers")
+    );
     assert_eq!(response_body["data"]["recipient_count"], 1);
 }
 

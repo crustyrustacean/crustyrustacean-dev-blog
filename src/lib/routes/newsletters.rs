@@ -2,17 +2,17 @@
 
 use crate::auth::AuthenticatedUser;
 use crate::errors::AppError;
-use crate::state::AppState;
 use crate::models::{
     CreateNewsletterIssue, NewsletterIssueResponse, NewsletterStats, SubscribeRequest,
     UpdateNewsletterIssue,
 };
 use crate::response::ApiResponse;
+use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::{Html, IntoResponse},
-    Json,
 };
 use chrono::{Datelike, Utc};
 use libsql::params;
@@ -698,9 +698,7 @@ pub async fn admin_newsletters_page(
     context.insert("user", &user_info);
     context.insert("current_year", &chrono::Utc::now().year());
 
-    let html = state
-        .templates
-        .render("admin/newsletters.html", &context)?;
+    let html = state.templates.render("admin/newsletters.html", &context)?;
 
     Ok(Html(html))
 }

@@ -4,7 +4,7 @@ use crate::{
     AppError, AppState,
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
     models::{
-        ProfileResponse, ProfilesQuery, ProfilesResponse, UserData, UserLogin, UserProfile,
+        ProfileResponse, ProfilesQuery, ProfilesResponse, Role, UserData, UserLogin, UserProfile,
         UserRegistration, UserResponse, UserUpdate,
     },
 };
@@ -57,17 +57,41 @@ pub async fn register_user(
         ));
     }
 
+    // Check if this is the first user (for admin assignment)
+    let mut count_row = conn
+        .query("SELECT COUNT(*) FROM users", ())
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let row = count_row
+        .next()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .ok_or_else(|| AppError::InternalServerError("Failed to count users".to_string()))?;
+
+    let user_count: i64 = row
+        .get(0)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    // First user gets admin role, all others get subscriber role
+    let role = if user_count == 0 {
+        Role::Admin
+    } else {
+        Role::Subscriber
+    };
+
     let user_id = Uuid::new_v4();
     let password_hash = hash_password(&user_data.password)?;
     let now = Utc::now();
 
     conn.execute(
-        "INSERT INTO users (id, username, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO users (id, username, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
         libsql::params![
             user_id.to_string(),
             user_data.username.clone(),
             user_data.email.clone(),
             password_hash,
+            role.to_string(),
             now.to_rfc3339(),
             now.to_rfc3339(),
         ],
@@ -84,6 +108,7 @@ pub async fn register_user(
             username: user_data.username,
             bio: None,
             image: None,
+            role,
         },
     };
 
@@ -113,7 +138,7 @@ pub async fn login_user(
 
     let mut rows = conn
         .query(
-            "SELECT id, username, email, password_hash, bio, image FROM users WHERE email = ?",
+            "SELECT id, username, email, password_hash, bio, image, role FROM users WHERE email = ?",
             libsql::params![login_data.email],
         )
         .await
@@ -139,6 +164,13 @@ pub async fn login_user(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let bio: Option<String> = row.get(4).ok();
     let image: Option<String> = row.get(5).ok();
+    let role_str: String = row
+        .get(6)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let role = role_str
+        .parse::<Role>()
+        .map_err(|_| AppError::InternalServerError("Invalid role in database".to_string()))?;
 
     let user_uuid = Uuid::parse_str(&user_id)
         .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
@@ -156,6 +188,7 @@ pub async fn login_user(
             username,
             bio,
             image,
+            role,
         },
     };
 
@@ -173,7 +206,7 @@ pub async fn get_current_user(
 
     let mut rows = conn
         .query(
-            "SELECT username, email, bio, image FROM users WHERE id = ?",
+            "SELECT username, email, bio, image, role FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
         .await
@@ -193,6 +226,13 @@ pub async fn get_current_user(
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
+    let role_str: String = row
+        .get(4)
+        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+
+    let role = role_str
+        .parse::<Role>()
+        .map_err(|_| AppError::InternalServerError("Invalid role in database".to_string()))?;
 
     let token = generate_token(user.user_id, &state.jwt_keys)?;
 
@@ -203,6 +243,7 @@ pub async fn get_current_user(
             username,
             bio,
             image,
+            role,
         },
     };
 

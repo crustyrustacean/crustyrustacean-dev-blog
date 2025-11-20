@@ -6,7 +6,10 @@
 use crate::auth::OptionalUser;
 use crate::errors::AppError;
 use crate::state::AppState;
-use axum::{extract::State, response::{Html, IntoResponse}};
+use axum::{
+    extract::State,
+    response::{Html, IntoResponse},
+};
 use axum_macros::debug_handler;
 use chrono::{Datelike, Utc};
 use serde::Serialize;
@@ -74,7 +77,8 @@ pub async fn get_login_page(
         "current_year": Utc::now().year()
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("auth/login.html", &tera::Context::from_serialize(&context)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
@@ -91,8 +95,12 @@ pub async fn get_register_page(
         error: None,
     };
 
-    let html = state.templates
-        .render("auth/register.html", &tera::Context::from_serialize(&register_content)?)
+    let html = state
+        .templates
+        .render(
+            "auth/register.html",
+            &tera::Context::from_serialize(&register_content)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))

@@ -1,12 +1,12 @@
 // tests/api/api_keys.rs
 
 use crate::helpers::{
-    assert_status_in, spawn_app, TestApiKeyBuilder, TestFixture, TestUserBuilder,
-    UnauthorizedRequestHelper,
+    TestApiKeyBuilder, TestFixture, TestUserBuilder, UnauthorizedRequestHelper, assert_status_in,
+    spawn_app,
 };
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // ============================================================================
 // Happy Path Tests
@@ -25,7 +25,10 @@ async fn test_create_api_key_happy_path() {
     assert!(body["id"].is_string(), "API key should have an ID");
     assert_eq!(body["name"], "My Test API Key");
     assert!(body["key"].is_string(), "API key should be returned");
-    assert!(body["created_at"].is_string(), "Created timestamp should be present");
+    assert!(
+        body["created_at"].is_string(),
+        "Created timestamp should be present"
+    );
 
     // Verify the key format (should be a long string)
     let key = body["key"].as_str().unwrap();
@@ -54,7 +57,10 @@ async fn test_list_api_keys_happy_path() {
         assert!(key["id"].is_string());
         assert!(key["name"].is_string());
         assert!(key["created_at"].is_string());
-        assert!(key.get("key").is_none(), "Raw key should NOT be included in list");
+        assert!(
+            key.get("key").is_none(),
+            "Raw key should NOT be included in list"
+        );
     }
 
     // Verify keys are ordered by created_at DESC (most recent first)
@@ -99,8 +105,14 @@ async fn test_multiple_api_keys_per_user() {
     let token2 = fixture.get_token("user2");
 
     // Act - Each user creates API keys
-    fixture.app.create_api_key_simple(&token1, "User1 Key").await;
-    fixture.app.create_api_key_simple(&token2, "User2 Key").await;
+    fixture
+        .app
+        .create_api_key_simple(&token1, "User1 Key")
+        .await;
+    fixture
+        .app
+        .create_api_key_simple(&token2, "User2 Key")
+        .await;
 
     // Assert - Each user sees only their own keys
     let keys1 = fixture.app.list_api_keys(&token1).await;
@@ -138,7 +150,7 @@ async fn test_create_api_key_with_empty_name() {
 
     // Act - Try to create API key with empty name
     let response = bearer_request!(
-        post &app,
+        post & app,
         format!("{}/api/keys", &app.address),
         &token,
         json!({"name": ""})
@@ -158,7 +170,7 @@ async fn test_create_api_key_with_name_too_long() {
     // Act - Try to create API key with name exceeding 100 characters
     let long_name = "a".repeat(101);
     let response = bearer_request!(
-        post &app,
+        post & app,
         format!("{}/api/keys", &app.address),
         &token,
         json!({"name": long_name})
@@ -176,7 +188,7 @@ async fn test_create_api_key_with_invalid_payload() {
     let token = app.register_user_default("testuser").await;
 
     // Act - Try to create API key with missing name field
-    let response = bearer_request!(post &app, app.api_keys_url(), &token, json!({}))
+    let response = bearer_request!(post & app, app.api_keys_url(), &token, json!({}))
         .expect("Failed to execute request");
 
     // Assert - Should fail validation
@@ -252,7 +264,10 @@ async fn test_delete_another_users_api_key() {
     let token2 = fixture.get_token("user2");
 
     // User1 creates an API key
-    let user1_key_id = fixture.app.create_api_key_simple(&token1, "User1 Key").await;
+    let user1_key_id = fixture
+        .app
+        .create_api_key_simple(&token1, "User1 Key")
+        .await;
 
     // Act - User2 tries to delete User1's key
     let response = fixture.app.delete_api_key(&token2, &user1_key_id).await;
@@ -285,7 +300,9 @@ async fn test_api_key_idempotent_deletion() {
     let token = app.register_user_default("testuser").await;
 
     // Create an API key
-    let key_id = app.create_api_key_simple(&token, "Key to Delete Twice").await;
+    let key_id = app
+        .create_api_key_simple(&token, "Key to Delete Twice")
+        .await;
 
     // Delete once (should succeed)
     let response1 = app.delete_api_key(&token, &key_id).await;

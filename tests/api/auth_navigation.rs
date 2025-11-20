@@ -20,7 +20,9 @@ async fn navigation_to_admin_users_with_cookie_auth() {
     assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let token = body["user"]["token"].as_str().expect("No token in response");
+    let token = body["user"]["token"]
+        .as_str()
+        .expect("No token in response");
 
     // Simulate browser navigation - set cookie and navigate without Authorization header
     let cookie = format!("authToken={}", token);
@@ -41,7 +43,9 @@ async fn navigation_to_admin_users_with_cookie_auth() {
         response.status()
     );
 
-    let content_type = response.headers().get("content-type")
+    let content_type = response
+        .headers()
+        .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
@@ -67,7 +71,9 @@ async fn navigation_to_account_settings_with_cookie_auth() {
         .expect("Failed to execute request");
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let token = body["user"]["token"].as_str().expect("No token in response");
+    let token = body["user"]["token"]
+        .as_str()
+        .expect("No token in response");
 
     // Navigate to account settings with cookie
     let cookie = format!("authToken={}", token);
@@ -102,7 +108,9 @@ async fn navigation_to_admin_dashboard_with_cookie_auth() {
         .expect("Failed to execute request");
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let token = body["user"]["token"].as_str().expect("No token in response");
+    let token = body["user"]["token"]
+        .as_str()
+        .expect("No token in response");
 
     // Navigate to admin dashboard with cookie
     let cookie = format!("authToken={}", token);

@@ -282,10 +282,15 @@ impl TestArticleBuilder for TestApp {
             .await
             .expect("Failed to create article");
 
+        let status = response.status();
         let body: serde_json::Value = response
             .json()
             .await
             .expect("Failed to parse article response");
+
+        if !status.is_success() {
+            panic!("Article creation failed with status {}: {:?}", status, body);
+        }
 
         body["article"]["slug"]
             .as_str()
@@ -319,7 +324,8 @@ pub trait TestApiKeyBuilder {
 #[async_trait]
 impl TestApiKeyBuilder for TestApp {
     async fn create_api_key(&self, token: &str, name: &str) -> serde_json::Value {
-        let response = self.client
+        let response = self
+            .client
             .post(self.api_keys_url())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", token))
@@ -328,16 +334,23 @@ impl TestApiKeyBuilder for TestApp {
             .await
             .expect("Failed to create API key");
 
-        response.json().await.expect("Failed to parse API key response")
+        response
+            .json()
+            .await
+            .expect("Failed to parse API key response")
     }
 
     async fn create_api_key_simple(&self, token: &str, name: &str) -> String {
         let body = self.create_api_key(token, name).await;
-        body["id"].as_str().expect("API key ID not found").to_string()
+        body["id"]
+            .as_str()
+            .expect("API key ID not found")
+            .to_string()
     }
 
     async fn list_api_keys(&self, token: &str) -> Vec<serde_json::Value> {
-        let response = self.client
+        let response = self
+            .client
             .get(self.api_keys_url())
             .header("Authorization", format!("Bearer {}", token))
             .send()
@@ -345,7 +358,10 @@ impl TestApiKeyBuilder for TestApp {
             .expect("Failed to list API keys");
 
         let body: serde_json::Value = response.json().await.expect("Failed to parse response");
-        body["api_keys"].as_array().expect("api_keys not found").clone()
+        body["api_keys"]
+            .as_array()
+            .expect("api_keys not found")
+            .clone()
     }
 
     async fn delete_api_key(&self, token: &str, key_id: &str) -> reqwest::Response {
@@ -511,6 +527,7 @@ pub fn assert_body_contains(body: &str, expected: &[&str]) {
 pub struct TestFixture {
     pub app: TestApp,
     pub users: HashMap<String, String>, // username -> token
+    pub admin_user: Option<String>,     // Track the admin user
 }
 
 impl TestFixture {
@@ -519,6 +536,7 @@ impl TestFixture {
         TestFixture {
             app: spawn_app().await,
             users: HashMap::new(),
+            admin_user: None,
         }
     }
 
@@ -526,6 +544,12 @@ impl TestFixture {
     pub async fn with_user_default(mut self, name: &str) -> Self {
         let token = self.app.register_user_default(name).await;
         self.users.insert(name.to_string(), token);
+
+        // First user is always admin
+        if self.admin_user.is_none() {
+            self.admin_user = Some(name.to_string());
+        }
+
         self
     }
 
@@ -535,6 +559,138 @@ impl TestFixture {
             .get(user)
             .unwrap_or_else(|| panic!("User '{}' not found in fixture", user))
             .clone()
+    }
+
+    /// Promote a user to author role (requires first user to be admin)
+    pub async fn promote_to_author(mut self, username: &str) -> Self {
+        // Get admin token (first user is always admin)
+        let admin_username = self
+            .admin_user
+            .as_ref()
+            .expect("No admin user in fixture")
+            .clone();
+        let admin_token = self.get_token(&admin_username);
+
+        // Get the user ID
+        let users_response = self
+            .app
+            .client
+            .get(format!(
+                "{}/api/admin/users?search={}",
+                &self.app.address, username
+            ))
+            .header("Authorization", format!("Bearer {}", admin_token))
+            .send()
+            .await
+            .expect("Failed to search for user");
+
+        let users_json: serde_json::Value = users_response
+            .json()
+            .await
+            .expect("Failed to parse users response");
+
+        // Find the exact username match (search uses LIKE so may return multiple matches)
+        let users_array = users_json["data"]["users"]
+            .as_array()
+            .unwrap_or_else(|| panic!("Users array not found in response: {:?}", users_json));
+
+        let user = users_array
+            .iter()
+            .find(|u| u["username"].as_str() == Some(username))
+            .unwrap_or_else(|| {
+                panic!(
+                    "User '{}' not found in search results. Found: {:?}",
+                    username, users_array
+                )
+            });
+
+        let user_id = user["id"].as_str().unwrap_or_else(|| {
+            panic!(
+                "User ID not found for '{}'. User data: {:?}",
+                username, user
+            )
+        });
+
+        // Promote to author
+        let promote_response = self
+            .app
+            .client
+            .put(format!("{}/api/admin/users/{}", &self.app.address, user_id))
+            .header("Authorization", format!("Bearer {}", admin_token))
+            .json(&serde_json::json!({
+                "role": "author"
+            }))
+            .send()
+            .await
+            .expect("Failed to promote user");
+
+        let promote_status = promote_response.status();
+        let promote_body: serde_json::Value = promote_response
+            .json()
+            .await
+            .expect("Failed to parse promotion response");
+
+        // Check promotion succeeded
+        if !promote_status.is_success() {
+            panic!(
+                "Failed to promote user '{}' (status {}): {:?}",
+                username, promote_status, promote_body
+            );
+        }
+
+        // Verify the response shows the updated role
+        let updated_role = promote_body["data"]["user"]["role"]
+            .as_str()
+            .expect("Role not found in promotion response");
+
+        if updated_role != "author" && updated_role != "admin" {
+            panic!(
+                "Promotion API returned success but role is still: {}",
+                updated_role
+            );
+        }
+
+        // Get new token for the promoted user
+
+        let login_response = self
+            .app
+            .client
+            .post(format!("{}/api/users/login", &self.app.address))
+            .json(&serde_json::json!({
+                "user": {
+                    "email": format!("{}@example.com", username),
+                    "password": "password123"
+                }
+            }))
+            .send()
+            .await
+            .expect("Failed to log in");
+
+        let login_json: serde_json::Value = login_response
+            .json()
+            .await
+            .expect("Failed to parse login response");
+
+        // Verify the user has author role
+        let role = login_json["user"]["role"]
+            .as_str()
+            .expect("Role not found in login response");
+
+        if role != "author" && role != "admin" {
+            panic!(
+                "User '{}' was promoted but login still shows role: {}",
+                username, role
+            );
+        }
+
+        let new_token = login_json["user"]["token"]
+            .as_str()
+            .expect("Token not found")
+            .to_string();
+
+        // Update token in fixture
+        self.users.insert(username.to_string(), new_token);
+        self
     }
 }
 

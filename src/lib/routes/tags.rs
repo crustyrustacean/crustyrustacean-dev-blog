@@ -232,7 +232,8 @@ pub async fn get_tags_admin_page(
         "user": user_info,
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("admin/tags.html", &tera::Context::from_serialize(&context)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 

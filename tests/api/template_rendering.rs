@@ -110,7 +110,7 @@ async fn test_article_template_renders_successfully_happy_path() {
 
     // Verify external JavaScript files are loaded with cache-busting
     // Note: URLs are HTML-entity encoded in attributes (&#x2F; instead of /)
-    assert!(body.contains("article-page.js?v=2.11.0"));
+    assert!(body.contains("article-page.js?v=2.12.0"));
 
     // Verify tags are rendered
     assert!(body.contains("template"));
@@ -239,7 +239,7 @@ async fn test_article_template_renders_with_comments() {
 
     // Verify external JS files are loaded with cache-busting
     // Note: URLs are HTML-entity encoded in attributes
-    assert!(body.contains("article-page.js?v=2.11.0"));
+    assert!(body.contains("article-page.js?v=2.12.0"));
 
     // Verify the template renders without JavaScript errors (basic validation)
     assert!(body.contains("<html") || body.contains("<!DOCTYPE html"));
@@ -321,7 +321,7 @@ async fn test_template_compiles_without_javascript_errors() {
 
     // Verify external JS modules are loaded with cache-busting
     // Note: URLs are HTML-entity encoded in attributes
-    assert!(body.contains("article-page.js?v=2.11.0"));
+    assert!(body.contains("article-page.js?v=2.12.0"));
 
     // The template should render complete HTML
     assert!(body.contains("<html") || body.contains("<!DOCTYPE html"));

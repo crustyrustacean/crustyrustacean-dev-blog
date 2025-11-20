@@ -33,7 +33,10 @@ fn test_parse_multiple_shortcodes() {
     assert_eq!(shortcodes[0].slug, "intro");
     assert_eq!(shortcodes[0].custom_text, None);
     assert_eq!(shortcodes[1].slug, "advanced");
-    assert_eq!(shortcodes[1].custom_text, Some("advanced topics".to_string()));
+    assert_eq!(
+        shortcodes[1].custom_text,
+        Some("advanced topics".to_string())
+    );
 }
 
 #[test]
@@ -68,7 +71,10 @@ fn test_parse_handles_spaces_in_custom_text() {
     let shortcodes = parse_shortcodes(text);
 
     assert_eq!(shortcodes.len(), 1);
-    assert_eq!(shortcodes[0].custom_text, Some("Check out this amazing article".to_string()));
+    assert_eq!(
+        shortcodes[0].custom_text,
+        Some("Check out this amazing article".to_string())
+    );
 }
 
 #[test]

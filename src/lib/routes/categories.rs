@@ -2,8 +2,11 @@
 
 use crate::{
     AppError, AppState,
-    auth::AuthenticatedUser,
-    models::{CategoriesResponse, CategoryResponse, CreateCategory, SingleCategoryResponse, UpdateCategory},
+    auth::{AuthenticatedUser, AuthorUser},
+    models::{
+        CategoriesResponse, CategoryResponse, CreateCategory, SingleCategoryResponse,
+        UpdateCategory,
+    },
 };
 use axum::{
     extract::{Path, State},
@@ -27,7 +30,9 @@ fn slugify(name: &str) -> String {
 }
 
 /// GET /api/categories - List all categories
-pub async fn get_categories(State(state): State<AppState>) -> Result<Json<CategoriesResponse>, AppError> {
+pub async fn get_categories(
+    State(state): State<AppState>,
+) -> Result<Json<CategoriesResponse>, AppError> {
     let conn = state
         .db
         .connect()
@@ -81,7 +86,7 @@ pub async fn get_categories(State(state): State<AppState>) -> Result<Json<Catego
 /// POST /api/categories - Create a new category
 pub async fn create_category(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    _user: AuthorUser,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<(StatusCode, Json<SingleCategoryResponse>), AppError> {
     let create_data: CreateCategory = serde_json::from_value(
@@ -208,7 +213,7 @@ pub async fn get_category(
 pub async fn update_category(
     State(state): State<AppState>,
     Path(old_slug): Path<String>,
-    _user: AuthenticatedUser,
+    _user: AuthorUser,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<SingleCategoryResponse>, AppError> {
     let update_data: UpdateCategory = serde_json::from_value(
@@ -255,7 +260,11 @@ pub async fn update_category(
         let mut conflict_rows = conn
             .query(
                 "SELECT id FROM categories WHERE (name = ? OR slug = ?) AND id != ?",
-                libsql::params![update_data.name.clone(), new_slug.clone(), category_id.clone()],
+                libsql::params![
+                    update_data.name.clone(),
+                    new_slug.clone(),
+                    category_id.clone()
+                ],
             )
             .await
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
@@ -318,7 +327,7 @@ pub async fn update_category(
 pub async fn delete_category(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-    _user: AuthenticatedUser,
+    _user: AuthorUser,
 ) -> Result<StatusCode, AppError> {
     let conn = state
         .db
@@ -413,8 +422,12 @@ pub async fn get_categories_admin_page(
         "user": user_info,
     });
 
-    let html = state.templates
-        .render("admin/categories.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "admin/categories.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
