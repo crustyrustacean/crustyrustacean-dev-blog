@@ -1,6 +1,6 @@
 // src/lib/routes/newsletters.rs
 
-use crate::auth::AuthenticatedUser;
+use crate::auth::{AuthenticatedUser, AuthorUser};
 use crate::errors::AppError;
 use crate::state::AppState;
 use crate::models::{
@@ -200,10 +200,10 @@ pub async fn unsubscribe(
     })))
 }
 
-/// List all newsletter issues (admin only)
+/// List all newsletter issues (author or admin)
 /// GET /api/admin/newsletters
 pub async fn list_newsletters(
-    _auth_user: AuthenticatedUser,
+    _auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.db.connect()?;
@@ -249,10 +249,10 @@ pub async fn list_newsletters(
     Ok(ApiResponse::success(json!({ "newsletters": issues })))
 }
 
-/// Create newsletter issue (admin only)
+/// Create newsletter issue (author or admin)
 /// POST /api/admin/newsletters
 pub async fn create_newsletter(
-    auth_user: AuthenticatedUser,
+    auth_user: AuthorUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateNewsletterIssue>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -288,10 +288,10 @@ pub async fn create_newsletter(
     ))
 }
 
-/// Get single newsletter issue (admin only)
+/// Get single newsletter issue (author or admin)
 /// GET /api/admin/newsletters/:id
 pub async fn get_newsletter(
-    _auth_user: AuthenticatedUser,
+    _auth_user: AuthorUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -339,10 +339,10 @@ pub async fn get_newsletter(
     Ok(ApiResponse::success(json!({ "newsletter": issue })))
 }
 
-/// Update newsletter issue (admin only)
+/// Update newsletter issue (author or admin)
 /// PUT /api/admin/newsletters/:id
 pub async fn update_newsletter(
-    _auth_user: AuthenticatedUser,
+    _auth_user: AuthorUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(payload): Json<UpdateNewsletterIssue>,
@@ -418,10 +418,10 @@ pub async fn update_newsletter(
     })))
 }
 
-/// Delete newsletter issue (admin only)
+/// Delete newsletter issue (author or admin)
 /// DELETE /api/admin/newsletters/:id
 pub async fn delete_newsletter(
-    _auth_user: AuthenticatedUser,
+    _auth_user: AuthorUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -443,10 +443,10 @@ pub async fn delete_newsletter(
     })))
 }
 
-/// Send newsletter to all confirmed subscribers (admin only)
+/// Send newsletter to all confirmed subscribers (author or admin)
 /// POST /api/admin/newsletters/:id/send
 pub async fn send_newsletter(
-    _auth_user: AuthenticatedUser,
+    _auth_user: AuthorUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -519,10 +519,10 @@ pub async fn send_newsletter(
     })))
 }
 
-/// Get newsletter statistics (admin only)
+/// Get newsletter statistics (author or admin)
 /// GET /api/admin/newsletters/stats
 pub async fn get_newsletter_stats(
-    _auth_user: AuthenticatedUser,
+    _auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.db.connect()?;
@@ -652,7 +652,7 @@ pub async fn newsletter_unsubscribed_page(
 /// Admin newsletter management page
 /// GET /admin/newsletters
 pub async fn admin_newsletters_page(
-    auth_user: AuthenticatedUser,
+    auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<Html<String>, AppError> {
     let conn = state
