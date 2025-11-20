@@ -376,6 +376,8 @@ async fn get_media_metadata_fails_for_non_owner() {
     // Arrange
     let fixture = TestFixture::new()
         .await
+        .with_user_default("admin")  // First user is admin
+        .await
         .with_user_default("owner")
         .await
         .with_user_default("other")
@@ -414,7 +416,8 @@ async fn get_media_metadata_fails_for_non_owner() {
         .expect("Failed to upload media");
 
     let upload_body: Value = parse_json!(upload_response);
-    let media_id = upload_body["media"]["id"].as_str().unwrap();
+    let media_id = upload_body["media"]["id"].as_str()
+        .unwrap_or_else(|| panic!("Media ID not found in response: {:?}", upload_body));
 
     // Act - other user tries to access
     let response = bearer_request!(
@@ -524,6 +527,8 @@ async fn update_media_metadata_fails_for_non_owner() {
     // Arrange
     let fixture = TestFixture::new()
         .await
+        .with_user_default("admin")  // First user is admin
+        .await
         .with_user_default("metaowner2")
         .await
         .with_user_default("metaother")
@@ -562,7 +567,8 @@ async fn update_media_metadata_fails_for_non_owner() {
         .expect("Failed to upload media");
 
     let upload_body: Value = parse_json!(upload_response);
-    let media_id = upload_body["media"]["id"].as_str().unwrap();
+    let media_id = upload_body["media"]["id"].as_str()
+        .unwrap_or_else(|| panic!("Media ID not found in response: {:?}", upload_body));
 
     // Act - other user tries to update
     let update_data = json!({
@@ -652,6 +658,8 @@ async fn delete_media_fails_for_non_owner() {
     // Arrange
     let fixture = TestFixture::new()
         .await
+        .with_user_default("admin")  // First user is admin
+        .await
         .with_user_default("delowner")
         .await
         .with_user_default("delother")
@@ -690,7 +698,8 @@ async fn delete_media_fails_for_non_owner() {
         .expect("Failed to upload media");
 
     let upload_body: Value = parse_json!(upload_response);
-    let media_id = upload_body["media"]["id"].as_str().unwrap();
+    let media_id = upload_body["media"]["id"].as_str()
+        .unwrap_or_else(|| panic!("Media ID not found in response: {:?}", upload_body));
 
     // Act - other user tries to delete
     let response = bearer_request!(
