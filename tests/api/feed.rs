@@ -13,6 +13,8 @@ async fn test_get_feed_happy_path() {
         .with_user_default("follower")
         .await
         .with_user_default("author")
+        .await
+        .promote_to_author("author")
         .await;
 
     let follower_token = fixture.get_token("follower");
@@ -111,6 +113,8 @@ async fn test_get_feed_with_pagination() {
         .with_user_default("feedreader")
         .await
         .with_user_default("prolificwriter")
+        .await
+        .promote_to_author("prolificwriter")
         .await;
 
     let follower_token = fixture.get_token("feedreader");
@@ -176,6 +180,10 @@ async fn test_get_feed_excludes_unfollowed_authors() {
         .with_user_default("followedauthor")
         .await
         .with_user_default("unfollowedauthor")
+        .await
+        .promote_to_author("followedauthor")
+        .await
+        .promote_to_author("unfollowedauthor")
         .await;
 
     let follower_token = fixture.get_token("selectivereader");

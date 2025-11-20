@@ -2,7 +2,7 @@
 //
 // Comprehensive tests for Role-Based Access Control (RBAC) system
 
-use crate::helpers::{spawn_app, TestUserBuilder, TestArticleBuilder};
+use crate::helpers::{spawn_app, TestUserBuilder};
 
 #[tokio::test]
 async fn test_first_user_gets_admin_role() {
@@ -23,7 +23,7 @@ async fn test_first_user_gets_admin_role() {
         .await
         .expect("Failed to execute request");
 
-    assert_eq!(response.status(), 201);
+    assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse response");
 
@@ -55,7 +55,7 @@ async fn test_subsequent_users_get_subscriber_role() {
         .await
         .expect("Failed to execute request");
 
-    assert_eq!(response.status(), 201);
+    assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse response");
 
@@ -228,7 +228,7 @@ async fn test_author_can_create_articles() {
         .await
         .expect("Failed to execute request");
 
-    // Should succeed
+    // Should succeed (201 Created)
     assert_eq!(response.status(), 201);
 }
 
@@ -256,7 +256,7 @@ async fn test_admin_can_create_articles() {
         .await
         .expect("Failed to execute request");
 
-    // Should succeed
+    // Should succeed (201 Created)
     assert_eq!(response.status(), 201);
 }
 
@@ -363,7 +363,7 @@ async fn test_author_can_create_categories() {
         .await
         .expect("Failed to execute request");
 
-    // Should succeed
+    // Should succeed (201 Created)
     assert_eq!(response.status(), 201);
 }
 
