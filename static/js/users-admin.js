@@ -90,7 +90,7 @@ async function loadUsers() {
         loadingIndicator.style.display = 'none';
 
         if (users.length === 0) {
-            usersList.innerHTML = '<tr><td colspan="6" class="text-center">No users found</td></tr>';
+            usersList.innerHTML = '<tr><td colspan="7" class="text-center">No users found</td></tr>';
             return;
         }
 
@@ -101,9 +101,25 @@ async function loadUsers() {
                 ? '<span class="badge bg-danger">Disabled</span>'
                 : '<span class="badge bg-success">Active</span>';
 
+            // Role badge with appropriate color
+            let roleBadge = '';
+            switch(user.role) {
+                case 'admin':
+                    roleBadge = '<span class="badge bg-danger">Admin</span>';
+                    break;
+                case 'author':
+                    roleBadge = '<span class="badge bg-primary">Author</span>';
+                    break;
+                case 'subscriber':
+                default:
+                    roleBadge = '<span class="badge bg-secondary">Subscriber</span>';
+                    break;
+            }
+
             row.innerHTML = `
                 <td><strong>${escapeHtml(user.username)}</strong></td>
                 <td>${escapeHtml(user.email)}</td>
+                <td>${roleBadge}</td>
                 <td>${user.articleCount}</td>
                 <td>${createdDate}</td>
                 <td>${statusBadge}</td>
@@ -112,6 +128,7 @@ async function loadUsers() {
                             data-id="${escapeHtml(user.id)}"
                             data-username="${escapeHtml(user.username)}"
                             data-email="${escapeHtml(user.email)}"
+                            data-role="${escapeHtml(user.role)}"
                             data-bio="${user.bio ? escapeHtml(user.bio) : ''}"
                             data-image="${user.image ? escapeHtml(user.image) : ''}"
                             data-disabled="${user.disabled}">
@@ -142,6 +159,7 @@ async function loadUsers() {
                     btn.dataset.id,
                     btn.dataset.username,
                     btn.dataset.email,
+                    btn.dataset.role,
                     btn.dataset.bio,
                     btn.dataset.image,
                     btn.dataset.disabled === 'true'
@@ -170,10 +188,11 @@ async function loadUsers() {
     }
 }
 
-function openEditModal(id, username, email, bio, image, disabled) {
+function openEditModal(id, username, email, role, bio, image, disabled) {
     document.getElementById('editUserId').value = id;
     document.getElementById('editUsername').value = username;
     document.getElementById('editEmail').value = email;
+    document.getElementById('editRole').value = role;
     document.getElementById('editBio').value = bio;
     document.getElementById('editImage').value = image;
     const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
@@ -191,11 +210,12 @@ async function saveUser() {
     const id = document.getElementById('editUserId').value;
     const username = document.getElementById('editUsername').value.trim();
     const email = document.getElementById('editEmail').value.trim();
+    const role = document.getElementById('editRole').value;
     const bio = document.getElementById('editBio').value.trim();
     const image = document.getElementById('editImage').value.trim();
 
-    if (!username || !email) {
-        showAlert('Username and email are required', 'danger');
+    if (!username || !email || !role) {
+        showAlert('Username, email, and role are required', 'danger');
         return;
     }
 
@@ -215,6 +235,7 @@ async function saveUser() {
             body: JSON.stringify({
                 username,
                 email,
+                role,
                 bio: bio || undefined,
                 image: image || undefined
             })
