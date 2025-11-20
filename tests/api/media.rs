@@ -1,6 +1,6 @@
 // tests/api/media.rs
 
-use crate::helpers::{TestUserBuilder, TestFixture, spawn_app};
+use crate::helpers::{TestFixture, TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::{
     StatusCode,
@@ -41,7 +41,8 @@ async fn upload_media_succeeds_with_valid_image() {
     let form = Form::new().part("file", part);
 
     // Act
-    let response = fixture.app
+    let response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -96,7 +97,8 @@ async fn upload_media_with_metadata() {
         .text("description", "This is a test image upload with metadata");
 
     // Act
-    let response = fixture.app
+    let response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -138,7 +140,8 @@ async fn upload_media_fails_with_non_image_file() {
     let form = Form::new().part("file", part);
 
     // Act
-    let response = fixture.app
+    let response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -199,7 +202,8 @@ async fn upload_media_fails_with_no_file() {
     let form = Form::new();
 
     // Act
-    let response = fixture.app
+    let response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -244,7 +248,8 @@ async fn list_media_returns_users_media() {
 
     let form = Form::new().part("file", part);
 
-    let _ = fixture.app
+    let _ = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -254,8 +259,12 @@ async fn list_media_returns_users_media() {
         .expect("Failed to upload media");
 
     // Act
-    let response = bearer_request!(get & fixture.app, format!("{}/api/media", &fixture.app.address), &token)
-        .expect("Failed to execute request");
+    let response = bearer_request!(
+        get & fixture.app,
+        format!("{}/api/media", &fixture.app.address),
+        &token
+    )
+    .expect("Failed to execute request");
 
     // Assert
     assert_status!(response, StatusCode::OK);
@@ -342,7 +351,8 @@ async fn get_media_metadata_succeeds_for_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -376,7 +386,7 @@ async fn get_media_metadata_fails_for_non_owner() {
     // Arrange
     let fixture = TestFixture::new()
         .await
-        .with_user_default("admin")  // First user is admin
+        .with_user_default("admin") // First user is admin
         .await
         .with_user_default("owner")
         .await
@@ -406,7 +416,8 @@ async fn get_media_metadata_fails_for_non_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
@@ -416,7 +427,8 @@ async fn get_media_metadata_fails_for_non_owner() {
         .expect("Failed to upload media");
 
     let upload_body: Value = parse_json!(upload_response);
-    let media_id = upload_body["media"]["id"].as_str()
+    let media_id = upload_body["media"]["id"]
+        .as_str()
         .unwrap_or_else(|| panic!("Media ID not found in response: {:?}", upload_body));
 
     // Act - other user tries to access
@@ -484,7 +496,8 @@ async fn update_media_metadata_succeeds() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -527,7 +540,7 @@ async fn update_media_metadata_fails_for_non_owner() {
     // Arrange
     let fixture = TestFixture::new()
         .await
-        .with_user_default("admin")  // First user is admin
+        .with_user_default("admin") // First user is admin
         .await
         .with_user_default("metaowner2")
         .await
@@ -557,7 +570,8 @@ async fn update_media_metadata_fails_for_non_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
@@ -567,7 +581,8 @@ async fn update_media_metadata_fails_for_non_owner() {
         .expect("Failed to upload media");
 
     let upload_body: Value = parse_json!(upload_response);
-    let media_id = upload_body["media"]["id"].as_str()
+    let media_id = upload_body["media"]["id"]
+        .as_str()
         .unwrap_or_else(|| panic!("Media ID not found in response: {:?}", upload_body));
 
     // Act - other user tries to update
@@ -619,7 +634,8 @@ async fn delete_media_succeeds_for_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -658,7 +674,7 @@ async fn delete_media_fails_for_non_owner() {
     // Arrange
     let fixture = TestFixture::new()
         .await
-        .with_user_default("admin")  // First user is admin
+        .with_user_default("admin") // First user is admin
         .await
         .with_user_default("delowner")
         .await
@@ -688,7 +704,8 @@ async fn delete_media_fails_for_non_owner() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
@@ -698,7 +715,8 @@ async fn delete_media_fails_for_non_owner() {
         .expect("Failed to upload media");
 
     let upload_body: Value = parse_json!(upload_response);
-    let media_id = upload_body["media"]["id"].as_str()
+    let media_id = upload_body["media"]["id"]
+        .as_str()
         .unwrap_or_else(|| panic!("Media ID not found in response: {:?}", upload_body));
 
     // Act - other user tries to delete
@@ -765,7 +783,8 @@ async fn download_media_succeeds() {
 
     let form = Form::new().part("file", part);
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -778,9 +797,13 @@ async fn download_media_succeeds() {
     let media_id = upload_body["media"]["id"].as_str().unwrap();
 
     // Act
-    let response = fixture.app
+    let response = fixture
+        .app
         .client
-        .get(format!("{}/api/media/{}/download", &fixture.app.address, media_id))
+        .get(format!(
+            "{}/api/media/{}/download",
+            &fixture.app.address, media_id
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -845,7 +868,8 @@ async fn complete_media_lifecycle_workflow() {
         .part("file", part)
         .text("title", "Lifecycle Test");
 
-    let upload_response = fixture.app
+    let upload_response = fixture
+        .app
         .client
         .post(format!("{}/api/media", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
@@ -859,8 +883,12 @@ async fn complete_media_lifecycle_workflow() {
     let media_id = upload_body["media"]["id"].as_str().unwrap();
 
     // Step 2: List and verify it's there
-    let list_response = bearer_request!(get & fixture.app, format!("{}/api/media", &fixture.app.address), &token)
-        .expect("Failed to list");
+    let list_response = bearer_request!(
+        get & fixture.app,
+        format!("{}/api/media", &fixture.app.address),
+        &token
+    )
+    .expect("Failed to list");
 
     assert_status!(list_response, StatusCode::OK);
     let list_body: Value = parse_json!(list_response);
@@ -895,9 +923,13 @@ async fn complete_media_lifecycle_workflow() {
     assert_eq!(update_body["media"]["title"], "Updated Lifecycle Test");
 
     // Step 5: Download
-    let download_response = fixture.app
+    let download_response = fixture
+        .app
         .client
-        .get(format!("{}/api/media/{}/download", &fixture.app.address, media_id))
+        .get(format!(
+            "{}/api/media/{}/download",
+            &fixture.app.address, media_id
+        ))
         .send()
         .await
         .expect("Failed to download");

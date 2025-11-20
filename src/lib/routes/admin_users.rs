@@ -3,14 +3,17 @@
 use crate::{
     auth::{AdminUser, AuthenticatedUser},
     errors::AppError,
-    models::{AdminUserData, AdminUserUpdate, AdminUsersQuery, AdminUsersResponse, AdminUserResponse, Role},
+    models::{
+        AdminUserData, AdminUserResponse, AdminUserUpdate, AdminUsersQuery, AdminUsersResponse,
+        Role,
+    },
     response::ApiResponse,
     state::AppState,
 };
 use axum::{
+    Json,
     extract::{Path, Query, State},
     response::{Html, IntoResponse},
-    Json,
 };
 use chrono::Datelike;
 use validator::Validate;
@@ -111,11 +114,11 @@ pub async fn list_users_admin(
     let mut params_vec: Vec<String> = Vec::new();
 
     // Search filter
-    if let Some(search) = &query.search {
-        if !search.trim().is_empty() {
-            where_clauses.push("(u.username LIKE ?1 OR u.email LIKE ?1)");
-            params_vec.push(format!("%{}%", search.trim()));
-        }
+    if let Some(search) = &query.search
+        && !search.trim().is_empty()
+    {
+        where_clauses.push("(u.username LIKE ?1 OR u.email LIKE ?1)");
+        params_vec.push(format!("%{}%", search.trim()));
     }
 
     // Status filter
@@ -169,9 +172,7 @@ pub async fn list_users_admin(
     {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
         let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
-        let role = role_str
-            .parse::<Role>()
-            .unwrap_or(Role::Subscriber);
+        let role = role_str.parse::<Role>().unwrap_or(Role::Subscriber);
 
         users.push(AdminUserData {
             id: row.get(0).unwrap(),
@@ -187,10 +188,7 @@ pub async fn list_users_admin(
     }
 
     // Get total count
-    let count_query = format!(
-        "SELECT COUNT(DISTINCT u.id) FROM users u {}",
-        where_clause
-    );
+    let count_query = format!("SELECT COUNT(DISTINCT u.id) FROM users u {}", where_clause);
 
     let count_params: Vec<libsql::Value> = params_vec
         .iter()
@@ -251,9 +249,7 @@ pub async fn get_user_admin(
     {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
         let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
-        let role = role_str
-            .parse::<Role>()
-            .unwrap_or(Role::Subscriber);
+        let role = role_str.parse::<Role>().unwrap_or(Role::Subscriber);
 
         let user_data = AdminUserData {
             id: row.get(0).unwrap(),
@@ -304,7 +300,10 @@ pub async fn update_user_admin(
 
     // Check if user exists
     let mut check_rows = conn
-        .query("SELECT id FROM users WHERE id = ?", libsql::params![id.clone()])
+        .query(
+            "SELECT id FROM users WHERE id = ?",
+            libsql::params![id.clone()],
+        )
         .await
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
@@ -354,10 +353,7 @@ pub async fn update_user_admin(
 
     params.push(libsql::Value::Text(id.clone()));
 
-    let update_query = format!(
-        "UPDATE users SET {} WHERE id = ?",
-        updates.join(", ")
-    );
+    let update_query = format!("UPDATE users SET {} WHERE id = ?", updates.join(", "));
 
     conn.execute(&update_query, libsql::params_from_iter(params))
         .await
@@ -400,7 +396,10 @@ pub async fn delete_user_admin(
 
     // Check if user exists
     let mut check_rows = conn
-        .query("SELECT id FROM users WHERE id = ?", libsql::params![id.clone()])
+        .query(
+            "SELECT id FROM users WHERE id = ?",
+            libsql::params![id.clone()],
+        )
         .await
         .map_err(|e| AppError::InternalServerError(e.to_string()))?;
 

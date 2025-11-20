@@ -61,9 +61,11 @@ async fn test_search_articles_happy_path() {
     assert_eq!(results.len(), 2);
 
     // Verify the results contain rust-related articles
-    assert!(results
-        .iter()
-        .any(|r| r["title"].as_str().unwrap().contains("Rust")));
+    assert!(
+        results
+            .iter()
+            .any(|r| r["title"].as_str().unwrap().contains("Rust"))
+    );
 
     // Verify total count
     assert_eq!(response_body["resultsCount"], 2);
@@ -120,10 +122,12 @@ async fn test_search_articles_empty_query() {
         .await
         .expect("Failed to parse response as JSON");
 
-    assert!(response_body["errors"]["body"][0]
-        .as_str()
-        .unwrap()
-        .contains("Search query cannot be empty"));
+    assert!(
+        response_body["errors"]["body"][0]
+            .as_str()
+            .unwrap()
+            .contains("Search query cannot be empty")
+    );
 }
 
 #[tokio::test]
@@ -147,10 +151,12 @@ async fn test_search_articles_missing_query() {
         .await
         .expect("Failed to parse response as JSON");
 
-    assert!(response_body["errors"]["body"][0]
-        .as_str()
-        .unwrap()
-        .contains("Search query is required"));
+    assert!(
+        response_body["errors"]["body"][0]
+            .as_str()
+            .unwrap()
+            .contains("Search query is required")
+    );
 }
 
 #[tokio::test]
@@ -280,7 +286,8 @@ async fn test_search_includes_author_info() {
     let app = spawn_app().await;
     let token = app.register_user_default("searchtest").await;
 
-    app.create_article_simple(&token, "Searchable Article").await;
+    app.create_article_simple(&token, "Searchable Article")
+        .await;
 
     // Act
     let response = app

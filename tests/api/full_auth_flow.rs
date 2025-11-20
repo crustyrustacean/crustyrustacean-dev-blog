@@ -17,7 +17,9 @@ async fn complete_browser_flow_admin_users_page() {
         .await;
 
     // If login fails, register first
-    let (_token, cookie) = if login_response.is_err() || login_response.as_ref().unwrap().status() != 200 {
+    let (_token, cookie) = if login_response.is_err()
+        || login_response.as_ref().unwrap().status() != 200
+    {
         // Register
         let register_response = app
             .client
@@ -28,13 +30,26 @@ async fn complete_browser_flow_admin_users_page() {
             .await
             .expect("Failed to register");
 
-        let body: serde_json::Value = register_response.json().await.expect("Failed to parse JSON");
-        let token = body["user"]["token"].as_str().expect("No token").to_string();
+        let body: serde_json::Value = register_response
+            .json()
+            .await
+            .expect("Failed to parse JSON");
+        let token = body["user"]["token"]
+            .as_str()
+            .expect("No token")
+            .to_string();
         let cookie = format!("authToken={}", token);
         (token, cookie)
     } else {
-        let body: serde_json::Value = login_response.unwrap().json().await.expect("Failed to parse JSON");
-        let token = body["user"]["token"].as_str().expect("No token").to_string();
+        let body: serde_json::Value = login_response
+            .unwrap()
+            .json()
+            .await
+            .expect("Failed to parse JSON");
+        let token = body["user"]["token"]
+            .as_str()
+            .expect("No token")
+            .to_string();
         let cookie = format!("authToken={}", token);
         (token, cookie)
     };
@@ -71,7 +86,10 @@ async fn complete_browser_flow_admin_users_page() {
     );
 
     // Step 4: Verify the API response is valid JSON
-    let api_body: serde_json::Value = api_response.json().await.expect("Failed to parse API response");
+    let api_body: serde_json::Value = api_response
+        .json()
+        .await
+        .expect("Failed to parse API response");
 
     assert!(
         api_body["data"]["users"].is_array(),

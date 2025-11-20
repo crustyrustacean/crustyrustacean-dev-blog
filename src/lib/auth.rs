@@ -234,9 +234,7 @@ impl FromRequestParts<crate::AppState> for AdminUser {
         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
 
         if !user.role.is_admin() {
-            return Err(AppError::Forbidden(
-                "Admin access required".to_string(),
-            ));
+            return Err(AppError::Forbidden("Admin access required".to_string()));
         }
 
         Ok(AdminUser {
@@ -262,9 +260,7 @@ impl FromRequestParts<crate::AppState> for AuthorUser {
         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
 
         if !user.role.is_author() {
-            return Err(AppError::Forbidden(
-                "Author access required".to_string(),
-            ));
+            return Err(AppError::Forbidden("Author access required".to_string()));
         }
 
         Ok(AuthorUser {

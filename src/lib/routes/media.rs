@@ -714,8 +714,12 @@ pub async fn get_media_library_page(
         "user": user_info,
     });
 
-    let html = state.templates
-        .render("media/library.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "media/library.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))

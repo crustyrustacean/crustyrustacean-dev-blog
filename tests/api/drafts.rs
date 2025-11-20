@@ -1,6 +1,8 @@
 // tests/api/drafts.rs - Integration tests for draft article functionality
 
-use crate::helpers::{assert_body_contains, spawn_app, TestArticleBuilder, TestUserBuilder, HtmlResponseValidator};
+use crate::helpers::{
+    HtmlResponseValidator, TestArticleBuilder, TestUserBuilder, assert_body_contains, spawn_app,
+};
 
 #[tokio::test]
 async fn test_create_draft_article() {
@@ -83,7 +85,9 @@ async fn test_list_user_drafts_api() {
     assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse response");
-    let articles = body["articles"].as_array().expect("Expected articles array");
+    let articles = body["articles"]
+        .as_array()
+        .expect("Expected articles array");
 
     assert_eq!(articles.len(), 2);
     assert_eq!(body["articlesCount"], 2);
@@ -131,12 +135,15 @@ async fn test_drafts_admin_page() {
     assert_eq!(response.status(), 200);
 
     let body = response.assert_html_response().await;
-    assert_body_contains(&body, &[
-        "Draft Articles",
-        "Test Draft",
-        "Draft description",
-        "testuser",
-    ]);
+    assert_body_contains(
+        &body,
+        &[
+            "Draft Articles",
+            "Test Draft",
+            "Draft description",
+            "testuser",
+        ],
+    );
 }
 
 #[tokio::test]
@@ -193,15 +200,21 @@ async fn test_publish_draft() {
         .expect("Failed to execute request");
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse response");
-    let articles = body["articles"].as_array().expect("Expected articles array");
+    let articles = body["articles"]
+        .as_array()
+        .expect("Expected articles array");
     assert_eq!(articles.len(), 0);
 }
 
 #[tokio::test]
 async fn test_draft_visibility_author_only() {
     let app = spawn_app().await;
-    let alice_token = app.register_user("alice", "alice@example.com", "password").await;
-    let bob_token = app.register_user("bob", "bob@example.com", "password").await;
+    let alice_token = app
+        .register_user("alice", "alice@example.com", "password")
+        .await;
+    let bob_token = app
+        .register_user("bob", "bob@example.com", "password")
+        .await;
 
     // Alice creates a draft
     let response = app
@@ -265,7 +278,9 @@ async fn test_draft_visibility_author_only() {
         .expect("Failed to execute request");
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse response");
-    let articles = body["articles"].as_array().expect("Expected articles array");
+    let articles = body["articles"]
+        .as_array()
+        .expect("Expected articles array");
     assert_eq!(articles.len(), 0);
 }
 
@@ -303,7 +318,9 @@ async fn test_draft_not_in_public_listing() {
     assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse response");
-    let articles = body["articles"].as_array().expect("Expected articles array");
+    let articles = body["articles"]
+        .as_array()
+        .expect("Expected articles array");
 
     // Only the published article should appear
     assert_eq!(articles.len(), 1);
@@ -375,11 +392,10 @@ async fn test_empty_drafts_page() {
     assert_eq!(response.status(), 200);
 
     let body = response.assert_html_response().await;
-    assert_body_contains(&body, &[
-        "Draft Articles",
-        "No Drafts Yet",
-        "Create Your First Draft",
-    ]);
+    assert_body_contains(
+        &body,
+        &["Draft Articles", "No Drafts Yet", "Create Your First Draft"],
+    );
 }
 
 #[tokio::test]

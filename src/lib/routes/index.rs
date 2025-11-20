@@ -180,7 +180,8 @@ pub async fn get_index(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("index.html", &tera::Context::from_serialize(&context)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
@@ -244,7 +245,8 @@ pub async fn get_about(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("about.html", &tera::Context::from_serialize(&context)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
@@ -308,7 +310,8 @@ pub async fn get_privacy(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("privacy.html", &tera::Context::from_serialize(&context)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
@@ -372,7 +375,8 @@ pub async fn get_terms(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("terms.html", &tera::Context::from_serialize(&context)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 

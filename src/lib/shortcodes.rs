@@ -116,10 +116,7 @@ async fn resolve_shortcode(
     };
 
     // Article found - use custom text if provided, otherwise use article title
-    let link_text = shortcode
-        .custom_text
-        .as_deref()
-        .unwrap_or(&article_title);
+    let link_text = shortcode.custom_text.as_deref().unwrap_or(&article_title);
 
     Ok(format!("[{}](/articles/{})", link_text, shortcode.slug))
 }
@@ -139,10 +136,7 @@ async fn resolve_shortcode(
 /// // If the article exists: "Check out [Introduction to Rust](/articles/rust-intro) for more"
 /// // If not: "Check out [rust-intro](/articles/rust-intro \"Article not found\") for more"
 /// ```
-pub async fn process_shortcodes(
-    text: &str,
-    db: &DatabaseConnection,
-) -> Result<String, AppError> {
+pub async fn process_shortcodes(text: &str, db: &DatabaseConnection) -> Result<String, AppError> {
     let shortcodes = parse_shortcodes(text);
 
     // If no shortcodes found, return original text

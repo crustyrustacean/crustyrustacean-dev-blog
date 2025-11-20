@@ -17,7 +17,10 @@ async fn cookie_persists_across_multiple_page_navigations() {
         .await
         .expect("Failed to register");
 
-    let body: serde_json::Value = register_response.json().await.expect("Failed to parse JSON");
+    let body: serde_json::Value = register_response
+        .json()
+        .await
+        .expect("Failed to parse JSON");
     let token = body["user"]["token"].as_str().expect("No token");
 
     // Step 2: Navigate to admin dashboard with cookie
@@ -31,7 +34,11 @@ async fn cookie_persists_across_multiple_page_navigations() {
         .await
         .expect("Failed to navigate to admin");
 
-    assert_eq!(admin_response.status(), 200, "Failed to access admin dashboard with cookie");
+    assert_eq!(
+        admin_response.status(),
+        200,
+        "Failed to access admin dashboard with cookie"
+    );
 
     // Step 3: Navigate to user management with the SAME cookie
     let users_response = app
@@ -42,7 +49,11 @@ async fn cookie_persists_across_multiple_page_navigations() {
         .await
         .expect("Failed to navigate to users");
 
-    assert_eq!(users_response.status(), 200, "Failed to access user management with same cookie");
+    assert_eq!(
+        users_response.status(),
+        200,
+        "Failed to access user management with same cookie"
+    );
 
     // Step 4: Navigate to account settings with the SAME cookie
     let account_response = app
@@ -53,7 +64,11 @@ async fn cookie_persists_across_multiple_page_navigations() {
         .await
         .expect("Failed to navigate to account");
 
-    assert_eq!(account_response.status(), 200, "Failed to access account settings with same cookie");
+    assert_eq!(
+        account_response.status(),
+        200,
+        "Failed to access account settings with same cookie"
+    );
 
     // Step 5: Make an API call with the SAME cookie
     let api_response = app
@@ -64,7 +79,11 @@ async fn cookie_persists_across_multiple_page_navigations() {
         .await
         .expect("Failed to call API");
 
-    assert_eq!(api_response.status(), 200, "Failed to call API with same cookie");
+    assert_eq!(
+        api_response.status(),
+        200,
+        "Failed to call API with same cookie"
+    );
 }
 
 #[tokio::test]

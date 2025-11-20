@@ -5,7 +5,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// User roles in the system with hierarchical permissions
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     /// Full system access, user management, role assignment
@@ -13,6 +13,7 @@ pub enum Role {
     /// Can write and manage own articles, has subscriber permissions
     Author,
     /// Can read content, manage own account
+    #[default]
     Subscriber,
 }
 
@@ -72,12 +73,6 @@ impl FromStr for Role {
             "subscriber" => Ok(Role::Subscriber),
             _ => Err(format!("Invalid role: {}", s)),
         }
-    }
-}
-
-impl Default for Role {
-    fn default() -> Self {
-        Role::Subscriber
     }
 }
 

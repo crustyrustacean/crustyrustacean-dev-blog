@@ -27,7 +27,8 @@ pub async fn handle_404(
         request_path: Some(request_path),
     };
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("errors/404.html", &tera::Context::from_serialize(&content)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
@@ -43,7 +44,8 @@ pub async fn handle_404_simple(
         request_path: None,
     };
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("errors/404.html", &tera::Context::from_serialize(&content)?)
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 

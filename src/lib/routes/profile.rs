@@ -110,8 +110,12 @@ pub async fn get_profile_page(
         total_pages: 1,
     };
 
-    let html = state.templates
-        .render("profile/profile.html", &tera::Context::from_serialize(&profile_content)?)
+    let html = state
+        .templates
+        .render(
+            "profile/profile.html",
+            &tera::Context::from_serialize(&profile_content)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -187,8 +191,12 @@ pub async fn get_my_favorites_page(
         "articles": articles
     });
 
-    let html = state.templates
-        .render("profile/favorites.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "profile/favorites.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -264,8 +272,12 @@ pub async fn get_authors_page(
         "search_query": query.search
     });
 
-    let html = state.templates
-        .render("profile/authors.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "profile/authors.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))

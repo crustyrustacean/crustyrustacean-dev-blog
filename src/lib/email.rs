@@ -57,11 +57,7 @@ impl EmailService {
     /// Send welcome email
     /// Currently logs to console
     /// TODO: Integrate actual email sending
-    pub async fn send_welcome_email(
-        &self,
-        to_email: &str,
-        username: &str,
-    ) -> Result<(), AppError> {
+    pub async fn send_welcome_email(&self, to_email: &str, username: &str) -> Result<(), AppError> {
         info!(
             "=== WELCOME EMAIL ===\n\
             To: {}\n\

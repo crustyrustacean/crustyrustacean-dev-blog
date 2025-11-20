@@ -2,7 +2,7 @@
 //
 // Comprehensive tests for Role-Based Access Control (RBAC) system
 
-use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::helpers::{TestUserBuilder, spawn_app};
 
 #[tokio::test]
 async fn test_first_user_gets_admin_role() {
@@ -172,18 +172,27 @@ async fn test_author_can_create_articles() {
     // Admin promotes subscriber to author
     let users_response = app
         .client
-        .get(format!("{}/api/admin/users?search={}", &app.address, user_id))
+        .get(format!(
+            "{}/api/admin/users?search={}",
+            &app.address, user_id
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .send()
         .await
         .expect("Failed to execute request");
 
-    let users: serde_json::Value = users_response.json().await.expect("Failed to parse response");
+    let users: serde_json::Value = users_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let author_user_id = users["data"]["users"][0]["id"].as_str().unwrap();
 
     let promote_response = app
         .client
-        .put(format!("{}/api/admin/users/{}", &app.address, author_user_id))
+        .put(format!(
+            "{}/api/admin/users/{}",
+            &app.address, author_user_id
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .json(&serde_json::json!({
             "role": "author"
@@ -208,7 +217,10 @@ async fn test_author_can_create_articles() {
         .await
         .expect("Failed to execute request");
 
-    let login_body: serde_json::Value = login_response.json().await.expect("Failed to parse response");
+    let login_body: serde_json::Value = login_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let author_token = login_body["user"]["token"].as_str().unwrap();
 
     // Try to create article as author
@@ -312,17 +324,26 @@ async fn test_author_can_create_categories() {
     // Admin promotes subscriber to author
     let users_response = app
         .client
-        .get(format!("{}/api/admin/users?search={}", &app.address, user_id))
+        .get(format!(
+            "{}/api/admin/users?search={}",
+            &app.address, user_id
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .send()
         .await
         .expect("Failed to execute request");
 
-    let users: serde_json::Value = users_response.json().await.expect("Failed to parse response");
+    let users: serde_json::Value = users_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let author_user_id = users["data"]["users"][0]["id"].as_str().unwrap();
 
     app.client
-        .put(format!("{}/api/admin/users/{}", &app.address, author_user_id))
+        .put(format!(
+            "{}/api/admin/users/{}",
+            &app.address, author_user_id
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .json(&serde_json::json!({
             "role": "author"
@@ -345,7 +366,10 @@ async fn test_author_can_create_categories() {
         .await
         .expect("Failed to execute request");
 
-    let login_body: serde_json::Value = login_response.json().await.expect("Failed to parse response");
+    let login_body: serde_json::Value = login_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let author_token = login_body["user"]["token"].as_str().unwrap();
 
     // Try to create category as author
@@ -421,13 +445,19 @@ async fn test_admin_can_promote_subscriber_to_author() {
     // Get subscriber's user ID
     let users_response = app
         .client
-        .get(format!("{}/api/admin/users?search=subscriber", &app.address))
+        .get(format!(
+            "{}/api/admin/users?search=subscriber",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .send()
         .await
         .expect("Failed to execute request");
 
-    let users: serde_json::Value = users_response.json().await.expect("Failed to parse response");
+    let users: serde_json::Value = users_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let subscriber_id = users["data"]["users"][0]["id"].as_str().unwrap();
     let current_role = users["data"]["users"][0]["role"].as_str().unwrap();
 
@@ -436,7 +466,10 @@ async fn test_admin_can_promote_subscriber_to_author() {
     // Promote subscriber to author
     let response = app
         .client
-        .put(format!("{}/api/admin/users/{}", &app.address, subscriber_id))
+        .put(format!(
+            "{}/api/admin/users/{}",
+            &app.address, subscriber_id
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .json(&serde_json::json!({
             "role": "author"
@@ -470,7 +503,10 @@ async fn test_admin_can_promote_author_to_admin() {
         .await
         .expect("Failed to execute request");
 
-    let users: serde_json::Value = users_response.json().await.expect("Failed to parse response");
+    let users: serde_json::Value = users_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let user_id = users["data"]["users"][0]["id"].as_str().unwrap();
 
     // Promote to author first
@@ -521,7 +557,10 @@ async fn test_admin_can_demote_author_to_subscriber() {
         .await
         .expect("Failed to execute request");
 
-    let users: serde_json::Value = users_response.json().await.expect("Failed to parse response");
+    let users: serde_json::Value = users_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let user_id = users["data"]["users"][0]["id"].as_str().unwrap();
 
     // Promote to author
@@ -566,13 +605,19 @@ async fn test_non_admin_cannot_update_user_roles() {
     let admin_token = app.register_user_default("tempAdmin").await;
     let users_response = app
         .client
-        .get(format!("{}/api/admin/users?search=subscriber2", &app.address))
+        .get(format!(
+            "{}/api/admin/users?search=subscriber2",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .send()
         .await
         .expect("Failed to execute request");
 
-    let users: serde_json::Value = users_response.json().await.expect("Failed to parse response");
+    let users: serde_json::Value = users_response
+        .json()
+        .await
+        .expect("Failed to parse response");
 
     // If no users found, the endpoint might have failed due to permissions
     if users["data"]["users"].as_array().map_or(0, |a| a.len()) == 0 {
@@ -611,13 +656,19 @@ async fn test_role_validation_rejects_invalid_roles() {
     // Get subscriber's user ID
     let users_response = app
         .client
-        .get(format!("{}/api/admin/users?search=subscriber", &app.address))
+        .get(format!(
+            "{}/api/admin/users?search=subscriber",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", admin_token))
         .send()
         .await
         .expect("Failed to execute request");
 
-    let users: serde_json::Value = users_response.json().await.expect("Failed to parse response");
+    let users: serde_json::Value = users_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let user_id = users["data"]["users"][0]["id"].as_str().unwrap();
 
     // Try to set invalid role

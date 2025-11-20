@@ -42,7 +42,7 @@ fn setup_templates(config: &AppConfig) -> Result<&'static Tera, tera::Error> {
 fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Tera, tera::Error> {
     COMPILED_TEMPLATES.get_or_try_init(|| {
         let mut tera = Tera::new(templates_dir)?;
-        
+
         let external = config.external_stylesheet.clone();
         let override_css = config.override_stylesheet.clone();
 
@@ -76,7 +76,9 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
                 let path = args
                     .get("path")
                     .and_then(|v| from_value::<String>(v.clone()).ok())
-                    .ok_or_else(|| tera::Error::msg("versioned_asset requires a 'path' argument"))?;
+                    .ok_or_else(|| {
+                        tera::Error::msg("versioned_asset requires a 'path' argument")
+                    })?;
 
                 let versioned_url = format!("{}?v={}", path, app_version);
                 Ok(Value::String(versioned_url))

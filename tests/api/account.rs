@@ -1,6 +1,6 @@
 // tests/api/account.rs
 
-use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::helpers::{TestUserBuilder, spawn_app};
 use serde_json::json;
 
 #[tokio::test]

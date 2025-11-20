@@ -3,7 +3,10 @@
 use crate::{
     AppError, AppState,
     auth::{AuthenticatedUser, AuthorUser},
-    models::{CategoriesResponse, CategoryResponse, CreateCategory, SingleCategoryResponse, UpdateCategory},
+    models::{
+        CategoriesResponse, CategoryResponse, CreateCategory, SingleCategoryResponse,
+        UpdateCategory,
+    },
 };
 use axum::{
     extract::{Path, State},
@@ -27,7 +30,9 @@ fn slugify(name: &str) -> String {
 }
 
 /// GET /api/categories - List all categories
-pub async fn get_categories(State(state): State<AppState>) -> Result<Json<CategoriesResponse>, AppError> {
+pub async fn get_categories(
+    State(state): State<AppState>,
+) -> Result<Json<CategoriesResponse>, AppError> {
     let conn = state
         .db
         .connect()
@@ -255,7 +260,11 @@ pub async fn update_category(
         let mut conflict_rows = conn
             .query(
                 "SELECT id FROM categories WHERE (name = ? OR slug = ?) AND id != ?",
-                libsql::params![update_data.name.clone(), new_slug.clone(), category_id.clone()],
+                libsql::params![
+                    update_data.name.clone(),
+                    new_slug.clone(),
+                    category_id.clone()
+                ],
             )
             .await
             .map_err(|e| AppError::InternalServerError(e.to_string()))?;
@@ -413,8 +422,12 @@ pub async fn get_categories_admin_page(
         "user": user_info,
     });
 
-    let html = state.templates
-        .render("admin/categories.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "admin/categories.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))

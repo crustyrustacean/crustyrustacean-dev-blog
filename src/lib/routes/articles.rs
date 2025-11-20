@@ -536,8 +536,12 @@ pub async fn get_editor_page(
         "user": user_info
     });
 
-    let html = state.templates
-        .render("articles/editor.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "articles/editor.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -549,7 +553,14 @@ pub async fn get_edit_article_page(
     Path(slug): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     // Get the article to edit
-    let article_response = get_article(State(state.clone()), Path(slug.clone()), OptionalUser { user: Some(user.clone()) }).await?;
+    let article_response = get_article(
+        State(state.clone()),
+        Path(slug.clone()),
+        OptionalUser {
+            user: Some(user.clone()),
+        },
+    )
+    .await?;
     let article = article_response.0.article;
 
     // Check if the current user is the author
@@ -636,8 +647,12 @@ pub async fn get_edit_article_page(
         "user": user_info
     });
 
-    let html = state.templates
-        .render("articles/editor.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "articles/editor.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -704,7 +719,7 @@ pub async fn get_admin_dashboard(
     let total_articles = match conn
         .query(
             "SELECT COUNT(*) FROM articles WHERE draft = 0",
-            libsql::params![]
+            libsql::params![],
         )
         .await
     {
@@ -741,8 +756,12 @@ pub async fn get_admin_dashboard(
     });
 
     tracing::info!("Rendering admin dashboard template");
-    let html = state.templates
-        .render("admin/dashboard.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "admin/dashboard.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -921,7 +940,14 @@ pub async fn update_article(
         user_id: user.user_id,
         role: user.role,
     };
-    get_article(State(state), Path(slug), OptionalUser { user: Some(auth_user) }).await
+    get_article(
+        State(state),
+        Path(slug),
+        OptionalUser {
+            user: Some(auth_user),
+        },
+    )
+    .await
 }
 
 pub async fn delete_article(
@@ -1169,7 +1195,14 @@ pub async fn get_article_page(
     optional_user: OptionalUser,
 ) -> Result<impl IntoResponse, AppError> {
     // Get the article data using the existing API endpoint
-    let article_response = get_article(State(state.clone()), Path(slug.clone()), OptionalUser { user: optional_user.user.clone() }).await?;
+    let article_response = get_article(
+        State(state.clone()),
+        Path(slug.clone()),
+        OptionalUser {
+            user: optional_user.user.clone(),
+        },
+    )
+    .await?;
     let article = article_response.0.article;
 
     // Get user info if authenticated
@@ -1222,8 +1255,12 @@ pub async fn get_article_page(
         "article": article
     });
 
-    let html = state.templates
-        .render("articles/article.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "articles/article.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -1418,8 +1455,12 @@ pub async fn get_articles_list_page(
         }
     });
 
-    let html = state.templates
-        .render("articles/list.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "articles/list.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -1968,8 +2009,12 @@ pub async fn get_articles_feed_page(
         "latest_post_date": latest_post_date,
     });
 
-    let html = state.templates
-        .render("articles/feed.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "articles/feed.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -2151,10 +2196,10 @@ pub async fn upload_markdown_file(
                 .await
                 .map_err(|e| AppError::BadRequest(format!("Failed to read file data: {}", e)))?;
 
-            file_content = Some(
-                String::from_utf8(bytes.to_vec())
-                    .map_err(|_| AppError::BadRequest("File must be valid UTF-8 text".to_string()))?,
-            );
+            file_content =
+                Some(String::from_utf8(bytes.to_vec()).map_err(|_| {
+                    AppError::BadRequest("File must be valid UTF-8 text".to_string())
+                })?);
         }
     }
 
@@ -2168,8 +2213,8 @@ pub async fn upload_markdown_file(
         ));
     }
 
-    let content = file_content
-        .ok_or_else(|| AppError::BadRequest("No file content provided".to_string()))?;
+    let content =
+        file_content.ok_or_else(|| AppError::BadRequest("No file content provided".to_string()))?;
 
     // Check file size (1MB limit for markdown files)
     const MAX_FILE_SIZE: usize = 1024 * 1024;
@@ -2307,8 +2352,12 @@ pub async fn get_api_keys_admin_page(
         "user": user_info,
     });
 
-    let html = state.templates
-        .render("admin/api-keys.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "admin/api-keys.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
@@ -2529,8 +2578,12 @@ pub async fn get_drafts_admin_page(
         "drafts": drafts,
     });
 
-    let html = state.templates
-        .render("admin/drafts.html", &tera::Context::from_serialize(&context)?)
+    let html = state
+        .templates
+        .render(
+            "admin/drafts.html",
+            &tera::Context::from_serialize(&context)?,
+        )
         .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
