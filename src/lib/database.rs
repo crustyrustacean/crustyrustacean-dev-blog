@@ -55,6 +55,17 @@ impl DatabaseConnection {
         .await;
         // Ignore error if column already exists
 
+        // Promote the first user to admin if they don't already have admin role
+        // This handles the case where existing users were created before RBAC was implemented
+        let _ = conn.execute(
+            r"UPDATE users
+              SET role = 'admin'
+              WHERE id = (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)
+              AND role = 'subscriber'",
+            (),
+        )
+        .await;
+
         // Create articles table
         conn.execute(
             r"
