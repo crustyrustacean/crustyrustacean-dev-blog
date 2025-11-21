@@ -1,6 +1,6 @@
 // tests/api/tags.rs
 
-use crate::helpers::{TestArticleBuilder, TestUserBuilder, spawn_app};
+use crate::helpers::{TestArticleBuilder, TestFixture, TestUserBuilder, spawn_app};
 use crate::{assert_status, bearer_request, parse_json};
 use reqwest::StatusCode;
 use serde_json::json;
@@ -116,11 +116,17 @@ async fn get_tags_returns_tags_in_alphabetical_order() {
 #[tokio::test]
 async fn update_tag_happy_path() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app.register_user_default("tagupdater").await;
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("tagupdater")
+        .await
+        .promote_to_author("tagupdater")
+        .await;
+
+    let token = fixture.get_token("tagupdater");
 
     // Create article with a tag
-    app.create_article(
+    fixture.app.create_article(
         &token,
         "Test article",
         "Testing tag update",
@@ -137,8 +143,8 @@ async fn update_tag_happy_path() {
     });
 
     let response = bearer_request!(
-        put & app,
-        format!("{}/api/tags/oldtag", &app.address),
+        put & fixture.app,
+        format!("{}/api/tags/oldtag", &fixture.app.address),
         &token,
         update_body
     )
@@ -150,9 +156,9 @@ async fn update_tag_happy_path() {
     assert_eq!(body["tag"], "newtag");
 
     // Verify the old tag no longer exists and new tag exists
-    let tags_response = app
+    let tags_response = fixture.app
         .client
-        .get(format!("{}/api/tags", &app.address))
+        .get(format!("{}/api/tags", &fixture.app.address))
         .send()
         .await
         .expect("Failed to get tags");
@@ -196,8 +202,14 @@ async fn update_tag_requires_authentication() {
 #[tokio::test]
 async fn update_nonexistent_tag() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app.register_user_default("testuser").await;
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("testuser")
+        .await
+        .promote_to_author("testuser")
+        .await;
+
+    let token = fixture.get_token("testuser");
 
     // Act - Try to update a tag that doesn't exist
     let update_body = json!({
@@ -207,8 +219,8 @@ async fn update_nonexistent_tag() {
     });
 
     let response = bearer_request!(
-        put & app,
-        format!("{}/api/tags/nonexistent", &app.address),
+        put & fixture.app,
+        format!("{}/api/tags/nonexistent", &fixture.app.address),
         &token,
         update_body
     )
@@ -221,11 +233,17 @@ async fn update_nonexistent_tag() {
 #[tokio::test]
 async fn update_tag_with_duplicate_name() {
     // Arrange
-    let app = spawn_app().await;
-    let token = app.register_user_default("testuser").await;
+    let fixture = TestFixture::new()
+        .await
+        .with_user_default("testuser")
+        .await
+        .promote_to_author("testuser")
+        .await;
+
+    let token = fixture.get_token("testuser");
 
     // Create article with two tags
-    app.create_article(
+    fixture.app.create_article(
         &token,
         "Test article",
         "Testing",
@@ -242,8 +260,8 @@ async fn update_tag_with_duplicate_name() {
     });
 
     let response = bearer_request!(
-        put & app,
-        format!("{}/api/tags/tag1", &app.address),
+        put & fixture.app,
+        format!("{}/api/tags/tag1", &fixture.app.address),
         &token,
         update_body
     )
