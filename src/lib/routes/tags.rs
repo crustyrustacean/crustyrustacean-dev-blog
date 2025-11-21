@@ -5,7 +5,7 @@
 use crate::state::CachedTags;
 use crate::{
     AppError, AppState,
-    auth::{AuthenticatedUser, AuthorUser},
+    auth::AuthorUser,
     models::{SingleTagResponse, TagsResponse, UpdateTag},
 };
 use axum::{

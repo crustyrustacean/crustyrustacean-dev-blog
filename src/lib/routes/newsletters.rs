@@ -1,6 +1,6 @@
 // src/lib/routes/newsletters.rs
 
-use crate::auth::{AuthenticatedUser, AuthorUser};
+use crate::auth::AuthorUser;
 use crate::errors::AppError;
 use crate::state::AppState;
 use crate::models::{
