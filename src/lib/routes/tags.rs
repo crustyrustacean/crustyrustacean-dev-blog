@@ -5,7 +5,7 @@
 use crate::state::CachedTags;
 use crate::{
     AppError, AppState,
-    auth::AuthenticatedUser,
+    auth::AuthorUser,
     models::{SingleTagResponse, TagsResponse, UpdateTag},
 };
 use axum::{
@@ -64,7 +64,7 @@ pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse
 pub async fn update_tag(
     State(state): State<AppState>,
     Path(old_name): Path<String>,
-    _user: AuthenticatedUser, // Requires authentication
+    _user: AuthorUser, // Requires author or admin role
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<SingleTagResponse>, AppError> {
     let update_data: UpdateTag = serde_json::from_value(
@@ -141,7 +141,7 @@ pub async fn update_tag(
 pub async fn delete_tag(
     State(state): State<AppState>,
     Path(name): Path<String>,
-    _user: AuthenticatedUser, // Requires authentication
+    _user: AuthorUser, // Requires author or admin role
 ) -> Result<StatusCode, AppError> {
     let conn = state
         .db
@@ -185,7 +185,7 @@ pub async fn delete_tag(
 
 pub async fn get_tags_admin_page(
     State(state): State<AppState>,
-    user: AuthenticatedUser,
+    user: AuthorUser,
 ) -> Result<impl IntoResponse, AppError> {
     // Get user info for template context
     let conn = state
