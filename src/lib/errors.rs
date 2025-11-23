@@ -1,9 +1,9 @@
 // src/lib/errors.rs
 
 // dependencies
+use crate::response::ApiResponse;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
 
 // Unified error type for the application
 #[derive(Debug, thiserror::Error)]
@@ -62,16 +62,6 @@ impl From<chrono::ParseError> for AppError {
     }
 }
 
-#[derive(Serialize)]
-struct ErrorResponse {
-    errors: ErrorBody,
-}
-
-#[derive(Serialize)]
-struct ErrorBody {
-    body: Vec<String>,
-}
-
 // implement the IntoResponse trait for the AppError type
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
@@ -89,12 +79,6 @@ impl IntoResponse for AppError {
             ),
         };
 
-        let error_response = ErrorResponse {
-            errors: ErrorBody {
-                body: vec![message],
-            },
-        };
-
-        (status, axum::Json(error_response)).into_response()
+        ApiResponse::<()>::error(&message, status).into_response()
     }
 }
