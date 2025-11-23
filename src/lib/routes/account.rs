@@ -1,6 +1,6 @@
 // src/lib/routes/account.rs
 
-use crate::{AppError, AppState, auth::AuthenticatedUser};
+use crate::{ApiError, AppState, auth::AuthenticatedUser};
 use axum::{
     extract::State,
     response::{Html, IntoResponse},
@@ -13,7 +13,7 @@ use serde_json::json;
 pub async fn get_account_page(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     // Get user information
@@ -27,7 +27,7 @@ pub async fn get_account_page(
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
     let username: String = row.get(0)?;
     let email: String = row.get(1)?;
@@ -54,9 +54,9 @@ pub async fn get_account_page(
                 "authenticated": true,
                 "current_year": chrono::Utc::now().year(),
             }))
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         )
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     Ok(Html(template))
 }

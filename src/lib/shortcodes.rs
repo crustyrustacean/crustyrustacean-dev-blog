@@ -12,7 +12,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 use crate::database::DatabaseConnection;
-use crate::errors::AppError;
+use crate::errors::ApiError;
 
 /// Represents a parsed shortcode
 #[derive(Debug, Clone, PartialEq)]
@@ -80,11 +80,11 @@ pub fn parse_shortcodes(text: &str) -> Vec<Shortcode> {
 async fn resolve_shortcode(
     shortcode: &Shortcode,
     db: &DatabaseConnection,
-) -> Result<String, AppError> {
+) -> Result<String, ApiError> {
     // Get database connection
     let conn = db.connect().map_err(|e| {
         tracing::error!("Database connection failed: {}", e);
-        AppError::InternalServerError(e.to_string())
+        ApiError::InternalServerError(e.to_string())
     })?;
 
     // Query database for article with this slug
@@ -94,17 +94,17 @@ async fn resolve_shortcode(
         .await
         .map_err(|e| {
             tracing::error!("Failed to query article for shortcode: {}", e);
-            AppError::InternalServerError(e.to_string())
+            ApiError::InternalServerError(e.to_string())
         })?;
 
     // Check if article exists
     let article_title = if let Some(row) = rows.next().await.map_err(|e| {
         tracing::error!("Failed to fetch row: {}", e);
-        AppError::InternalServerError(e.to_string())
+        ApiError::InternalServerError(e.to_string())
     })? {
         row.get::<String>(0).map_err(|e| {
             tracing::error!("Failed to get title from row: {}", e);
-            AppError::InternalServerError(e.to_string())
+            ApiError::InternalServerError(e.to_string())
         })?
     } else {
         // Article not found - use slug as fallback text and add tooltip
@@ -136,7 +136,7 @@ async fn resolve_shortcode(
 /// // If the article exists: "Check out [Introduction to Rust](/articles/rust-intro) for more"
 /// // If not: "Check out [rust-intro](/articles/rust-intro \"Article not found\") for more"
 /// ```
-pub async fn process_shortcodes(text: &str, db: &DatabaseConnection) -> Result<String, AppError> {
+pub async fn process_shortcodes(text: &str, db: &DatabaseConnection) -> Result<String, ApiError> {
     let shortcodes = parse_shortcodes(text);
 
     // If no shortcodes found, return original text

@@ -2,7 +2,7 @@
 
 use crate::{
     auth::AuthenticatedUser,
-    errors::AppError,
+    errors::ApiError,
     models::{Media, MediaQuery, MultipleMediaResponse, SingleMediaResponse, UpdateMedia},
     state::AppState,
     storage::generate_media_path,
@@ -24,7 +24,7 @@ pub async fn upload_media(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     mut multipart: Multipart,
-) -> Result<Json<SingleMediaResponse>, AppError> {
+) -> Result<Json<SingleMediaResponse>, ApiError> {
     let mut filename: Option<String> = None;
     let mut file_data: Option<Vec<u8>> = None;
     let mut content_type: Option<String> = None;
@@ -37,7 +37,7 @@ pub async fn upload_media(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| AppError::BadRequest(format!("Failed to read multipart field: {}", e)))?
+        .map_err(|e| ApiError::BadRequest(format!("Failed to read multipart field: {}", e)))?
     {
         let field_name = field.name().unwrap_or("").to_string();
 
@@ -50,7 +50,7 @@ pub async fn upload_media(
                 if let Some(ct) = &content_type
                     && !ct.starts_with("image/")
                 {
-                    return Err(AppError::BadRequest(
+                    return Err(ApiError::BadRequest(
                         "Only image files are allowed".to_string(),
                     ));
                 }
@@ -60,7 +60,7 @@ pub async fn upload_media(
                         .bytes()
                         .await
                         .map_err(|e| {
-                            AppError::BadRequest(format!("Failed to read file data: {}", e))
+                            ApiError::BadRequest(format!("Failed to read file data: {}", e))
                         })?
                         .to_vec(),
                 );
@@ -68,23 +68,23 @@ pub async fn upload_media(
             "title" => {
                 title =
                     Some(field.text().await.map_err(|e| {
-                        AppError::BadRequest(format!("Failed to read title: {}", e))
+                        ApiError::BadRequest(format!("Failed to read title: {}", e))
                     })?);
             }
             "alt_text" => {
                 alt_text = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("Failed to read alt_text: {}", e))
+                    ApiError::BadRequest(format!("Failed to read alt_text: {}", e))
                 })?);
             }
             "caption" => {
                 caption =
                     Some(field.text().await.map_err(|e| {
-                        AppError::BadRequest(format!("Failed to read caption: {}", e))
+                        ApiError::BadRequest(format!("Failed to read caption: {}", e))
                     })?);
             }
             "description" => {
                 description = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("Failed to read description: {}", e))
+                    ApiError::BadRequest(format!("Failed to read description: {}", e))
                 })?);
             }
             _ => {}
@@ -92,15 +92,15 @@ pub async fn upload_media(
     }
 
     // Validate required fields
-    let filename = filename.ok_or_else(|| AppError::BadRequest("No file provided".to_string()))?;
+    let filename = filename.ok_or_else(|| ApiError::BadRequest("No file provided".to_string()))?;
 
     let file_data =
-        file_data.ok_or_else(|| AppError::BadRequest("No file data provided".to_string()))?;
+        file_data.ok_or_else(|| ApiError::BadRequest("No file data provided".to_string()))?;
 
     // Check file size (50MB limit)
     const MAX_FILE_SIZE: usize = 50 * 1024 * 1024;
     if file_data.len() > MAX_FILE_SIZE {
-        return Err(AppError::BadRequest(
+        return Err(ApiError::BadRequest(
             "File size exceeds 50MB limit".to_string(),
         ));
     }
@@ -119,13 +119,13 @@ pub async fn upload_media(
         .storage
         .upload(&storage_path, file_data.clone(), content_type.clone())
         .await
-        .map_err(|e| AppError::InternalServerError(format!("Storage upload failed: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Storage upload failed: {}", e)))?;
 
     // Create media record in database
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
@@ -133,7 +133,7 @@ pub async fn upload_media(
     conn.execute(
         r#"
         INSERT INTO media_library (
-            id, user_id, filename, storage_path, title, alt_text, 
+            id, user_id, filename, storage_path, title, alt_text,
             caption, description, mime_type, file_size, width, height,
             uploaded_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -158,7 +158,7 @@ pub async fn upload_media(
         ],
     )
     .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let media = Media {
         id: id.clone(),
@@ -188,11 +188,11 @@ pub async fn list_media(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Query(query): Query<MediaQuery>,
-) -> Result<Json<MultipleMediaResponse>, AppError> {
+) -> Result<Json<MultipleMediaResponse>, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
@@ -235,57 +235,57 @@ pub async fn list_media(
     let mut rows = conn
         .query(&sql, libsql::params_from_iter(params))
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut media_list = Vec::new();
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let media = Media {
             id: row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             user_id: row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             filename: row
                 .get(2)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             storage_path: row
                 .get(3)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             title: row
                 .get(4)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             alt_text: row
                 .get(5)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             caption: row
                 .get(6)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             description: row
                 .get(7)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             mime_type: row
                 .get(8)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             file_size: row
                 .get(9)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             width: row
                 .get(10)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             height: row
                 .get(11)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             uploaded_at: row
                 .get(12)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             updated_at: row
                 .get(13)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         };
         media_list.push(media.into());
     }
@@ -297,15 +297,15 @@ pub async fn list_media(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let media_count = if let Some(row) = count_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         row.get::<i64>(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     } else {
         0
     };
@@ -322,11 +322,11 @@ pub async fn get_media_metadata(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(id): Path<String>,
-) -> Result<Json<SingleMediaResponse>, AppError> {
+) -> Result<Json<SingleMediaResponse>, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -340,64 +340,64 @@ pub async fn get_media_metadata(
             libsql::params![id],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let media = if let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         Media {
             id: row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             user_id: row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             filename: row
                 .get(2)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             storage_path: row
                 .get(3)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             title: row
                 .get(4)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             alt_text: row
                 .get(5)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             caption: row
                 .get(6)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             description: row
                 .get(7)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             mime_type: row
                 .get(8)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             file_size: row
                 .get(9)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             width: row
                 .get(10)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             height: row
                 .get(11)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             uploaded_at: row
                 .get(12)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             updated_at: row
                 .get(13)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         }
     } else {
-        return Err(AppError::NotFound("Media not found".to_string()));
+        return Err(ApiError::NotFound("Media not found".to_string()));
     };
 
     // Verify ownership
     if media.user_id != user.user_id.to_string() {
-        return Err(AppError::Forbidden(
+        return Err(ApiError::Forbidden(
             "You don't have permission to access this media".to_string(),
         ));
     }
@@ -414,11 +414,11 @@ pub async fn update_media_metadata(
     user: AuthenticatedUser,
     Path(id): Path<String>,
     Json(payload): Json<UpdateMedia>,
-) -> Result<Json<SingleMediaResponse>, AppError> {
+) -> Result<Json<SingleMediaResponse>, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     // First, check if media exists and user owns it
     let mut check_rows = conn
@@ -427,21 +427,21 @@ pub async fn update_media_metadata(
             libsql::params![id.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let owner_id: String = if let Some(row) = check_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         row.get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     } else {
-        return Err(AppError::NotFound("Media not found".to_string()));
+        return Err(ApiError::NotFound("Media not found".to_string()));
     };
 
     if owner_id != user.user_id.to_string() {
-        return Err(AppError::Forbidden(
+        return Err(ApiError::Forbidden(
             "You don't have permission to update this media".to_string(),
         ));
     }
@@ -464,7 +464,7 @@ pub async fn update_media_metadata(
         ],
     )
     .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     // Fetch updated media
     let mut rows = conn
@@ -479,59 +479,59 @@ pub async fn update_media_metadata(
             libsql::params![id],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let media = if let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         Media {
             id: row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             user_id: row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             filename: row
                 .get(2)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             storage_path: row
                 .get(3)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             title: row
                 .get(4)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             alt_text: row
                 .get(5)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             caption: row
                 .get(6)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             description: row
                 .get(7)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             mime_type: row
                 .get(8)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             file_size: row
                 .get(9)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             width: row
                 .get(10)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             height: row
                 .get(11)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             uploaded_at: row
                 .get(12)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             updated_at: row
                 .get(13)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         }
     } else {
-        return Err(AppError::NotFound(
+        return Err(ApiError::NotFound(
             "Media not found after update".to_string(),
         ));
     };
@@ -547,11 +547,11 @@ pub async fn delete_media(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(id): Path<String>,
-) -> Result<StatusCode, AppError> {
+) -> Result<StatusCode, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     // Fetch media to get storage path and verify ownership
     let mut rows = conn
@@ -560,25 +560,25 @@ pub async fn delete_media(
             libsql::params![id.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let (owner_id, storage_path): (String, String) = if let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         (
             row.get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             row.get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         )
     } else {
-        return Err(AppError::NotFound("Media not found".to_string()));
+        return Err(ApiError::NotFound("Media not found".to_string()));
     };
 
     if owner_id != user.user_id.to_string() {
-        return Err(AppError::Forbidden(
+        return Err(ApiError::Forbidden(
             "You don't have permission to delete this media".to_string(),
         ));
     }
@@ -588,7 +588,7 @@ pub async fn delete_media(
         .storage
         .delete(&storage_path)
         .await
-        .map_err(|e| AppError::InternalServerError(format!("Storage deletion failed: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Storage deletion failed: {}", e)))?;
 
     // Delete from database
     conn.execute(
@@ -596,7 +596,7 @@ pub async fn delete_media(
         libsql::params![id],
     )
     .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -606,11 +606,11 @@ pub async fn delete_media(
 pub async fn download_media(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<Response, AppError> {
+) -> Result<Response, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -618,29 +618,29 @@ pub async fn download_media(
             libsql::params![id],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let (storage_path, filename, mime_type): (String, String, String) = if let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         (
             row.get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             row.get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             row.get(2)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         )
     } else {
-        return Err(AppError::NotFound("Media not found".to_string()));
+        return Err(ApiError::NotFound("Media not found".to_string()));
     };
 
     // Download from storage
     let file_data =
         state.storage.download(&storage_path).await.map_err(|e| {
-            AppError::InternalServerError(format!("Storage download failed: {}", e))
+            ApiError::InternalServerError(format!("Storage download failed: {}", e))
         })?;
 
     // Return file with appropriate headers
@@ -668,12 +668,12 @@ pub async fn download_media(
 pub async fn get_media_library_page(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut user_rows = conn
         .query(
@@ -681,19 +681,19 @@ pub async fn get_media_library_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let email: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -720,7 +720,7 @@ pub async fn get_media_library_page(
             "media/library.html",
             &tera::Context::from_serialize(&context)?,
         )
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }

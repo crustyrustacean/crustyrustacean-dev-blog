@@ -3,7 +3,7 @@
 // route handlers for profile pages
 
 // dependencies
-use crate::{auth::AuthenticatedUser, errors::AppError, models::ProfilesQuery, state::AppState};
+use crate::{auth::AuthenticatedUser, errors::ApiError, models::ProfilesQuery, state::AppState};
 use axum::{
     extract::{Path, Query, State},
     response::{Html, IntoResponse},
@@ -58,7 +58,7 @@ struct ProfilePageContent {
 pub async fn get_profile_page(
     State(state): State<AppState>,
     Path(username): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Mock profile data - in a real app, this would come from the database
     let profile = UserProfile {
         username: username.clone(),
@@ -116,7 +116,7 @@ pub async fn get_profile_page(
             "profile/profile.html",
             &tera::Context::from_serialize(&profile_content)?,
         )
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }
@@ -124,11 +124,11 @@ pub async fn get_profile_page(
 pub async fn get_my_favorites_page(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
     let conn = state.db.connect().map_err(|e| {
         tracing::error!("Database connection failed: {}", e);
-        AppError::InternalServerError(e.to_string())
+        ApiError::InternalServerError(e.to_string())
     })?;
 
     let mut user_rows = conn
@@ -137,19 +137,19 @@ pub async fn get_my_favorites_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let email: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -197,7 +197,7 @@ pub async fn get_my_favorites_page(
             "profile/favorites.html",
             &tera::Context::from_serialize(&context)?,
         )
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }
@@ -206,11 +206,11 @@ pub async fn get_authors_page(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Query(query): Query<ProfilesQuery>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
     let conn = state.db.connect().map_err(|e| {
         tracing::error!("Database connection failed: {}", e);
-        AppError::InternalServerError(e.to_string())
+        ApiError::InternalServerError(e.to_string())
     })?;
 
     let mut user_rows = conn
@@ -219,19 +219,19 @@ pub async fn get_authors_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let email: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -278,7 +278,7 @@ pub async fn get_authors_page(
             "profile/authors.html",
             &tera::Context::from_serialize(&context)?,
         )
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }

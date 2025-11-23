@@ -611,7 +611,7 @@ The project has established several patterns that should be followed:
 - Consistent JSON structure with proper HTTP status codes
 - Validation errors return detailed messages
 - Authorization failures return 401/403 appropriately
-- Use `AppError` type for error handling
+- Use `ApiError` type for error handling
 
 **Database Migrations:**
 - Add migration logic to `src/lib/database.rs`
