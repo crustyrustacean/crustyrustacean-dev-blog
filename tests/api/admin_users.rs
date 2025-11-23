@@ -404,8 +404,9 @@ async fn delete_user_admin_prevents_self_deletion() {
     assert_eq!(response.status(), 400, "Expected 400 Bad Request");
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
+    assert_eq!(body["success"], false);
     assert!(
-        body["errors"]["body"][0]
+        body["message"]
             .as_str()
             .unwrap()
             .contains("Cannot delete your own account")
