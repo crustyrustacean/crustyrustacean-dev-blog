@@ -100,7 +100,7 @@ async fn associate_tags_with_article(
             libsql::params![tag_id.to_string(), tag_name.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
         // Get the tag ID (either newly created or existing)
         let mut tag_rows = conn
@@ -109,16 +109,16 @@ async fn associate_tags_with_article(
                 libsql::params![tag_name.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(tag_row) = tag_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let existing_tag_id: String = tag_row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
 
             // Link article to tag
             conn.execute(
@@ -126,7 +126,7 @@ async fn associate_tags_with_article(
                 libsql::params![article_id, existing_tag_id],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
             associated_tags.push(tag_name.clone());
         }
@@ -155,7 +155,7 @@ pub async fn create_article(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Generate base slug from title
     let base_slug = slugify(&article_data.title);
@@ -171,12 +171,12 @@ pub async fn create_article(
                 libsql::params![slug.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if slug_check
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .is_none()
         {
             break; // Slug is unique
@@ -206,16 +206,16 @@ pub async fn create_article(
                 libsql::params![cat_slug.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(cat_row) = cat_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let cat_id: String = cat_row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             (Some(cat_id), Some(cat_slug.clone()))
         } else {
             return Err(ApiError::BadRequest(format!(
@@ -249,7 +249,7 @@ pub async fn create_article(
         ],
     )
     .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    ?;
 
     // Handle tags if provided
     let tag_names = if let Some(tags) = &article_data.tag_list {
@@ -265,17 +265,17 @@ pub async fn create_article(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let author_row = author_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::InternalServerError("Author not found".to_string()))?;
 
     let username: String = author_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let bio: Option<String> = author_row.get(1).ok();
     let image: Option<String> = author_row.get(2).ok();
 
@@ -319,7 +319,7 @@ pub async fn get_article(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Get the article with author information
     let mut article_rows = conn
@@ -337,44 +337,44 @@ pub async fn get_article(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let article_slug: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let title: String = article_row
         .get(1)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let description: String = article_row
         .get(2)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let body: String = article_row
         .get(3)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let created_at_str: String = article_row
         .get(4)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let updated_at_str: String = article_row
         .get(5)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let author_id_str: String = article_row
         .get(6)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let username: String = article_row
         .get(7)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let bio: Option<String> = article_row.get(8).ok();
     let image: Option<String> = article_row.get(9).ok();
     let category_slug: Option<String> = article_row.get(10).ok();
     let draft: i64 = article_row
         .get(11)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let is_draft = draft_int_to_bool(draft);
 
     // If article is a draft, only the author can see it
@@ -395,17 +395,17 @@ pub async fn get_article(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_id_row = article_id_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::InternalServerError("Article ID not found".to_string()))?;
 
     let article_id_str: String = article_id_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Get tags for this article
     let mut tag_rows = conn
@@ -419,17 +419,17 @@ pub async fn get_article(
             libsql::params![article_id_str.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut tag_names = Vec::new();
     while let Some(tag_row) = tag_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let tag_name: String = tag_row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         tag_names.push(tag_name);
     }
 
@@ -440,16 +440,16 @@ pub async fn get_article(
             libsql::params![article_id_str],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let favorites_count = if let Some(fav_row) = favorites_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let count: i64 = fav_row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         count as i32
     } else {
         0
@@ -495,7 +495,7 @@ pub async fn get_editor_page(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut user_rows = conn
         .query(
@@ -503,19 +503,19 @@ pub async fn get_editor_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -567,7 +567,7 @@ pub async fn get_edit_article_page(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut author_check = conn
         .query(
@@ -575,16 +575,16 @@ pub async fn get_edit_article_page(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     if let Some(row) = author_check
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let author_id_str: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let author_id = Uuid::parse_str(&author_id_str)
             .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
 
@@ -604,19 +604,19 @@ pub async fn get_edit_article_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -677,19 +677,19 @@ pub async fn get_admin_dashboard(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -788,7 +788,7 @@ pub async fn update_article(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Check if article exists and user is the author
     let mut article_rows = conn
@@ -797,20 +797,20 @@ pub async fn update_article(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let _article_id_str: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let author_id_str: String = article_row
         .get(1)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let author_id = Uuid::parse_str(&author_id_str)
         .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
@@ -861,16 +861,16 @@ pub async fn update_article(
                     libsql::params![cat_slug.clone()],
                 )
                 .await
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
 
             if let Some(cat_row) = cat_rows
                 .next()
                 .await
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+                ?
             {
                 let cat_id: String = cat_row
                     .get(0)
-                    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                    ?;
                 updates.push("category_id = ?");
                 params.push(cat_id);
             } else {
@@ -898,7 +898,7 @@ pub async fn update_article(
 
         conn.execute(&sql, libsql_params)
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
     }
 
     // Handle tag updates if provided
@@ -910,17 +910,17 @@ pub async fn update_article(
                 libsql::params![slug.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let id_row = id_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
         let article_id: String = id_row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         // Delete existing tag associations
         conn.execute(
@@ -928,7 +928,7 @@ pub async fn update_article(
             libsql::params![article_id.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
         // Add new tags using helper function
         associate_tags_with_article(&conn, &article_id, tag_list).await?;
@@ -958,7 +958,7 @@ pub async fn delete_article(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Check if article exists and user is the author
     let mut article_rows = conn
@@ -967,20 +967,20 @@ pub async fn delete_article(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let article_id_str: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let author_id_str: String = article_row
         .get(1)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let author_id = Uuid::parse_str(&author_id_str)
         .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
@@ -998,7 +998,7 @@ pub async fn delete_article(
         libsql::params![article_id_str.clone()],
     )
     .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    ?;
 
     // Delete user favorites
     conn.execute(
@@ -1006,7 +1006,7 @@ pub async fn delete_article(
         libsql::params![article_id_str.clone()],
     )
     .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    ?;
 
     // Delete the article
     conn.execute(
@@ -1014,7 +1014,7 @@ pub async fn delete_article(
         libsql::params![article_id_str],
     )
     .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    ?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1026,7 +1026,7 @@ pub async fn list_articles(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let limit = query.limit.unwrap_or(20).min(100);
     let offset = query.offset.unwrap_or(0);
@@ -1093,45 +1093,45 @@ pub async fn list_articles(
     let mut article_rows = conn
         .query(&sql, params)
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut articles = Vec::new();
 
     while let Some(row) = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let _article_id: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let slug: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let title: String = row
             .get(2)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let description: String = row
             .get(3)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let body: String = row
             .get(4)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at_str: String = row
             .get(5)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let updated_at_str: String = row
             .get(6)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let username: String = row
             .get(7)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
         let draft: i64 = row
             .get(11)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let is_draft = draft_int_to_bool(draft);
 
         // Get tags from GROUP_CONCAT result (comma-separated string)
@@ -1143,7 +1143,7 @@ pub async fn list_articles(
         // Get favorites count from the query
         let favorites_count: i64 = row
             .get(13)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let favorites_count = favorites_count as i32;
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -1210,7 +1210,7 @@ pub async fn get_article_page(
         let conn = state
             .db
             .connect()
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let mut rows = conn
             .query(
@@ -1218,19 +1218,19 @@ pub async fn get_article_page(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let email: String = row
                 .get(1)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -1276,7 +1276,7 @@ pub async fn get_articles_list_page(
         let conn = state
             .db
             .connect()
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let mut rows = conn
             .query(
@@ -1284,19 +1284,19 @@ pub async fn get_articles_list_page(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let email: String = row
                 .get(1)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -1337,7 +1337,7 @@ pub async fn get_articles_list_page(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Build WHERE clause for total count (same filters as list_articles)
     let mut where_clauses = Vec::new();
@@ -1474,7 +1474,7 @@ pub async fn favorite_article(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Get the article ID by slug
     let mut article_rows = conn
@@ -1483,17 +1483,17 @@ pub async fn favorite_article(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let article_id: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Insert favorite (ignore if already exists - idempotent)
     conn.execute(
@@ -1501,7 +1501,7 @@ pub async fn favorite_article(
         libsql::params![user.user_id.to_string(), article_id],
     )
     .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    ?;
 
     // Return the article with updated favorite status
     get_article_with_user_context(State(state), Path(slug), Some(user)).await
@@ -1515,7 +1515,7 @@ pub async fn unfavorite_article(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Get the article ID by slug
     let mut article_rows = conn
@@ -1524,17 +1524,17 @@ pub async fn unfavorite_article(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let article_id: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Remove favorite (ignore if doesn't exist - idempotent)
     conn.execute(
@@ -1542,7 +1542,7 @@ pub async fn unfavorite_article(
         libsql::params![user.user_id.to_string(), article_id],
     )
     .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    ?;
 
     // Return the article with updated favorite status
     get_article_with_user_context(State(state), Path(slug), Some(user)).await
@@ -1557,7 +1557,7 @@ async fn get_article_with_user_context(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Get the article with author information
     let mut article_rows = conn
@@ -1575,47 +1575,47 @@ async fn get_article_with_user_context(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let article_id: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let article_slug: String = article_row
         .get(1)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let title: String = article_row
         .get(2)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let description: String = article_row
         .get(3)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let body: String = article_row
         .get(4)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let created_at_str: String = article_row
         .get(5)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let updated_at_str: String = article_row
         .get(6)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let _author_id: String = article_row
         .get(7)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let username: String = article_row
         .get(8)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let bio: Option<String> = article_row.get(9).ok();
     let image: Option<String> = article_row.get(10).ok();
     let category_slug: Option<String> = article_row.get(11).ok();
     let draft: i64 = article_row
         .get(12)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let is_draft = draft_int_to_bool(draft);
 
     // Parse the timestamps
@@ -1638,17 +1638,17 @@ async fn get_article_with_user_context(
             libsql::params![article_id.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut tag_names = Vec::new();
     while let Some(tag_row) = tag_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let tag_name: String = tag_row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         tag_names.push(tag_name);
     }
 
@@ -1659,16 +1659,16 @@ async fn get_article_with_user_context(
             libsql::params![article_id.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let favorites_count = if let Some(fav_row) = favorites_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let count: i64 = fav_row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         count as i32
     } else {
         0
@@ -1682,12 +1682,12 @@ async fn get_article_with_user_context(
                 libsql::params![auth_user.user_id.to_string(), article_id],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         user_fav_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .is_some()
     } else {
         false
@@ -1733,7 +1733,7 @@ pub async fn get_articles_feed(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let limit = query.limit.unwrap_or(20).min(100);
     let offset = query.offset.unwrap_or(0);
@@ -1758,45 +1758,45 @@ pub async fn get_articles_feed(
     let mut article_rows = conn
         .query(sql, params)
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut articles = Vec::new();
 
     while let Some(row) = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let article_id: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let slug: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let title: String = row
             .get(2)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let description: String = row
             .get(3)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let body: String = row
             .get(4)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at_str: String = row
             .get(5)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let updated_at_str: String = row
             .get(6)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let username: String = row
             .get(7)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
         let draft: i64 = row
             .get(11)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -1818,17 +1818,17 @@ pub async fn get_articles_feed(
                 libsql::params![article_id.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let mut tag_names = Vec::new();
         while let Some(tag_row) = tag_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let tag_name: String = tag_row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             tag_names.push(tag_name);
         }
 
@@ -1839,16 +1839,16 @@ pub async fn get_articles_feed(
                 libsql::params![article_id.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let favorites_count = if let Some(fav_row) = favorites_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let count: i64 = fav_row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             count as i32
         } else {
             0
@@ -1861,12 +1861,12 @@ pub async fn get_articles_feed(
                 libsql::params![user.user_id.to_string(), article_id],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let favorited = user_fav_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .is_some();
 
         let author = UserProfile {
@@ -1914,7 +1914,7 @@ pub async fn get_articles_feed_page(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut user_rows = conn
         .query(
@@ -1922,19 +1922,19 @@ pub async fn get_articles_feed_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -1977,16 +1977,16 @@ pub async fn get_articles_feed_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let following_count = if let Some(row) = following_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let count: i64 = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         count
     } else {
         0
@@ -2065,7 +2065,7 @@ pub async fn mobile_upload_article(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Generate base slug from title
     let base_slug = slugify(&title);
@@ -2081,12 +2081,12 @@ pub async fn mobile_upload_article(
                 libsql::params![slug.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if slug_check
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .is_none()
         {
             break; // Slug is unique
@@ -2115,7 +2115,7 @@ pub async fn mobile_upload_article(
         ],
     )
     .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    ?;
 
     // Handle tags if provided
     if !tags.is_empty() {
@@ -2127,7 +2127,7 @@ pub async fn mobile_upload_article(
                 libsql::params![tag_id.to_string(), tag_name.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
             // Get the tag ID (either the one we just created or the existing one)
             let mut tag_rows = conn
@@ -2136,16 +2136,16 @@ pub async fn mobile_upload_article(
                     libsql::params![tag_name.clone()],
                 )
                 .await
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
 
             if let Some(tag_row) = tag_rows
                 .next()
                 .await
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+                ?
             {
                 let tag_id_str: String = tag_row
                     .get(0)
-                    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                    ?;
 
                 // Associate tag with article
                 conn.execute(
@@ -2153,7 +2153,7 @@ pub async fn mobile_upload_article(
                     libsql::params![article_id.to_string(), tag_id_str],
                 )
                 .await
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             }
         }
     }
@@ -2311,7 +2311,7 @@ pub async fn get_api_keys_admin_page(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut user_rows = conn
         .query(
@@ -2319,19 +2319,19 @@ pub async fn get_api_keys_admin_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -2371,7 +2371,7 @@ pub async fn list_user_drafts(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Query only draft articles for the current user
     let sql = r#"
@@ -2391,45 +2391,45 @@ pub async fn list_user_drafts(
     let mut article_rows = conn
         .query(sql, params)
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut articles = Vec::new();
 
     while let Some(row) = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let article_id: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let slug: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let title: String = row
             .get(2)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let description: String = row
             .get(3)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let body: String = row
             .get(4)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at_str: String = row
             .get(5)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let updated_at_str: String = row
             .get(6)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let username: String = row
             .get(7)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
         let draft: i64 = row
             .get(11)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -2451,17 +2451,17 @@ pub async fn list_user_drafts(
                 libsql::params![article_id.clone()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let mut tag_names = Vec::new();
         while let Some(tag_row) = tag_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let tag_name: String = tag_row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             tag_names.push(tag_name);
         }
 
@@ -2472,16 +2472,16 @@ pub async fn list_user_drafts(
                 libsql::params![article_id],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let favorites_count = if let Some(fav_row) = favorites_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let count: i64 = fav_row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             count as i32
         } else {
             0
@@ -2532,7 +2532,7 @@ pub async fn get_drafts_admin_page(
     let conn = state
         .db
         .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut user_rows = conn
         .query(
@@ -2540,19 +2540,19 @@ pub async fn get_drafts_admin_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

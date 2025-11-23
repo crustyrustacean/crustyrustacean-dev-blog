@@ -56,7 +56,7 @@ pub async fn get_account_page(
             }))
             .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         )
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     Ok(Html(template))
 }

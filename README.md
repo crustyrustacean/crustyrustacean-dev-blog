@@ -9,9 +9,10 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **User authentication system** with JWT tokens and secure password hashing
 - **User registration and login** with comprehensive validation
 - **Protected API endpoints** with Bearer token authentication
+- **Role-Based Access Control (RBAC)** with Admin, Author, and Subscriber roles
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 239 integration tests and 19 unit tests (258 total)
+- **Comprehensive test suite** with 264 integration tests and 19 unit tests (283 total)
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -147,13 +148,29 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Newsletter subscription with email validation
   - Double opt-in confirmation pattern
   - Subscriber management (subscribe, confirm, unsubscribe)
-  - Newsletter creation and management (admin only)
+  - Newsletter creation and management (Author+ role required)
   - Send newsletters to confirmed subscribers
   - Newsletter statistics dashboard
   - Subscription page with responsive UI
   - Admin newsletter management page
   - Re-subscription support for unsubscribed users
   - 16 comprehensive integration tests
+- **Role-Based Access Control (RBAC) System** (TDD implementation):
+  - Three user roles: Admin, Author, Subscriber
+  - Hierarchical permission system (Admin > Author > Subscriber)
+  - Role-based route protection with custom extractors
+  - First user automatically promoted to admin
+  - Role management UI with color-coded badges
+  - Admins can promote/demote users between roles
+  - Server-side role verification (never exposed in JWT)
+  - Protection against privilege escalation
+  - 16 comprehensive RBAC integration tests
+- **Unified Error Handling Architecture**:
+  - Common `ApiError` type used throughout codebase
+  - Standardized `ApiResponse` format for all API responses
+  - Database error sanitization for security
+  - Consistent error handling patterns across all routes
+  - Automatic error logging while protecting sensitive details
 
 ### 🚧 Planned
 - Image processing and optimization
@@ -286,7 +303,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (258 total: 239 integration + 19 unit)
+cargo test              # Run all tests (283 total: 264 integration + 19 unit)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -326,6 +343,8 @@ The test suite includes comprehensive testing:
 - ✅ Newsletter subscription with double opt-in confirmation
 - ✅ Newsletter management and delivery to confirmed subscribers
 - ✅ Template rendering with authentication state validation
+- ✅ RBAC system with role-based permissions and access control
+- ✅ Unified error handling with sanitized error messages
 - ✅ Idempotent operations and multi-user scenarios
 
 ### Deploying with Shuttle
@@ -363,10 +382,18 @@ GET  /rss                          # RSS feed (XML)
 
 ### Authentication API
 ```
-POST /api/users                    # User registration
+POST /api/users                    # User registration (first user becomes admin)
 POST /api/users/login              # User login
 GET  /api/user                     # Get current user (protected)
 PUT  /api/user                     # Update current user (protected)
+```
+
+### User Management API (Admin Only)
+```
+GET    /api/admin/users            # List all users
+GET    /api/admin/users/:id        # Get user details
+PUT    /api/admin/users/:id        # Update user (including role promotion/demotion)
+DELETE /api/admin/users/:id        # Delete user
 ```
 
 ### User Profiles API
@@ -382,13 +409,15 @@ DELETE /api/profiles/{username}/follow    # Unfollow user (protected)
 GET    /api/articles                    # List articles (JSON, paginated, excludes drafts)
 GET    /api/articles?page=N             # Get specific page of articles
 GET    /api/articles/feed               # Get personal feed (protected, includes own drafts)
-GET    /api/articles/drafts             # List user's draft articles (protected)
-POST   /api/articles                    # Create article (protected, supports draft status)
-POST   /api/articles/upload-markdown    # Upload markdown file to editor (protected)
+GET    /api/articles/drafts             # List user's draft articles (Author+)
+POST   /api/articles                    # Create article (Author+, supports draft status)
+POST   /api/articles/upload-markdown    # Upload markdown file to editor (Author+)
 GET    /api/articles/{slug}             # Get article (JSON, author can view own drafts)
-PUT    /api/articles/{slug}             # Update article with tag editing and draft status (protected)
-DELETE /api/articles/{slug}             # Delete article (protected)
+PUT    /api/articles/{slug}             # Update article with tag editing and draft status (Author+)
+DELETE /api/articles/{slug}             # Delete article (Author+)
 ```
+
+**Note**: (Author+) indicates Author or Admin role required
 
 ### Favorites API
 ```
@@ -404,11 +433,11 @@ GET /api/tags                      # Get all tags (alphabetically sorted)
 
 ### Categories API
 ```
-POST   /api/categories             # Create new category (protected)
+POST   /api/categories             # Create new category (Author+)
 GET    /api/categories             # List all categories with article counts
 GET    /api/categories/{slug}      # Get specific category
-PUT    /api/categories/{slug}      # Update category (protected)
-DELETE /api/categories/{slug}      # Delete category (protected)
+PUT    /api/categories/{slug}      # Update category (Author+)
+DELETE /api/categories/{slug}      # Delete category (Author+)
 ```
 
 ### Search API
@@ -425,11 +454,11 @@ DELETE /api/articles/{slug}/comments/{id}  # Delete comment (protected, author o
 
 ### Media Library API
 ```
-POST   /api/media                  # Upload media file (protected)
-GET    /api/media                  # List user's media with pagination (protected)
-GET    /api/media/:id              # Get media metadata (protected)
-PUT    /api/media/:id              # Update media metadata (protected)
-DELETE /api/media/:id              # Delete media file (protected)
+POST   /api/media                  # Upload media file (Author+)
+GET    /api/media                  # List user's media with pagination (Author+)
+GET    /api/media/:id              # Get media metadata (Author+)
+PUT    /api/media/:id              # Update media metadata (Author+)
+DELETE /api/media/:id              # Delete media file (Author+)
 GET    /api/media/:id/download     # Download/display media file
 ```
 
@@ -442,7 +471,7 @@ GET    /api/newsletters/confirm/{token}     # Confirm subscription (GET support)
 POST   /api/newsletters/unsubscribe/{token} # Unsubscribe from newsletter
 GET    /api/newsletters/unsubscribe/{token} # Unsubscribe from newsletter (GET support)
 
-# Admin newsletter management endpoints (protected)
+# Newsletter management endpoints (Author+)
 POST   /api/admin/newsletters               # Create new newsletter issue
 GET    /api/admin/newsletters               # List all newsletter issues
 GET    /api/admin/newsletters/{id}          # Get specific newsletter issue
@@ -498,18 +527,28 @@ The application now includes a complete blog system:
 
 - **Argon2 Password Hashing**: Industry-standard secure password storage
 - **JWT Authentication**: Stateless token-based authentication with 24-hour expiration
+- **Role-Based Access Control (RBAC)**:
+  - Three user roles: Admin, Author, Subscriber
+  - Hierarchical permission system (Admin > Author > Subscriber)
+  - Server-side role verification (never exposed in JWT claims)
+  - Protection against privilege escalation
+  - First user automatically becomes admin
 - **Input Validation**: Comprehensive validation with proper error messages
 - **Environment-based Secrets**: Configurable JWT secret for different environments
 - **Protected Endpoints**: Bearer token validation for sensitive operations
+- **Error Sanitization**: Database errors sanitized to prevent information leakage
+- **SQL Injection Protection**: Parameterized queries throughout
 
 ## Code Quality & Architecture
 
-- **Unified Error Handling**: Consolidated error architecture eliminates duplication
-- **Domain-Driven Design**: Authentication errors properly separated from HTTP concerns
-- **Comprehensive Testing**: 258 total tests (239 integration + 19 unit) covering happy path and failure scenarios
-- **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, Drafts, Media Library, and Newsletter features built with TDD approach
+- **Unified Error Handling**: Consolidated `ApiError` type eliminates duplication across codebase
+- **Standardized Responses**: All API responses use `ApiResponse<T>` type for consistency
+- **Domain-Driven Design**: Clear separation between domain logic and HTTP concerns
+- **Comprehensive Testing**: 283 total tests (264 integration + 19 unit) covering happy path and failure scenarios
+- **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, Drafts, Media Library, Newsletter, and RBAC features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
+- **Role-Based Security**: Production-ready RBAC system with hierarchical permissions
 - **Cloud-Native Storage**: OpenDAL integration for flexible storage backend options
 - **Modular JavaScript**: 20+ JavaScript modules with separation of concerns
 - **Content Management**: Complete draft workflow with author-only visibility

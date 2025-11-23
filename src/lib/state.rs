@@ -123,6 +123,7 @@ mod tests {
             external_stylesheet: "https://cdn.example.com/bootstrap.css".to_string(),
             override_stylesheet: "/static/overrides.css".to_string(),
             app_version: "2.9.0".to_string(),
+            allowed_origins: vec!["http://localhost:8000".to_string()],
         }
     }
 
@@ -162,6 +163,7 @@ mod tests {
             external_stylesheet: "".to_string(),
             override_stylesheet: "".to_string(),
             app_version: "2.9.0".to_string(),
+            allowed_origins: vec!["http://localhost:8000".to_string()],
         };
         let _temp_dir = setup_test_templates_dir();
 
@@ -181,6 +183,7 @@ mod tests {
             external_stylesheet: "https://example.com/style.css?v=1.0&theme=dark".to_string(),
             override_stylesheet: "/static/override-theme.css".to_string(),
             app_version: "2.9.0".to_string(),
+            allowed_origins: vec!["http://localhost:8000".to_string()],
         };
         let _temp_dir = setup_test_templates_dir();
 

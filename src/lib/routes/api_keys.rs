@@ -22,10 +22,7 @@ pub async fn create_api_key(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Generate API key
     let api_key = generate_api_key();
@@ -44,8 +41,7 @@ pub async fn create_api_key(
             now.to_rfc3339(),
         ],
     )
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    .await?;
 
     let response = ApiKeyResponse {
         id: key_id,
@@ -61,10 +57,7 @@ pub async fn list_api_keys(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<ApiKeysResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -72,24 +65,24 @@ pub async fn list_api_keys(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut api_keys = Vec::new();
 
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let id: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let name: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at: String = row
             .get(2)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let last_used_at: Option<String> = row.get(3).ok();
         let expires_at: Option<String> = row.get(4).ok();
 
@@ -126,10 +119,7 @@ pub async fn delete_api_key(
     user: AuthenticatedUser,
     Path(key_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Delete the API key (only if it belongs to the user)
     let result = conn
@@ -138,7 +128,7 @@ pub async fn delete_api_key(
             libsql::params![key_id.to_string(), user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     if result == 0 {
         return Err(ApiError::NotFound("API key not found".to_string()));

@@ -12,6 +12,7 @@ pub struct AppConfig {
     pub external_stylesheet: String,
     pub override_stylesheet: String,
     pub app_version: String,
+    pub allowed_origins: Vec<String>,
 }
 
 // implement the TryFrom trait for the AppConfig type
@@ -38,12 +39,30 @@ impl TryFrom<&SecretStore> for AppConfig {
         // Get version from Cargo.toml at compile time
         let app_version = env!("CARGO_PKG_VERSION").to_string();
 
+        // Parse allowed origins (optional, defaults to localhost for development)
+        let allowed_origins = secrets
+            .get("ALLOWED_ORIGINS")
+            .map(|s| {
+                s.split(',')
+                    .map(|origin| origin.trim().to_string())
+                    .filter(|origin| !origin.is_empty())
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_else(|| {
+                // Default to localhost for development
+                vec![
+                    "http://localhost:8000".to_string(),
+                    "http://127.0.0.1:8000".to_string(),
+                ]
+            });
+
         Ok(Self {
             jwt_secret,
             templates_dir,
             external_stylesheet,
             override_stylesheet,
             app_version,
+            allowed_origins,
         })
     }
 }

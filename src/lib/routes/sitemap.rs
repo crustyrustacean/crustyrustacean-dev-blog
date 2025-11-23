@@ -9,10 +9,7 @@ use axum::{
 use chrono::Utc;
 
 pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get all articles with their update times
     let mut article_rows = conn
@@ -25,7 +22,7 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, ApiE
             libsql::params![],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut urls = Vec::new();
 
@@ -68,14 +65,14 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, ApiE
     while let Some(row) = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let slug: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let updated_at_str: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         // Parse the timestamp
         let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)

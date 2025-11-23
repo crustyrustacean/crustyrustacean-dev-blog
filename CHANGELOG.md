@@ -2,6 +2,134 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [2.12.3] - 2025-11-23
+
+### Changed - Error Handling Refactor
+- **Unified Error Architecture**:
+  - Refactored entire codebase to use common `ApiError` type throughout
+  - Standardized all error responses to use `ApiResponse` type
+  - Eliminated duplication in error handling across routes
+  - Consolidated error types from multiple domains into single `ApiError` enum
+
+- **Improved Error Types**:
+  - BadRequest, NotFound, Unauthorized, Forbidden, Conflict, UnprocessableEntity, InternalServerError
+  - Template-specific error handling with Tera error integration
+  - Database error sanitization with user-friendly messages
+  - Automatic error logging for debugging while protecting sensitive details
+
+- **Enhanced Developer Experience**:
+  - Consistent error handling patterns across all route handlers
+  - Simplified error propagation with `?` operator
+  - Better separation of concerns between domain and HTTP errors
+  - Improved code maintainability and readability
+
+### Technical Details
+- **Files Updated**: All route handlers (account.rs, admin_users.rs, api_keys.rs, articles.rs, auth.rs, categories.rs, comments.rs, index.rs, media.rs, newsletters.rs, profile.rs, rss.rs, sitemap.rs, tags.rs, users.rs)
+- **Code Quality**: Eliminated error handling duplication, cleaner error propagation
+- **Testing**: All 283 tests continue to pass with new error handling
+- **Performance**: No performance impact, cleaner code paths
+
+## [2.12.0] - 2025-11-19
+
+### Added - Role-Based Access Control (RBAC) System
+- **Production-Ready RBAC Implementation**:
+  - Three distinct user roles: Admin, Author, Subscriber
+  - Hierarchical permission management (Admin > Author > Subscriber)
+  - Role-based route protection with custom extractors
+  - First user automatically promoted to admin
+  - Comprehensive role management API
+
+- **Role Enum and Permissions**:
+  - Created Role enum with Admin, Author, Subscriber variants
+  - Implemented hierarchical permission checking
+  - Role helper methods: `is_admin()`, `is_author()`, `is_subscriber()`
+  - 5 comprehensive unit tests for role logic
+
+- **Database Schema Updates**:
+  - Added `role` column to users table (TEXT, default 'subscriber')
+  - Backward-compatible migration for existing databases
+  - All user queries updated to include role field
+  - Indexed for efficient role-based queries
+
+- **Authentication & Authorization**:
+  - Extended `AuthenticatedUser` extractor to fetch and cache user role
+  - Created `AdminUser` extractor for admin-only route protection
+  - Created `AuthorUser` extractor for author/admin route protection
+  - All role checks performed server-side via database lookup
+  - Role information never exposed in JWT claims
+
+- **Route Protection Updates**:
+  - **Admin-Only Endpoints**: `/api/admin/users/*` (user management)
+  - **Author-Required Endpoints**: Article CRUD, category CRUD, tag management, newsletter management
+  - **Subscriber Endpoints**: Read-only access, profile management, following, favorites
+
+- **Role Management Features**:
+  - Admins can promote/demote users between roles
+  - Role management UI in admin users page
+  - Color-coded role badges (Admin: red, Author: blue, Subscriber: gray)
+  - Role dropdown with descriptions in edit user modal
+  - Role updates via `PUT /api/admin/users/:id` with 'role' field
+
+- **First-User Admin Assignment**:
+  - Automatic admin role for first registered user
+  - Subsequent users default to subscriber role
+  - Atomic user count check during registration
+
+- **User Interface Updates**:
+  - Role column in admin users table
+  - Role selection dropdown in user edit modal
+  - Color-coded role badges for visual distinction
+  - Role descriptions for clarity
+
+### Test Coverage
+- Added 16 comprehensive RBAC integration tests:
+  - First user gets admin role
+  - Subsequent users get subscriber role
+  - Role included in login/current user responses
+  - Subscriber cannot create articles/categories
+  - Author can create articles/categories after promotion
+  - Admin has full access to all operations
+  - Admin can manage user roles (promote/demote)
+  - Non-admins cannot access admin endpoints
+  - Non-admins cannot modify user roles
+  - Invalid role values are rejected
+- Updated all existing tests for RBAC compatibility
+- Added role promotion helpers to test infrastructure
+- **Total test count**: 283 tests (264 integration + 19 unit)
+
+### Security Features
+- **Server-Side Role Verification**: Role fetched fresh from database on each request
+- **No JWT Role Claims**: Role information never exposed in token claims
+- **Privilege Escalation Protection**: Guards against horizontal and vertical privilege escalation
+- **Disabled User Protection**: Disabled users cannot authenticate (role check fails)
+- **Hierarchical Permissions**: Clear permission hierarchy prevents unauthorized access
+
+### Breaking Changes
+- **Article/Category Creation**: Now requires Author role (or higher)
+- **Admin Endpoints**: Require Admin role instead of any authentication
+- **Tag Management**: Now requires Author role (or higher)
+- **Newsletter Management**: Now requires Author role (or higher)
+
+### Migration Notes
+For existing deployments:
+1. Database migration adds 'role' column automatically
+2. Existing users default to 'subscriber' role
+3. Admins should manually promote appropriate users to 'author' or 'admin'
+4. First new user registration after deployment gets 'admin' automatically
+
+### Technical Details
+- **Performance**: Role fetched via indexed database query (minimal overhead)
+- **Caching**: Role cached in request lifetime via extractor
+- **No N+1 Queries**: Existing database indexes support role queries efficiently
+- **Code Quality**: Clean separation of authentication and authorization concerns
+
+### Benefits
+- **Granular Access Control**: Fine-grained permission management
+- **Security**: Production-ready role-based security model
+- **Scalability**: Support for multi-tenant scenarios with different permission levels
+- **User Management**: Admins can easily manage user permissions
+- **Compliance**: Clear audit trail for role-based actions
+
 ## [2.9.0] - 2025-11-17
 
 ### Added - Newsletter Subscription and Delivery Service

@@ -9,10 +9,7 @@ use axum::{
 use chrono::Utc;
 
 pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get the latest 20 articles with author information
     let mut article_rows = conn
@@ -29,36 +26,36 @@ pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, Api
             libsql::params![],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut items = Vec::new();
 
     while let Some(row) = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let slug: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let title: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let description: String = row
             .get(2)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let _body: String = row
             .get(3)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at_str: String = row
             .get(4)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let _updated_at_str: String = row
             .get(5)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let username: String = row
             .get(6)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let author_email: Option<String> = row.get(7).ok();
 
         // Parse the created_at timestamp
