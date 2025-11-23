@@ -312,8 +312,9 @@ async fn password_reset_token_can_only_be_used_once() {
         .json()
         .await
         .expect("Failed to deserialize response");
+    assert_eq!(body["success"], false);
     assert!(
-        body["errors"]["body"][0]
+        body["message"]
             .as_str()
             .unwrap()
             .contains("already been used")

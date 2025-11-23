@@ -27,7 +27,7 @@ use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use axum::{
     Router,
-    http::{HeaderName, HeaderValue, header},
+    http::{HeaderName, HeaderValue, Method, header},
     routing::{get, post},
 };
 use tokio::net::TcpListener;
@@ -51,12 +51,12 @@ pub struct App {
 impl App {
     // create a new application instance
     pub fn new(config: AppConfig, state: AppState) -> Self {
-        let router = Self::build_router(state);
+        let router = Self::build_router(state, config.allowed_origins.clone());
         Self { config, router }
     }
 
     // build the application router with all routes and middleware layers
-    pub fn build_router(state: AppState) -> Router {
+    pub fn build_router(state: AppState, allowed_origins: Vec<String>) -> Router {
         // define the tracing layer
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(
@@ -217,7 +217,34 @@ impl App {
             .fallback(handle_404_simple)
             .with_state(state)
             .layer(CompressionLayer::new())
-            .layer(CorsLayer::permissive())
+            .layer(
+                CorsLayer::new()
+                    // Parse allowed origins from config
+                    .allow_origin(
+                        allowed_origins
+                            .iter()
+                            .filter_map(|origin| origin.parse().ok())
+                            .collect::<Vec<_>>(),
+                    )
+                    // Allow common HTTP methods
+                    .allow_methods([
+                        Method::GET,
+                        Method::POST,
+                        Method::PUT,
+                        Method::DELETE,
+                        Method::OPTIONS,
+                    ])
+                    // Allow headers needed for JWT authentication
+                    .allow_headers([
+                        header::AUTHORIZATION,
+                        header::CONTENT_TYPE,
+                        header::ACCEPT,
+                    ])
+                    // Allow credentials (cookies, authorization headers)
+                    .allow_credentials(true)
+                    // Cache preflight requests for 1 hour
+                    .max_age(std::time::Duration::from_secs(3600)),
+            )
             .layer(SetRequestIdLayer::new(
                 x_request_id.clone(),
                 MakeRequestUuid,

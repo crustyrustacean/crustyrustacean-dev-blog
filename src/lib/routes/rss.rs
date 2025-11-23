@@ -1,6 +1,6 @@
 // src/lib/routes/rss.rs
 
-use crate::{AppError, AppState};
+use crate::{ApiError, AppState};
 use axum::{
     extract::State,
     http::{StatusCode, header},
@@ -8,17 +8,14 @@ use axum::{
 };
 use chrono::Utc;
 
-pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get the latest 20 articles with author information
     let mut article_rows = conn
         .query(
             r#"
-            SELECT 
+            SELECT
                 a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
                 u.username, u.email
             FROM articles a
@@ -29,41 +26,41 @@ pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, App
             libsql::params![],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut items = Vec::new();
 
     while let Some(row) = article_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        ?
     {
         let slug: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let title: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let description: String = row
             .get(2)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let _body: String = row
             .get(3)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at_str: String = row
             .get(4)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let _updated_at_str: String = row
             .get(5)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let username: String = row
             .get(6)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let author_email: Option<String> = row.get(7).ok();
 
         // Parse the created_at timestamp
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
             .with_timezone(&Utc);
 
         // Convert to RFC 2822 format for RSS pubDate

@@ -122,8 +122,9 @@ async fn test_search_articles_empty_query() {
         .await
         .expect("Failed to parse response as JSON");
 
+    assert_eq!(response_body["success"], false);
     assert!(
-        response_body["errors"]["body"][0]
+        response_body["message"]
             .as_str()
             .unwrap()
             .contains("Search query cannot be empty")
@@ -151,8 +152,9 @@ async fn test_search_articles_missing_query() {
         .await
         .expect("Failed to parse response as JSON");
 
+    assert_eq!(response_body["success"], false);
     assert!(
-        response_body["errors"]["body"][0]
+        response_body["message"]
             .as_str()
             .unwrap()
             .contains("Search query is required")

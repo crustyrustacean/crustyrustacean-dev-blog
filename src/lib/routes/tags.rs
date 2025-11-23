@@ -4,7 +4,7 @@
 
 use crate::state::CachedTags;
 use crate::{
-    AppError, AppState,
+    ApiError, AppState,
     auth::AuthorUser,
     models::{SingleTagResponse, TagsResponse, UpdateTag},
 };
@@ -18,7 +18,7 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 use validator::Validate;
 
-pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse>, AppError> {
+pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse>, ApiError> {
     {
         let cache = state.cached_tags.read().await;
         if let Some(cached) = cache.as_ref()
@@ -30,26 +30,23 @@ pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse
         }
     }
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut tag_rows = conn
         .query("SELECT name FROM tags ORDER BY name ASC", libsql::params![])
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut tags = Vec::new();
 
     while let Some(row) = tag_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        ?
     {
         let tag_name: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         tags.push(tag_name);
     }
 
@@ -66,23 +63,20 @@ pub async fn update_tag(
     Path(old_name): Path<String>,
     _user: AuthorUser, // Requires author or admin role
     Json(payload): Json<serde_json::Value>,
-) -> Result<Json<SingleTagResponse>, AppError> {
+) -> Result<Json<SingleTagResponse>, ApiError> {
     let update_data: UpdateTag = serde_json::from_value(
         payload
             .get("tag")
-            .ok_or_else(|| AppError::BadRequest("Missing tag field".to_string()))?
+            .ok_or_else(|| ApiError::BadRequest("Missing tag field".to_string()))?
             .clone(),
     )
-    .map_err(|_| AppError::BadRequest("Invalid tag data".to_string()))?;
+    .map_err(|_| ApiError::BadRequest("Invalid tag data".to_string()))?;
 
     update_data
         .validate()
-        .map_err(|e| AppError::BadRequest(format!("Validation error: {}", e)))?;
+        .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if old tag exists
     let mut old_tag_rows = conn
@@ -91,17 +85,17 @@ pub async fn update_tag(
             libsql::params![old_name.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let tag_row = old_tag_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("Tag not found".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::NotFound("Tag not found".to_string()))?;
 
     let _tag_id: String = tag_row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Check if new name already exists (and it's not the same tag)
     if old_name != update_data.name {
@@ -111,15 +105,15 @@ pub async fn update_tag(
                 libsql::params![update_data.name.clone()],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
 
         if new_tag_rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            ?
             .is_some()
         {
-            return Err(AppError::Conflict(
+            return Err(ApiError::Conflict(
                 "A tag with this name already exists".to_string(),
             ));
         }
@@ -130,8 +124,7 @@ pub async fn update_tag(
         "UPDATE tags SET name = ? WHERE name = ?",
         libsql::params![update_data.name.clone(), old_name],
     )
-    .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .await?;
 
     Ok(Json(SingleTagResponse {
         tag: update_data.name,
@@ -142,11 +135,8 @@ pub async fn delete_tag(
     State(state): State<AppState>,
     Path(name): Path<String>,
     _user: AuthorUser, // Requires author or admin role
-) -> Result<StatusCode, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<StatusCode, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if tag exists
     let mut tag_rows = conn
@@ -155,30 +145,29 @@ pub async fn delete_tag(
             libsql::params![name.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let tag_row = tag_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("Tag not found".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::NotFound("Tag not found".to_string()))?;
 
     let tag_id: String = tag_row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Delete article_tags relationships first (CASCADE should handle this, but being explicit)
     conn.execute(
         "DELETE FROM article_tags WHERE tag_id = ?",
         libsql::params![tag_id.clone()],
     )
-    .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .await?;
 
     // Delete the tag
     conn.execute("DELETE FROM tags WHERE id = ?", libsql::params![tag_id])
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -186,12 +175,9 @@ pub async fn delete_tag(
 pub async fn get_tags_admin_page(
     State(state): State<AppState>,
     user: AuthorUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
@@ -199,19 +185,19 @@ pub async fn get_tags_admin_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -235,7 +221,7 @@ pub async fn get_tags_admin_page(
     let html = state
         .templates
         .render("admin/tags.html", &tera::Context::from_serialize(&context)?)
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }

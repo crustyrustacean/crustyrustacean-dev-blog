@@ -1,7 +1,7 @@
 // src/lib/routes/users.rs
 
 use crate::{
-    AppError, AppState,
+    ApiError, AppState,
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
     models::{
         ProfileResponse, ProfilesQuery, ProfilesResponse, Role, UserData, UserLogin, UserProfile,
@@ -19,23 +19,20 @@ use validator::Validate;
 pub async fn register_user(
     State(state): State<AppState>,
     Json(payload): Json<serde_json::Value>,
-) -> Result<Json<UserResponse>, AppError> {
+) -> Result<Json<UserResponse>, ApiError> {
     let user_data: UserRegistration = serde_json::from_value(
         payload
             .get("user")
-            .ok_or_else(|| AppError::BadRequest("Missing user field".to_string()))?
+            .ok_or_else(|| ApiError::BadRequest("Missing user field".to_string()))?
             .clone(),
     )
-    .map_err(|_| AppError::BadRequest("Invalid user data".to_string()))?;
+    .map_err(|_| ApiError::BadRequest("Invalid user data".to_string()))?;
 
     user_data
         .validate()
-        .map_err(|e| AppError::BadRequest(format!("Validation error: {}", e)))?;
+        .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if user already exists
     let mut existing_user = conn
@@ -44,15 +41,15 @@ pub async fn register_user(
             libsql::params![user_data.email.clone(), user_data.username.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     if existing_user
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        ?
         .is_some()
     {
-        return Err(AppError::Conflict(
+        return Err(ApiError::Conflict(
             "User with this email or username already exists".to_string(),
         ));
     }
@@ -61,17 +58,17 @@ pub async fn register_user(
     let mut count_row = conn
         .query("SELECT COUNT(*) FROM users", ())
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let row = count_row
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::InternalServerError("Failed to count users".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::InternalServerError("Failed to count users".to_string()))?;
 
     let user_count: i64 = row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     // First user gets admin role, all others get subscriber role
     let role = if user_count == 0 {
@@ -96,8 +93,7 @@ pub async fn register_user(
             now.to_rfc3339(),
         ],
     )
-    .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .await?;
 
     let token = generate_token(user_id, &state.jwt_keys)?;
 
@@ -118,23 +114,20 @@ pub async fn register_user(
 pub async fn login_user(
     State(state): State<AppState>,
     Json(payload): Json<serde_json::Value>,
-) -> Result<Json<UserResponse>, AppError> {
+) -> Result<Json<UserResponse>, ApiError> {
     let login_data: UserLogin = serde_json::from_value(
         payload
             .get("user")
-            .ok_or_else(|| AppError::BadRequest("Missing user field".to_string()))?
+            .ok_or_else(|| ApiError::BadRequest("Missing user field".to_string()))?
             .clone(),
     )
-    .map_err(|_| AppError::BadRequest("Invalid login data".to_string()))?;
+    .map_err(|_| ApiError::BadRequest("Invalid login data".to_string()))?;
 
     login_data
         .validate()
-        .map_err(|e| AppError::BadRequest(format!("Validation error: {}", e)))?;
+        .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -142,41 +135,41 @@ pub async fn login_user(
             libsql::params![login_data.email],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let row = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::Unauthorized("Invalid credentials".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::Unauthorized("Invalid credentials".to_string()))?;
 
     let user_id: String = row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let username: String = row
         .get(1)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let email: String = row
         .get(2)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let password_hash: String = row
         .get(3)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let bio: Option<String> = row.get(4).ok();
     let image: Option<String> = row.get(5).ok();
     let role_str: String = row
         .get(6)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let role = role_str
         .parse::<Role>()
-        .map_err(|_| AppError::InternalServerError("Invalid role in database".to_string()))?;
+        .map_err(|_| ApiError::InternalServerError("Invalid role in database".to_string()))?;
 
     let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
+        .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
 
     if !verify_password(&login_data.password, &password_hash)? {
-        return Err(AppError::Unauthorized("Invalid credentials".to_string()));
+        return Err(ApiError::Unauthorized("Invalid credentials".to_string()));
     }
 
     let token = generate_token(user_uuid, &state.jwt_keys)?;
@@ -198,11 +191,8 @@ pub async fn login_user(
 pub async fn get_current_user(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<Json<UserResponse>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Json<UserResponse>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -210,29 +200,29 @@ pub async fn get_current_user(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let row = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
     let username: String = row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let email: String = row
         .get(1)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
     let role_str: String = row
         .get(4)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let role = role_str
         .parse::<Role>()
-        .map_err(|_| AppError::InternalServerError("Invalid role in database".to_string()))?;
+        .map_err(|_| ApiError::InternalServerError("Invalid role in database".to_string()))?;
 
     let token = generate_token(user.user_id, &state.jwt_keys)?;
 
@@ -254,23 +244,20 @@ pub async fn update_current_user(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(payload): Json<serde_json::Value>,
-) -> Result<Json<UserResponse>, AppError> {
+) -> Result<Json<UserResponse>, ApiError> {
     let update_data: UserUpdate = serde_json::from_value(
         payload
             .get("user")
-            .ok_or_else(|| AppError::BadRequest("Missing user field".to_string()))?
+            .ok_or_else(|| ApiError::BadRequest("Missing user field".to_string()))?
             .clone(),
     )
-    .map_err(|_| AppError::BadRequest("Invalid update data".to_string()))?;
+    .map_err(|_| ApiError::BadRequest("Invalid update data".to_string()))?;
 
     update_data
         .validate()
-        .map_err(|e| AppError::BadRequest(format!("Validation error: {}", e)))?;
+        .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let now = Utc::now();
     let mut updates = Vec::new();
@@ -310,7 +297,7 @@ pub async fn update_current_user(
 
     conn.execute(&query, libsql::params_from_iter(values))
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Fetch updated user
     get_current_user(State(state), user).await
@@ -319,7 +306,7 @@ pub async fn update_current_user(
 pub async fn get_profile(
     State(state): State<AppState>,
     Path(username): Path<String>,
-) -> Result<Json<ProfileResponse>, AppError> {
+) -> Result<Json<ProfileResponse>, ApiError> {
     get_profile_internal(state, username, None).await
 }
 
@@ -327,7 +314,7 @@ pub async fn get_profile_authenticated(
     State(state): State<AppState>,
     Path(username): Path<String>,
     user: AuthenticatedUser,
-) -> Result<Json<ProfileResponse>, AppError> {
+) -> Result<Json<ProfileResponse>, ApiError> {
     get_profile_internal(state, username, Some(user)).await
 }
 
@@ -335,11 +322,8 @@ async fn get_profile_internal(
     state: AppState,
     username: String,
     user: Option<AuthenticatedUser>,
-) -> Result<Json<ProfileResponse>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Json<ProfileResponse>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -347,25 +331,25 @@ async fn get_profile_internal(
             libsql::params![username],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let row = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("Profile not found".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::NotFound("Profile not found".to_string()))?;
 
     let profile_id: String = row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let profile_username: String = row
         .get(1)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
 
     let profile_uuid = Uuid::parse_str(&profile_id)
-        .map_err(|_| AppError::InternalServerError("Invalid profile ID".to_string()))?;
+        .map_err(|_| ApiError::InternalServerError("Invalid profile ID".to_string()))?;
 
     let following = if let Some(current_user) = user {
         let mut follow_rows = conn
@@ -374,12 +358,12 @@ async fn get_profile_internal(
                 libsql::params![current_user.user_id.to_string(), profile_uuid.to_string(),],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
 
         follow_rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            ?
             .is_some()
     } else {
         false
@@ -401,11 +385,8 @@ pub async fn follow_user(
     State(state): State<AppState>,
     Path(username): Path<String>,
     user: AuthenticatedUser,
-) -> Result<Json<ProfileResponse>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Json<ProfileResponse>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get the user to follow
     let mut rows = conn
@@ -414,27 +395,26 @@ pub async fn follow_user(
             libsql::params![username.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let row = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
     let following_id: String = row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let following_uuid = Uuid::parse_str(&following_id)
-        .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
+        .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
 
     // Insert follow relationship (ignore if already exists)
     conn.execute(
         "INSERT OR IGNORE INTO user_follows (follower_id, following_id) VALUES (?, ?)",
         libsql::params![user.user_id.to_string(), following_uuid.to_string(),],
     )
-    .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .await?;
 
     get_profile_internal(state, username, Some(user)).await
 }
@@ -443,11 +423,8 @@ pub async fn unfollow_user(
     State(state): State<AppState>,
     Path(username): Path<String>,
     user: AuthenticatedUser,
-) -> Result<Json<ProfileResponse>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Json<ProfileResponse>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get the user to unfollow
     let mut rows = conn
@@ -456,27 +433,26 @@ pub async fn unfollow_user(
             libsql::params![username.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let row = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        ?
+        .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
     let following_id: String = row
         .get(0)
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
     let following_uuid = Uuid::parse_str(&following_id)
-        .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
+        .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
 
     // Remove follow relationship
     conn.execute(
         "DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?",
         libsql::params![user.user_id.to_string(), following_uuid.to_string(),],
     )
-    .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .await?;
 
     get_profile_internal(state, username, Some(user)).await
 }
@@ -485,11 +461,8 @@ pub async fn list_profiles(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Query(query): Query<ProfilesQuery>,
-) -> Result<Json<ProfilesResponse>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Json<ProfilesResponse>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let limit = query.limit.unwrap_or(20).min(100);
     let offset = query.offset.unwrap_or(0);
@@ -517,27 +490,27 @@ pub async fn list_profiles(
     let mut rows = conn
         .query(&sql, params)
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut profiles = Vec::new();
 
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        ?
     {
         let profile_id: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let username: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
         // Skip the current user from the results
         let profile_uuid = Uuid::parse_str(&profile_id)
-            .map_err(|_| AppError::InternalServerError("Invalid profile ID".to_string()))?;
+            .map_err(|_| ApiError::InternalServerError("Invalid profile ID".to_string()))?;
 
         if profile_uuid == user.user_id {
             continue;
@@ -550,12 +523,12 @@ pub async fn list_profiles(
                 libsql::params![user.user_id.to_string(), profile_id],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
 
         let following = follow_rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            ?
             .is_some();
 
         let profile = UserProfile {

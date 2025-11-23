@@ -1,7 +1,7 @@
 // src/lib/routes/api_keys.rs
 
 use crate::{
-    AppError, AppState,
+    ApiError, AppState,
     auth::{AuthenticatedUser, generate_api_key, hash_api_key},
     models::{ApiKeyInfo, ApiKeyResponse, ApiKeysResponse, CreateApiKey},
 };
@@ -17,15 +17,12 @@ pub async fn create_api_key(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(payload): Json<CreateApiKey>,
-) -> Result<Json<ApiKeyResponse>, AppError> {
+) -> Result<Json<ApiKeyResponse>, ApiError> {
     payload
         .validate()
-        .map_err(|e| AppError::BadRequest(format!("Validation error: {}", e)))?;
+        .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Generate API key
     let api_key = generate_api_key();
@@ -44,8 +41,7 @@ pub async fn create_api_key(
             now.to_rfc3339(),
         ],
     )
-    .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .await?;
 
     let response = ApiKeyResponse {
         id: key_id,
@@ -60,11 +56,8 @@ pub async fn create_api_key(
 pub async fn list_api_keys(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<Json<ApiKeysResponse>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Json<ApiKeysResponse>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -72,31 +65,31 @@ pub async fn list_api_keys(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut api_keys = Vec::new();
 
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        ?
     {
         let id: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let name: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at: String = row
             .get(2)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let last_used_at: Option<String> = row.get(3).ok();
         let expires_at: Option<String> = row.get(4).ok();
 
         let id_uuid = Uuid::parse_str(&id)
-            .map_err(|_| AppError::InternalServerError("Invalid key ID".to_string()))?;
+            .map_err(|_| ApiError::InternalServerError("Invalid key ID".to_string()))?;
         let created_at_dt = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_err(|_| AppError::InternalServerError("Invalid created_at".to_string()))?
+            .map_err(|_| ApiError::InternalServerError("Invalid created_at".to_string()))?
             .with_timezone(&Utc);
         let last_used_at_dt = last_used_at.and_then(|s| {
             chrono::DateTime::parse_from_rfc3339(&s)
@@ -125,11 +118,8 @@ pub async fn delete_api_key(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(key_id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Delete the API key (only if it belongs to the user)
     let result = conn
@@ -138,10 +128,10 @@ pub async fn delete_api_key(
             libsql::params![key_id.to_string(), user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     if result == 0 {
-        return Err(AppError::NotFound("API key not found".to_string()));
+        return Err(ApiError::NotFound("API key not found".to_string()));
     }
 
     Ok(Json(serde_json::json!({ "message": "API key deleted" })))

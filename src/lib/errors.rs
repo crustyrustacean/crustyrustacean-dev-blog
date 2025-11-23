@@ -1,13 +1,13 @@
 // src/lib/errors.rs
 
 // dependencies
+use crate::response::ApiResponse;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
 
 // Unified error type for the application
 #[derive(Debug, thiserror::Error)]
-pub enum AppError {
+pub enum ApiError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
@@ -34,67 +34,88 @@ pub enum AppError {
     Tera(#[from] tera::Error),
 }
 
+impl ApiError {
+    /// Sanitize database errors to avoid leaking implementation details
+    /// Logs the actual error for debugging while returning a generic message
+    pub fn from_db_error(err: libsql::Error) -> Self {
+        // Log the actual error for debugging
+        tracing::error!("Database error: {}", err);
+
+        let error_string = err.to_string();
+
+        // Check for specific constraint violations and provide user-friendly messages
+        if error_string.contains("UNIQUE constraint failed") {
+            if error_string.contains("username") {
+                return ApiError::Conflict("Username already exists".to_string());
+            } else if error_string.contains("email") {
+                return ApiError::Conflict("Email already exists".to_string());
+            } else {
+                return ApiError::Conflict("A record with this value already exists".to_string());
+            }
+        }
+
+        // For all other database errors, return a generic message
+        ApiError::InternalServerError("A database error occurred".to_string())
+    }
+
+    /// Sanitize connection errors
+    pub fn from_connection_error(err: impl std::fmt::Display) -> Self {
+        tracing::error!("Connection error: {}", err);
+        ApiError::InternalServerError("Unable to connect to the database".to_string())
+    }
+}
+
 // Implement From for validator::ValidationErrors
-impl From<validator::ValidationErrors> for AppError {
+impl From<validator::ValidationErrors> for ApiError {
     fn from(err: validator::ValidationErrors) -> Self {
-        AppError::BadRequest(err.to_string())
+        ApiError::BadRequest(err.to_string())
     }
 }
 
 // Implement From for libsql::Error
-impl From<libsql::Error> for AppError {
+impl From<libsql::Error> for ApiError {
     fn from(err: libsql::Error) -> Self {
-        AppError::InternalServerError(err.to_string())
+        ApiError::from_db_error(err)
     }
 }
 
 // Implement From for uuid::Error
-impl From<uuid::Error> for AppError {
+impl From<uuid::Error> for ApiError {
     fn from(err: uuid::Error) -> Self {
-        AppError::BadRequest(err.to_string())
+        tracing::warn!("Invalid UUID format: {}", err);
+        ApiError::BadRequest("Invalid ID format".to_string())
     }
 }
 
 // Implement From for chrono::ParseError
-impl From<chrono::ParseError> for AppError {
+impl From<chrono::ParseError> for ApiError {
     fn from(err: chrono::ParseError) -> Self {
-        AppError::BadRequest(err.to_string())
+        tracing::warn!("Invalid date format: {}", err);
+        ApiError::BadRequest("Invalid date format".to_string())
     }
 }
 
-#[derive(Serialize)]
-struct ErrorResponse {
-    errors: ErrorBody,
-}
-
-#[derive(Serialize)]
-struct ErrorBody {
-    body: Vec<String>,
-}
-
-// implement the IntoResponse trait for the AppError type
-impl IntoResponse for AppError {
+// implement the IntoResponse trait for the ApiError type
+impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
-            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
-            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
-            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
-            AppError::Conflict(msg) => (StatusCode::CONFLICT, msg),
-            AppError::UnprocessableEntity(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
-            AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
-            AppError::Tera(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Tera template rendering error: {err}"),
-            ),
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
+            ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
+            ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
+            ApiError::UnprocessableEntity(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
+            ApiError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            ApiError::Tera(err) => {
+                // Log the actual template error for debugging
+                tracing::error!("Template rendering error: {}", err);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An error occurred while rendering the page".to_string(),
+                )
+            }
         };
 
-        let error_response = ErrorResponse {
-            errors: ErrorBody {
-                body: vec![message],
-            },
-        };
-
-        (status, axum::Json(error_response)).into_response()
+        ApiResponse::<()>::error(&message, status).into_response()
     }
 }

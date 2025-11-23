@@ -6,6 +6,9 @@
 # Cursor
 .cursor/
 
+# LLM rules
+CLAUDE.*
+
 # Build outputs
 target/
 

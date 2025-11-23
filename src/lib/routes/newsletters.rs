@@ -1,7 +1,7 @@
 // src/lib/routes/newsletters.rs
 
 use crate::auth::AuthorUser;
-use crate::errors::AppError;
+use crate::errors::ApiError;
 use crate::models::{
     CreateNewsletterIssue, NewsletterIssueResponse, NewsletterStats, SubscribeRequest,
     UpdateNewsletterIssue,
@@ -25,7 +25,7 @@ use validator::Validate;
 pub async fn subscribe(
     State(state): State<AppState>,
     Json(payload): Json<SubscribeRequest>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Validate request
     payload.validate()?;
 
@@ -111,7 +111,7 @@ pub async fn subscribe(
 pub async fn confirm_subscription(
     State(state): State<AppState>,
     Path(token): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     // Find subscriber with this confirmation token
@@ -125,7 +125,7 @@ pub async fn confirm_subscription(
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| AppError::NotFound("Invalid confirmation token".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound("Invalid confirmation token".to_string()))?;
 
     let id: String = row.get(0)?;
     let email: String = row.get(1)?;
@@ -158,7 +158,7 @@ pub async fn confirm_subscription(
 pub async fn unsubscribe(
     State(state): State<AppState>,
     Path(token): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     // Find subscriber with this unsubscribe token
@@ -172,7 +172,7 @@ pub async fn unsubscribe(
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| AppError::NotFound("Invalid unsubscribe token".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound("Invalid unsubscribe token".to_string()))?;
 
     let id: String = row.get(0)?;
     let email: String = row.get(1)?;
@@ -205,7 +205,7 @@ pub async fn unsubscribe(
 pub async fn list_newsletters(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     let mut rows = conn
@@ -255,7 +255,7 @@ pub async fn create_newsletter(
     auth_user: AuthorUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateNewsletterIssue>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Validate request
     payload.validate()?;
 
@@ -294,7 +294,7 @@ pub async fn get_newsletter(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     let mut rows = conn
@@ -308,7 +308,7 @@ pub async fn get_newsletter(
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| AppError::NotFound("Newsletter not found".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound("Newsletter not found".to_string()))?;
 
     let id: String = row.get(0)?;
     let title: String = row.get(1)?;
@@ -346,7 +346,7 @@ pub async fn update_newsletter(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(payload): Json<UpdateNewsletterIssue>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Validate request
     payload.validate()?;
 
@@ -361,7 +361,7 @@ pub async fn update_newsletter(
         .await?;
 
     if rows.next().await?.is_none() {
-        return Err(AppError::NotFound("Newsletter not found".to_string()));
+        return Err(ApiError::NotFound("Newsletter not found".to_string()));
     }
 
     // Build update query dynamically
@@ -394,7 +394,7 @@ pub async fn update_newsletter(
     }
 
     if updates.is_empty() {
-        return Err(AppError::BadRequest("No fields to update".to_string()));
+        return Err(ApiError::BadRequest("No fields to update".to_string()));
     }
 
     updates.push("updated_at = ?");
@@ -424,7 +424,7 @@ pub async fn delete_newsletter(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     let result = conn
@@ -435,7 +435,7 @@ pub async fn delete_newsletter(
         .await?;
 
     if result == 0 {
-        return Err(AppError::NotFound("Newsletter not found".to_string()));
+        return Err(ApiError::NotFound("Newsletter not found".to_string()));
     }
 
     Ok(ApiResponse::success(json!({
@@ -449,7 +449,7 @@ pub async fn send_newsletter(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     // Get newsletter
@@ -463,13 +463,13 @@ pub async fn send_newsletter(
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| AppError::NotFound("Newsletter not found".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound("Newsletter not found".to_string()))?;
 
     let status: String = row.get(4)?;
 
     // Check if already sent
     if status == "sent" {
-        return Err(AppError::BadRequest(
+        return Err(ApiError::BadRequest(
             "Newsletter has already been sent".to_string(),
         ));
     }
@@ -524,7 +524,7 @@ pub async fn send_newsletter(
 pub async fn get_newsletter_stats(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     // Get total subscribers
@@ -572,7 +572,7 @@ pub async fn get_newsletter_stats(
 
 /// Newsletter subscription page
 /// GET /newsletter
-pub async fn newsletter_page(State(state): State<AppState>) -> Result<Html<String>, AppError> {
+pub async fn newsletter_page(State(state): State<AppState>) -> Result<Html<String>, ApiError> {
     let mut context = tera::Context::new();
     context.insert("title", "Newsletter Subscription");
 
@@ -588,7 +588,7 @@ pub async fn newsletter_page(State(state): State<AppState>) -> Result<Html<Strin
 pub async fn newsletter_confirmed_page(
     State(state): State<AppState>,
     Path(token): Path<String>,
-) -> Result<Html<String>, AppError> {
+) -> Result<Html<String>, ApiError> {
     let conn = state.db.connect()?;
 
     // Get subscriber email from token
@@ -602,7 +602,7 @@ pub async fn newsletter_confirmed_page(
     let email = if let Some(row) = rows.next().await? {
         row.get::<String>(0)?
     } else {
-        return Err(AppError::NotFound("Invalid confirmation link".to_string()));
+        return Err(ApiError::NotFound("Invalid confirmation link".to_string()));
     };
 
     let mut context = tera::Context::new();
@@ -621,7 +621,7 @@ pub async fn newsletter_confirmed_page(
 pub async fn newsletter_unsubscribed_page(
     State(state): State<AppState>,
     Path(token): Path<String>,
-) -> Result<Html<String>, AppError> {
+) -> Result<Html<String>, ApiError> {
     let conn = state.db.connect()?;
 
     // Get subscriber email from token
@@ -635,7 +635,7 @@ pub async fn newsletter_unsubscribed_page(
     let email = if let Some(row) = rows.next().await? {
         row.get::<String>(0)?
     } else {
-        return Err(AppError::NotFound("Invalid unsubscribe link".to_string()));
+        return Err(ApiError::NotFound("Invalid unsubscribe link".to_string()));
     };
 
     let mut context = tera::Context::new();
@@ -654,11 +654,8 @@ pub async fn newsletter_unsubscribed_page(
 pub async fn admin_newsletters_page(
     auth_user: AuthorUser,
     State(state): State<AppState>,
-) -> Result<Html<String>, AppError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+) -> Result<Html<String>, ApiError> {
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get user info for template
     let mut user_rows = conn
@@ -667,19 +664,19 @@ pub async fn admin_newsletters_page(
             libsql::params![auth_user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

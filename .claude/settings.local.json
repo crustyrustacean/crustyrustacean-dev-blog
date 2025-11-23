@@ -1,18 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)",
-      "WebFetch(domain:github.com)",
-      "Bash(git checkout:*)",
-      "Bash(cargo check:*)",
-      "Bash(cargo test:*)",
-      "Bash(Select-String -Pattern \"test result:\")",
-      "Bash(dir:*)",
-      "Bash(del \"C:\\Users\\jeff\\Development\\crustyrustacean\\rust-lang\\crustyrustacean-dev-blog\\CODEBASE_INDEX_SUMMARY.md\")",
-      "Bash(rm:*)",
-      "Bash(cargo clippy:*)",
-      "Bash(powershell -Command \"(Get-Content tests\\api\\api_keys.rs | Measure-Object -Line).Lines\")",
-      "Bash(powershell -Command \"(Get-Content tests\\api\\helpers.rs | Measure-Object -Line).Lines\")"
+      "Bash(powershell -Command \"(Get-Content ''src/lib/routes/articles.rs'') -replace ''\\.map_err\\(\\|e\\| ApiError::InternalServerError\\(e\\.to_string\\(\\)\\)\\)\\?'', ''?'' | Set-Content ''src/lib/routes/articles.rs''\")",
+      "Bash(powershell -Command \"(Get-Content ''src/lib/routes/newsletters.rs'') -replace ''        \\.map_err\\(\\|e\\| ApiError::InternalServerError\\(e\\.to_string\\(\\)\\)\\)\\?'', ''        ?'' | Set-Content ''src/lib/routes/newsletters.rs''\")",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
