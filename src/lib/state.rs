@@ -2,6 +2,7 @@
 
 // dependencies
 use crate::auth::Keys;
+use crate::email::EmailService;
 use crate::storage::StorageBackend;
 use crate::{ApiError, AppConfig, DatabaseConnection};
 use once_cell::sync::OnceCell;
@@ -31,6 +32,8 @@ pub struct AppState {
     pub jwt_keys: Keys,
     pub storage: Arc<dyn StorageBackend>,
     pub cached_tags: TagCache,
+    pub email_service: EmailService,
+    pub base_url: String,
 }
 
 // simplified setup function
@@ -99,6 +102,7 @@ impl AppState {
     ) -> Result<Self, ApiError> {
         let templates = setup_templates(config)?;
         let jwt_keys = Keys::from_config(config);
+        let email_service = EmailService::new(config.email_config.clone());
 
         Ok(Self {
             templates,
@@ -106,6 +110,8 @@ impl AppState {
             jwt_keys,
             storage,
             cached_tags: Arc::new(RwLock::new(None)),
+            email_service,
+            base_url: config.base_url.clone(),
         })
     }
 }
@@ -123,6 +129,8 @@ mod tests {
             external_stylesheet: "https://cdn.example.com/bootstrap.css".to_string(),
             override_stylesheet: "/static/overrides.css".to_string(),
             app_version: "2.9.0".to_string(),
+            email_config: None, // No email service in tests by default
+            base_url: "http://localhost:8000".to_string(),
         }
     }
 
@@ -162,6 +170,8 @@ mod tests {
             external_stylesheet: "".to_string(),
             override_stylesheet: "".to_string(),
             app_version: "2.9.0".to_string(),
+            email_config: None,
+            base_url: "http://localhost:8000".to_string(),
         };
         let _temp_dir = setup_test_templates_dir();
 
@@ -181,6 +191,8 @@ mod tests {
             external_stylesheet: "https://example.com/style.css?v=1.0&theme=dark".to_string(),
             override_stylesheet: "/static/override-theme.css".to_string(),
             app_version: "2.9.0".to_string(),
+            email_config: None,
+            base_url: "http://localhost:8000".to_string(),
         };
         let _temp_dir = setup_test_templates_dir();
 

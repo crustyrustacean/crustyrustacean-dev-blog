@@ -1,7 +1,7 @@
 // src/lib/routes/password_reset.rs
 
 use crate::{
-    ApiError, AppState, EmailService,
+    ApiError, AppState,
     auth::{AuthenticatedUser, hash_password, verify_password},
     models::{ChangePasswordRequest, PasswordResetComplete, PasswordResetRequest},
     response::ApiResponse,
@@ -73,25 +73,44 @@ pub async fn request_password_reset(
         )
         .await?;
 
-        // Since there's no email service, return the reset link directly
-        // In production, this would send an email instead
-        let reset_link = format!("/password-reset/{}", token);
+        // Send password reset email
+        match state.email_service.send_password_reset_email(
+            &email,
+            &username,
+            &token,
+            &state.base_url,
+        ).await {
+            Ok(_) => {
+                tracing::info!(
+                    "Password reset email sent successfully to user: {} ({})",
+                    username,
+                    email
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to send password reset email to {}: {}",
+                    email,
+                    e
+                );
+                // Don't return error to user to prevent email enumeration
+            }
+        }
 
-        tracing::info!(
-            "Password reset requested for user: {} ({}). Reset link: {}",
-            username,
-            email,
-            reset_link
-        );
-
-        Some(reset_link)
+        // In development mode (no SMTP), return the reset link directly
+        if state.email_service.is_development_mode() {
+            let reset_link = format!("{}/password-reset/{}", state.base_url, token);
+            Some(reset_link)
+        } else {
+            None
+        }
     } else {
         None
     };
 
     Ok(ApiResponse::success(json!({
         "message": "If your email is registered, you will receive password reset instructions shortly.",
-        "reset_link": reset_link, // Included for development (no email service)
+        "reset_link": reset_link, // Only included in development mode (no email service)
     })))
 }
 
