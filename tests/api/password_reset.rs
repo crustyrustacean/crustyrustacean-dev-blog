@@ -1,6 +1,6 @@
 // tests/api/password_reset.rs
 
-use crate::helpers::{spawn_app, TestUserBuilder};
+use crate::helpers::{TestUserBuilder, spawn_app};
 use serde_json::json;
 
 #[tokio::test]
@@ -29,10 +29,12 @@ async fn password_reset_request_with_valid_email_returns_success() {
         .await
         .expect("Failed to deserialize response");
 
-    assert!(body["data"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("password reset instructions"));
+    assert!(
+        body["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("password reset instructions")
+    );
 }
 
 #[tokio::test]
@@ -57,10 +59,12 @@ async fn password_reset_request_with_nonexistent_email_returns_success() {
         .await
         .expect("Failed to deserialize response");
 
-    assert!(body["data"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("password reset instructions"));
+    assert!(
+        body["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("password reset instructions")
+    );
 }
 
 #[tokio::test]
@@ -308,10 +312,13 @@ async fn password_reset_token_can_only_be_used_once() {
         .json()
         .await
         .expect("Failed to deserialize response");
-    assert!(body["errors"]["body"][0]
-        .as_str()
-        .unwrap()
-        .contains("already been used"));
+    assert_eq!(body["success"], false);
+    assert!(
+        body["message"]
+            .as_str()
+            .unwrap()
+            .contains("already been used")
+    );
 }
 
 #[tokio::test]

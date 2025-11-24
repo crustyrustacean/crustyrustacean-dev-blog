@@ -1,16 +1,19 @@
 // src/lib/routes/admin_users.rs
 
 use crate::{
-    auth::AuthenticatedUser,
-    errors::AppError,
-    models::{AdminUserData, AdminUserUpdate, AdminUsersQuery, AdminUsersResponse, AdminUserResponse},
+    auth::{AdminUser, AuthenticatedUser},
+    errors::ApiError,
+    models::{
+        AdminUserData, AdminUserResponse, AdminUserUpdate, AdminUsersQuery, AdminUsersResponse,
+        Role,
+    },
     response::ApiResponse,
     state::AppState,
 };
 use axum::{
+    Json,
     extract::{Path, Query, State},
     response::{Html, IntoResponse},
-    Json,
 };
 use chrono::Datelike;
 use validator::Validate;
@@ -20,22 +23,22 @@ use validator::Validate;
 pub async fn get_admin_users_page(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     // Fetch basic user count for display
     let mut count_rows = conn
         .query("SELECT COUNT(*) FROM users", ())
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let user_count: i32 = if let Some(row) = count_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         row.get(0).unwrap_or(0)
     } else {
@@ -49,19 +52,19 @@ pub async fn get_admin_users_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let email: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -84,9 +87,9 @@ pub async fn get_admin_users_page(
                 "user_count": user_count,
                 "current_year": chrono::Utc::now().year(),
             }))
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
         )
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     Ok(Html(html))
 }
@@ -95,13 +98,13 @@ pub async fn get_admin_users_page(
 /// GET /api/admin/users?search=query&status=active&limit=20&offset=0
 pub async fn list_users_admin(
     State(state): State<AppState>,
-    _user: AuthenticatedUser, // Require authentication
+    _user: AdminUser, // Require admin authentication
     Query(query): Query<AdminUsersQuery>,
-) -> Result<Json<ApiResponse<AdminUsersResponse>>, AppError> {
+) -> Result<Json<ApiResponse<AdminUsersResponse>>, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
@@ -111,11 +114,11 @@ pub async fn list_users_admin(
     let mut params_vec: Vec<String> = Vec::new();
 
     // Search filter
-    if let Some(search) = &query.search {
-        if !search.trim().is_empty() {
-            where_clauses.push("(u.username LIKE ?1 OR u.email LIKE ?1)");
-            params_vec.push(format!("%{}%", search.trim()));
-        }
+    if let Some(search) = &query.search
+        && !search.trim().is_empty()
+    {
+        where_clauses.push("(u.username LIKE ?1 OR u.email LIKE ?1)");
+        params_vec.push(format!("%{}%", search.trim()));
     }
 
     // Status filter
@@ -133,7 +136,7 @@ pub async fn list_users_admin(
 
     // Fetch users with article count
     let query_str = format!(
-        "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.created_at,
+        "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.role, u.created_at,
                 COUNT(a.id) as article_count
          FROM users u
          LEFT JOIN articles a ON u.id = a.author_id
@@ -158,16 +161,19 @@ pub async fn list_users_admin(
         .await
         .map_err(|e| {
             tracing::error!("Failed to query users: {:?}", e);
-            AppError::InternalServerError(e.to_string())
+            ApiError::InternalServerError(e.to_string())
         })?;
 
     let mut users = Vec::new();
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
+        let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
+        let role = role_str.parse::<Role>().unwrap_or(Role::Subscriber);
+
         users.push(AdminUserData {
             id: row.get(0).unwrap(),
             username: row.get(1).unwrap(),
@@ -175,16 +181,14 @@ pub async fn list_users_admin(
             bio: row.get(3).ok(),
             image: row.get(4).ok(),
             disabled: disabled_int != 0,
-            created_at: row.get(6).unwrap(),
-            article_count: row.get::<i32>(7).unwrap_or(0),
+            role,
+            created_at: row.get(7).unwrap(),
+            article_count: row.get::<i32>(8).unwrap_or(0),
         });
     }
 
     // Get total count
-    let count_query = format!(
-        "SELECT COUNT(DISTINCT u.id) FROM users u {}",
-        where_clause
-    );
+    let count_query = format!("SELECT COUNT(DISTINCT u.id) FROM users u {}", where_clause);
 
     let count_params: Vec<libsql::Value> = params_vec
         .iter()
@@ -195,12 +199,12 @@ pub async fn list_users_admin(
     let mut count_rows = conn
         .query(&count_query, libsql::params_from_iter(count_params))
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let users_count: i32 = if let Some(row) = count_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         row.get(0).unwrap_or(0)
     } else {
@@ -217,17 +221,17 @@ pub async fn list_users_admin(
 /// GET /api/admin/users/:id
 pub async fn get_user_admin(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    _user: AdminUser,
     Path(id): Path<String>,
-) -> Result<Json<ApiResponse<AdminUserResponse>>, AppError> {
+) -> Result<Json<ApiResponse<AdminUserResponse>>, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut rows = conn
         .query(
-            "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.created_at,
+            "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.role, u.created_at,
                     COUNT(a.id) as article_count
              FROM users u
              LEFT JOIN articles a ON u.id = a.author_id
@@ -236,14 +240,17 @@ pub async fn get_user_admin(
             libsql::params![id.clone()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     if let Some(row) = rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
+        let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
+        let role = role_str.parse::<Role>().unwrap_or(Role::Subscriber);
+
         let user_data = AdminUserData {
             id: row.get(0).unwrap(),
             username: row.get(1).unwrap(),
@@ -251,15 +258,16 @@ pub async fn get_user_admin(
             bio: row.get(3).ok(),
             image: row.get(4).ok(),
             disabled: disabled_int != 0,
-            created_at: row.get(6).unwrap(),
-            article_count: row.get::<i32>(7).unwrap_or(0),
+            role,
+            created_at: row.get(7).unwrap(),
+            article_count: row.get::<i32>(8).unwrap_or(0),
         };
 
         Ok(Json(ApiResponse::success(AdminUserResponse {
             user: user_data,
         })))
     } else {
-        Err(AppError::NotFound("User not found".to_string()))
+        Err(ApiError::NotFound("User not found".to_string()))
     }
 }
 
@@ -267,10 +275,10 @@ pub async fn get_user_admin(
 /// PUT /api/admin/users/:id
 pub async fn update_user_admin(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    _user: AdminUser,
     Path(id): Path<String>,
     Json(payload): Json<AdminUserUpdate>,
-) -> Result<Json<ApiResponse<AdminUserResponse>>, AppError> {
+) -> Result<Json<ApiResponse<AdminUserResponse>>, ApiError> {
     // Validate input
     payload.validate().map_err(|e| {
         let error_messages: Vec<String> = e
@@ -282,27 +290,30 @@ pub async fn update_user_admin(
                     .map(|error| error.message.clone().unwrap_or_default().to_string())
             })
             .collect();
-        AppError::UnprocessableEntity(error_messages.join(", "))
+        ApiError::UnprocessableEntity(error_messages.join(", "))
     })?;
 
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     // Check if user exists
     let mut check_rows = conn
-        .query("SELECT id FROM users WHERE id = ?", libsql::params![id.clone()])
+        .query(
+            "SELECT id FROM users WHERE id = ?",
+            libsql::params![id.clone()],
+        )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     if check_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         .is_none()
     {
-        return Err(AppError::NotFound("User not found".to_string()));
+        return Err(ApiError::NotFound("User not found".to_string()));
     }
 
     // Build update query dynamically
@@ -329,33 +340,34 @@ pub async fn update_user_admin(
         updates.push("disabled = ?");
         params.push(libsql::Value::Integer(if disabled { 1 } else { 0 }));
     }
+    if let Some(role) = &payload.role {
+        updates.push("role = ?");
+        params.push(libsql::Value::Text(role.to_string()));
+    }
 
     if updates.is_empty() {
-        return Err(AppError::BadRequest("No fields to update".to_string()));
+        return Err(ApiError::BadRequest("No fields to update".to_string()));
     }
 
     updates.push("updated_at = datetime('now')");
 
     params.push(libsql::Value::Text(id.clone()));
 
-    let update_query = format!(
-        "UPDATE users SET {} WHERE id = ?",
-        updates.join(", ")
-    );
+    let update_query = format!("UPDATE users SET {} WHERE id = ?", updates.join(", "));
 
     conn.execute(&update_query, libsql::params_from_iter(params))
         .await
         .map_err(|e| {
             if e.to_string().contains("UNIQUE constraint failed") {
                 if e.to_string().contains("username") {
-                    AppError::Conflict("Username already exists".to_string())
+                    ApiError::Conflict("Username already exists".to_string())
                 } else if e.to_string().contains("email") {
-                    AppError::Conflict("Email already exists".to_string())
+                    ApiError::Conflict("Email already exists".to_string())
                 } else {
-                    AppError::Conflict("Unique constraint violation".to_string())
+                    ApiError::Conflict("Unique constraint violation".to_string())
                 }
             } else {
-                AppError::InternalServerError(e.to_string())
+                ApiError::InternalServerError(e.to_string())
             }
         })?;
 
@@ -367,12 +379,12 @@ pub async fn update_user_admin(
 /// DELETE /api/admin/users/:id
 pub async fn delete_user_admin(
     State(state): State<AppState>,
-    current_user: AuthenticatedUser,
+    current_user: AdminUser,
     Path(id): Path<String>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
     // Prevent admin from deleting themselves
     if current_user.user_id.to_string() == id {
-        return Err(AppError::BadRequest(
+        return Err(ApiError::BadRequest(
             "Cannot delete your own account".to_string(),
         ));
     }
@@ -380,21 +392,24 @@ pub async fn delete_user_admin(
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     // Check if user exists
     let mut check_rows = conn
-        .query("SELECT id FROM users WHERE id = ?", libsql::params![id.clone()])
+        .query(
+            "SELECT id FROM users WHERE id = ?",
+            libsql::params![id.clone()],
+        )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     if check_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         .is_none()
     {
-        return Err(AppError::NotFound("User not found".to_string()));
+        return Err(ApiError::NotFound("User not found".to_string()));
     }
 
     // Delete user (CASCADE will handle related records)
@@ -403,7 +418,7 @@ pub async fn delete_user_admin(
         libsql::params![id.clone()],
     )
     .await
-    .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     Ok(Json(ApiResponse::success(serde_json::json!({
         "message": "User deleted successfully"

@@ -3,7 +3,7 @@
 // common API response type
 
 // dependencies
-use crate::errors::AppError;
+use crate::errors::ApiError;
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 // convenience alias fo results returned by handlers
-pub type ApiResult<T> = Result<ApiResponse<T>, AppError>;
+pub type ApiResult<T> = Result<ApiResponse<T>, ApiError>;
 
 // struct type to represent and API response
 #[derive(Debug, Serialize)]

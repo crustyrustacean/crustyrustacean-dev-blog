@@ -1,6 +1,6 @@
 // tests/api/admin_users.rs
 
-use crate::helpers::{assert_body_contains, spawn_app, HtmlResponseValidator, TestUserBuilder};
+use crate::helpers::{HtmlResponseValidator, TestUserBuilder, assert_body_contains, spawn_app};
 
 #[tokio::test]
 async fn admin_users_page_requires_authentication() {
@@ -67,12 +67,17 @@ async fn list_users_api_returns_all_users() {
     assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let users = body["data"]["users"].as_array().expect("Expected users array");
+    let users = body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
 
     assert_eq!(users.len(), 3, "Expected 3 users");
 
     // Verify user data structure
-    let alice = users.iter().find(|u| u["username"] == "alice").expect("Alice not found");
+    let alice = users
+        .iter()
+        .find(|u| u["username"] == "alice")
+        .expect("Alice not found");
     assert_eq!(alice["email"], "alice@example.com");
     assert_eq!(alice["disabled"], false);
     assert!(alice["articleCount"].is_number());
@@ -97,7 +102,9 @@ async fn list_users_api_filters_by_search() {
     assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let users = body["data"]["users"].as_array().expect("Expected users array");
+    let users = body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
 
     assert_eq!(users.len(), 1, "Expected 1 user matching search");
     assert_eq!(users[0]["username"], "alice");
@@ -120,8 +127,13 @@ async fn list_users_api_filters_by_status() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let bob = users.iter().find(|u| u["username"] == "bob").expect("Bob not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let bob = users
+        .iter()
+        .find(|u| u["username"] == "bob")
+        .expect("Bob not found");
     let bob_id = bob["id"].as_str().expect("Expected bob ID");
 
     // Disable Bob
@@ -146,7 +158,9 @@ async fn list_users_api_filters_by_status() {
     assert_eq!(response.status(), 200);
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let users = body["data"]["users"].as_array().expect("Expected users array");
+    let users = body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
 
     assert_eq!(users.len(), 1, "Expected 1 active user");
     assert_eq!(users[0]["username"], "alice");
@@ -161,7 +175,9 @@ async fn list_users_api_filters_by_status() {
         .expect("Failed to execute request");
 
     let body2: serde_json::Value = response2.json().await.expect("Failed to parse JSON");
-    let users2 = body2["data"]["users"].as_array().expect("Expected users array");
+    let users2 = body2["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
 
     assert_eq!(users2.len(), 1, "Expected 1 disabled user");
     assert_eq!(users2[0]["username"], "bob");
@@ -183,8 +199,13 @@ async fn get_user_admin_returns_user_details() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let alice = users.iter().find(|u| u["username"] == "alice").expect("Alice not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let alice = users
+        .iter()
+        .find(|u| u["username"] == "alice")
+        .expect("Alice not found");
     let alice_id = alice["id"].as_str().expect("Expected alice ID");
 
     let response = app
@@ -221,8 +242,13 @@ async fn update_user_admin_succeeds() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let alice = users.iter().find(|u| u["username"] == "alice").expect("Alice not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let alice = users
+        .iter()
+        .find(|u| u["username"] == "alice")
+        .expect("Alice not found");
     let alice_id = alice["id"].as_str().expect("Expected alice ID");
 
     let response = app
@@ -261,8 +287,13 @@ async fn update_user_admin_can_disable_user() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let bob = users.iter().find(|u| u["username"] == "bob").expect("Bob not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let bob = users
+        .iter()
+        .find(|u| u["username"] == "bob")
+        .expect("Bob not found");
     let bob_id = bob["id"].as_str().expect("Expected bob ID");
 
     let response = app
@@ -300,8 +331,13 @@ async fn delete_user_admin_succeeds() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let bob = users.iter().find(|u| u["username"] == "bob").expect("Bob not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let bob = users
+        .iter()
+        .find(|u| u["username"] == "bob")
+        .expect("Bob not found");
     let bob_id = bob["id"].as_str().expect("Expected bob ID");
 
     let response = app
@@ -324,7 +360,9 @@ async fn delete_user_admin_succeeds() {
         .expect("Failed to list users");
 
     let list_body2: serde_json::Value = list_response2.json().await.expect("Failed to parse JSON");
-    let users2 = list_body2["data"]["users"].as_array().expect("Expected users array");
+    let users2 = list_body2["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
 
     assert_eq!(users2.len(), 1, "Expected 1 user remaining");
     assert_eq!(users2[0]["username"], "alice");
@@ -346,8 +384,13 @@ async fn delete_user_admin_prevents_self_deletion() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let alice = users.iter().find(|u| u["username"] == "alice").expect("Alice not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let alice = users
+        .iter()
+        .find(|u| u["username"] == "alice")
+        .expect("Alice not found");
     let alice_id = alice["id"].as_str().expect("Expected alice ID");
 
     let response = app
@@ -361,7 +404,13 @@ async fn delete_user_admin_prevents_self_deletion() {
     assert_eq!(response.status(), 400, "Expected 400 Bad Request");
 
     let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    assert!(body["errors"]["body"][0].as_str().unwrap().contains("Cannot delete your own account"));
+    assert_eq!(body["success"], false);
+    assert!(
+        body["message"]
+            .as_str()
+            .unwrap()
+            .contains("Cannot delete your own account")
+    );
 }
 
 #[tokio::test]
@@ -372,7 +421,10 @@ async fn get_nonexistent_user_returns_404() {
 
     let response = app
         .client
-        .get(format!("{}/api/admin/users/nonexistent-id-12345", &app.address))
+        .get(format!(
+            "{}/api/admin/users/nonexistent-id-12345",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -397,8 +449,13 @@ async fn update_user_validates_email_format() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let alice = users.iter().find(|u| u["username"] == "alice").expect("Alice not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let alice = users
+        .iter()
+        .find(|u| u["username"] == "alice")
+        .expect("Alice not found");
     let alice_id = alice["id"].as_str().expect("Expected alice ID");
 
     let response = app
@@ -430,8 +487,13 @@ async fn update_user_validates_username_length() {
         .expect("Failed to list users");
 
     let list_body: serde_json::Value = list_response.json().await.expect("Failed to parse JSON");
-    let users = list_body["data"]["users"].as_array().expect("Expected users array");
-    let alice = users.iter().find(|u| u["username"] == "alice").expect("Alice not found");
+    let users = list_body["data"]["users"]
+        .as_array()
+        .expect("Expected users array");
+    let alice = users
+        .iter()
+        .find(|u| u["username"] == "alice")
+        .expect("Alice not found");
     let alice_id = alice["id"].as_str().expect("Expected alice ID");
 
     let response = app

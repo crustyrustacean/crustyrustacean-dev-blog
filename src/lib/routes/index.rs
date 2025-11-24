@@ -4,7 +4,7 @@
 
 // dependencies
 use crate::auth::OptionalUser;
-use crate::errors::AppError;
+use crate::errors::ApiError;
 use crate::models::ArticleQuery;
 use crate::routes::articles::list_articles;
 use crate::state::AppState;
@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 pub async fn get_index(
     State(state): State<AppState>,
     optional_user: OptionalUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let current_year = chrono::Utc::now().year();
 
     // Get user info and ID if authenticated
@@ -31,7 +31,7 @@ pub async fn get_index(
         let conn = state
             .db
             .connect()
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         let mut rows = conn
             .query(
@@ -39,19 +39,19 @@ pub async fn get_index(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let email: String = row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -102,7 +102,7 @@ pub async fn get_index(
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let (total_articles_count, draft_count, tags_count) = if let Some(user_id) = user_id_opt {
         // Combine all counts in a single query for authenticated users
@@ -117,12 +117,12 @@ pub async fn get_index(
                 libsql::params![user_id.to_string()],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let total: i64 = row.get(0).unwrap_or(0);
             let drafts: i64 = row.get(1).unwrap_or(0);
@@ -143,12 +143,12 @@ pub async fn get_index(
                 libsql::params![],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let total: i64 = row.get(0).unwrap_or(0);
             let tags: i64 = row.get(1).unwrap_or(0);
@@ -180,9 +180,10 @@ pub async fn get_index(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("index.html", &tera::Context::from_serialize(&context)?)
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }
@@ -192,7 +193,7 @@ pub async fn get_index(
 pub async fn get_about(
     State(state): State<AppState>,
     optional_user: OptionalUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let current_year = chrono::Utc::now().year();
 
     // Get user info if authenticated
@@ -200,7 +201,7 @@ pub async fn get_about(
         let conn = state
             .db
             .connect()
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         let mut rows = conn
             .query(
@@ -208,19 +209,19 @@ pub async fn get_about(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let email: String = row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -244,9 +245,10 @@ pub async fn get_about(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("about.html", &tera::Context::from_serialize(&context)?)
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }
@@ -256,7 +258,7 @@ pub async fn get_about(
 pub async fn get_privacy(
     State(state): State<AppState>,
     optional_user: OptionalUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let current_year = chrono::Utc::now().year();
 
     // Get user info if authenticated
@@ -264,7 +266,7 @@ pub async fn get_privacy(
         let conn = state
             .db
             .connect()
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         let mut rows = conn
             .query(
@@ -272,19 +274,19 @@ pub async fn get_privacy(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let email: String = row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -308,9 +310,10 @@ pub async fn get_privacy(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("privacy.html", &tera::Context::from_serialize(&context)?)
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }
@@ -320,7 +323,7 @@ pub async fn get_privacy(
 pub async fn get_terms(
     State(state): State<AppState>,
     optional_user: OptionalUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let current_year = chrono::Utc::now().year();
 
     // Get user info if authenticated
@@ -328,7 +331,7 @@ pub async fn get_terms(
         let conn = state
             .db
             .connect()
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         let mut rows = conn
             .query(
@@ -336,19 +339,19 @@ pub async fn get_terms(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let email: String = row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -372,9 +375,10 @@ pub async fn get_terms(
         "current_year": current_year
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("terms.html", &tera::Context::from_serialize(&context)?)
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }

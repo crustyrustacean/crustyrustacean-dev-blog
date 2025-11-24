@@ -174,7 +174,9 @@ async fn get_categories_returns_all_categories() {
     // Assert
     assert_status!(response, StatusCode::OK);
     let body = parse_json!(response);
-    let categories = body["categories"].as_array().expect("categories should be an array");
+    let categories = body["categories"]
+        .as_array()
+        .expect("categories should be an array");
     assert_eq!(categories.len(), 3);
 }
 
@@ -549,13 +551,7 @@ async fn update_article_category() {
 
     // Create article with initial category
     let slug = app
-        .create_article(
-            &token,
-            "Test Article",
-            "Description",
-            "Body",
-            vec!["rust"],
-        )
+        .create_article(&token, "Test Article", "Description", "Body", vec!["rust"])
         .await;
 
     // Set initial category

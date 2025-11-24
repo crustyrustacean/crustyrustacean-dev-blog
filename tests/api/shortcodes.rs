@@ -1,7 +1,7 @@
 // Integration tests for shortcode processing with database
 // Tests the full shortcode resolution pipeline
 
-use crate::helpers::{spawn_app, TestArticleBuilder, TestUserBuilder};
+use crate::helpers::{TestArticleBuilder, TestUserBuilder, spawn_app};
 
 #[tokio::test]
 async fn test_process_shortcodes_resolves_existing_article() {
@@ -261,10 +261,16 @@ async fn test_create_article_with_shortcodes_processes_them() {
     eprintln!("Stored body: {}", stored_body);
 
     // Verify shortcodes were processed in stored body
-    assert!(stored_body.contains("[Referenced Article](/articles/referenced-article)"),
-        "Expected processed shortcode in body, got: {}", stored_body);
-    assert!(stored_body.contains(r#"[non-existent](/articles/non-existent "Article not found")"#),
-        "Expected missing article shortcode in body, got: {}", stored_body);
+    assert!(
+        stored_body.contains("[Referenced Article](/articles/referenced-article)"),
+        "Expected processed shortcode in body, got: {}",
+        stored_body
+    );
+    assert!(
+        stored_body.contains(r#"[non-existent](/articles/non-existent "Article not found")"#),
+        "Expected missing article shortcode in body, got: {}",
+        stored_body
+    );
 }
 
 #[tokio::test]

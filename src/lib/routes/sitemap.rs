@@ -1,6 +1,6 @@
 // src/lib/routes/sitemap.rs
 
-use crate::{AppError, AppState};
+use crate::{ApiError, AppState};
 use axum::{
     extract::State,
     http::{StatusCode, header},
@@ -8,11 +8,11 @@ use axum::{
 };
 use chrono::Utc;
 
-pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, AppError> {
+pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, ApiError> {
     let conn = state
         .db
         .connect()
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     // Get all articles with their update times
     let mut article_rows = conn
@@ -25,7 +25,7 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, AppE
             libsql::params![],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let mut urls = Vec::new();
 
@@ -68,18 +68,18 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, AppE
     while let Some(row) = article_rows
         .next()
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
     {
         let slug: String = row
             .get(0)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
         let updated_at_str: String = row
             .get(1)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         // Parse the timestamp
         let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-            .map_err(|e| AppError::InternalServerError(format!("Invalid timestamp: {}", e)))?
+            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
             .with_timezone(&Utc);
 
         // Format as W3C Datetime (ISO 8601)

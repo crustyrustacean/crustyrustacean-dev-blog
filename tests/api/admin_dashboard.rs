@@ -194,17 +194,11 @@ async fn test_admin_dashboard_displays_multiple_article_slugs() {
     let token = app.register_user_default("multislug").await;
 
     // Create multiple articles with different titles
-    let slug1 = app
-        .create_article_simple(&token, "First Article")
-        .await;
+    let slug1 = app.create_article_simple(&token, "First Article").await;
 
-    let slug2 = app
-        .create_article_simple(&token, "Second Article")
-        .await;
+    let slug2 = app.create_article_simple(&token, "Second Article").await;
 
-    let slug3 = app
-        .create_article_simple(&token, "Third Article")
-        .await;
+    let slug3 = app.create_article_simple(&token, "Third Article").await;
 
     // Act - Access admin dashboard
     let response = app
@@ -266,11 +260,7 @@ async fn test_admin_dashboard_pagination_with_more_than_10_articles() {
     // Should contain pagination info
     assert_body_contains(
         &body,
-        &[
-            "Showing 10 of 15 articles",
-            "Page 1 of 2",
-            "Next &raquo;",
-        ],
+        &["Showing 10 of 15 articles", "Page 1 of 2", "Next &raquo;"],
     );
 
     // Should have page 2 link
@@ -463,7 +453,7 @@ async fn test_admin_dashboard_pagination_excludes_drafts_from_count() {
         &body,
         &[
             "Showing 10 of 12 articles", // Should count only published articles
-            "Page 1 of 2",                // Should have 2 pages, not 3
+            "Page 1 of 2",               // Should have 2 pages, not 3
         ],
     );
 
@@ -484,7 +474,7 @@ async fn test_admin_dashboard_pagination_excludes_drafts_from_count() {
         &body_page2,
         &[
             "Showing 2 of 12 articles", // Only 2 articles on last page
-            "Page 2 of 2",               // This is the last page
+            "Page 2 of 2",              // This is the last page
         ],
     );
 

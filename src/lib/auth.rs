@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{AppConfig, AppError};
+use crate::{ApiError, AppConfig};
 
 #[derive(Clone)]
 pub struct Keys {
@@ -55,14 +55,14 @@ pub enum AuthError {
     PasswordHashError(String),
 }
 
-impl From<AuthError> for AppError {
+impl From<AuthError> for ApiError {
     fn from(err: AuthError) -> Self {
         match err {
-            AuthError::InvalidCredentials => AppError::Unauthorized(err.to_string()),
+            AuthError::InvalidCredentials => ApiError::Unauthorized(err.to_string()),
             AuthError::MissingToken | AuthError::InvalidToken | AuthError::TokenExpired => {
-                AppError::Unauthorized(err.to_string())
+                ApiError::Unauthorized(err.to_string())
             }
-            AuthError::PasswordHashError(msg) => AppError::InternalServerError(msg),
+            AuthError::PasswordHashError(msg) => ApiError::InternalServerError(msg),
         }
     }
 }
@@ -70,6 +70,7 @@ impl From<AuthError> for AppError {
 #[derive(Clone)]
 pub struct AuthenticatedUser {
     pub user_id: Uuid,
+    pub role: crate::models::Role,
 }
 
 // Optional authentication - doesn't fail if no token present
@@ -78,7 +79,7 @@ pub struct OptionalUser {
 }
 
 impl FromRequestParts<crate::AppState> for AuthenticatedUser {
-    type Rejection = AppError;
+    type Rejection = ApiError;
 
     async fn from_request_parts(
         parts: &mut Parts,
@@ -109,7 +110,33 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         let user_id =
             Uuid::parse_str(&token_data.claims.sub).map_err(|_| AuthError::InvalidToken)?;
 
-        Ok(AuthenticatedUser { user_id })
+        // Fetch user role from database
+        let conn = state
+            .db
+            .connect()
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+        let row = conn
+            .query(
+                "SELECT role FROM users WHERE id = ? AND disabled = 0",
+                libsql::params![user_id.to_string()],
+            )
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            .next()
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            .ok_or(AuthError::InvalidToken)?;
+
+        let role_str: String = row
+            .get(0)
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+        let role = role_str
+            .parse::<crate::models::Role>()
+            .map_err(|_| ApiError::InternalServerError("Invalid role in database".to_string()))?;
+
+        Ok(AuthenticatedUser { user_id, role })
     }
 }
 
@@ -190,13 +217,66 @@ pub fn verify_api_key(key: &str, hash: &str) -> Result<bool, AuthError> {
     verify_password(key, hash)
 }
 
+// Role-based authentication extractors
+#[derive(Clone)]
+pub struct AdminUser {
+    pub user_id: Uuid,
+    pub role: crate::models::Role,
+}
+
+impl FromRequestParts<crate::AppState> for AdminUser {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+
+        if !user.role.is_admin() {
+            return Err(ApiError::Forbidden("Admin access required".to_string()));
+        }
+
+        Ok(AdminUser {
+            user_id: user.user_id,
+            role: user.role,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct AuthorUser {
+    pub user_id: Uuid,
+    pub role: crate::models::Role,
+}
+
+impl FromRequestParts<crate::AppState> for AuthorUser {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+
+        if !user.role.is_author() {
+            return Err(ApiError::Forbidden("Author access required".to_string()));
+        }
+
+        Ok(AuthorUser {
+            user_id: user.user_id,
+            role: user.role,
+        })
+    }
+}
+
 // Extractor for API key authentication
 pub struct ApiKeyUser {
     pub user_id: Uuid,
 }
 
 impl FromRequestParts<crate::AppState> for ApiKeyUser {
-    type Rejection = AppError;
+    type Rejection = ApiError;
 
     async fn from_request_parts(
         parts: &mut Parts,
@@ -212,30 +292,30 @@ impl FromRequestParts<crate::AppState> for ApiKeyUser {
         let conn = state
             .db
             .connect()
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         // Find all API keys and check each one
         let mut rows = conn
             .query("SELECT id, user_id, key_hash, expires_at FROM api_keys", ())
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         let mut found_user_id: Option<(Uuid, Uuid)> = None;
 
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let key_id: String = row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let user_id: String = row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let key_hash: String = row
                 .get(2)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let expires_at: Option<String> = row.get(3).ok();
 
             // Check if key is expired
@@ -249,9 +329,9 @@ impl FromRequestParts<crate::AppState> for ApiKeyUser {
             // Verify the API key
             if verify_api_key(api_key, &key_hash)? {
                 let key_uuid = Uuid::parse_str(&key_id)
-                    .map_err(|_| AppError::InternalServerError("Invalid key ID".to_string()))?;
+                    .map_err(|_| ApiError::InternalServerError("Invalid key ID".to_string()))?;
                 let user_uuid = Uuid::parse_str(&user_id)
-                    .map_err(|_| AppError::InternalServerError("Invalid user ID".to_string()))?;
+                    .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
                 found_user_id = Some((key_uuid, user_uuid));
                 break;
             }
@@ -266,7 +346,7 @@ impl FromRequestParts<crate::AppState> for ApiKeyUser {
             libsql::params![now.to_rfc3339(), key_id.to_string()],
         )
         .await
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         Ok(ApiKeyUser { user_id })
     }

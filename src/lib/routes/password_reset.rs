@@ -1,15 +1,15 @@
 // src/lib/routes/password_reset.rs
 
 use crate::{
-    AppError, AppState,
+    ApiError, AppState, EmailService,
     auth::{AuthenticatedUser, hash_password, verify_password},
     models::{ChangePasswordRequest, PasswordResetComplete, PasswordResetRequest},
     response::ApiResponse,
 };
 use axum::{
+    Json,
     extract::{Path, State},
     response::{Html, IntoResponse},
-    Json,
 };
 use chrono::{Duration, Utc};
 use libsql::params;
@@ -21,11 +21,11 @@ use validator::Validate;
 /// GET /password-reset/request
 pub async fn get_password_reset_request_page(
     State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let template = state
         .templates
         .render("auth/password_reset_request.html", &tera::Context::new())
-        .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     Ok(Html(template))
 }
@@ -35,7 +35,7 @@ pub async fn get_password_reset_request_page(
 pub async fn request_password_reset(
     State(state): State<AppState>,
     Json(payload): Json<PasswordResetRequest>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Validate request
     payload.validate()?;
 
@@ -100,7 +100,7 @@ pub async fn request_password_reset(
 pub async fn get_password_reset_page(
     State(state): State<AppState>,
     Path(token): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
     // Validate token exists and is not expired
@@ -117,18 +117,18 @@ pub async fn get_password_reset_page(
 
         // Check if token is used
         if used == 1 {
-            return Err(AppError::BadRequest(
+            return Err(ApiError::BadRequest(
                 "This password reset link has already been used.".to_string(),
             ));
         }
 
         // Check if token is expired
         let exp_date = chrono::DateTime::parse_from_rfc3339(&expires_at)
-            .map_err(|_| AppError::InternalServerError("Invalid date format".to_string()))?
+            .map_err(|_| ApiError::InternalServerError("Invalid date format".to_string()))?
             .with_timezone(&Utc);
 
         if exp_date < Utc::now() {
-            return Err(AppError::BadRequest(
+            return Err(ApiError::BadRequest(
                 "This password reset link has expired. Please request a new one.".to_string(),
             ));
         }
@@ -141,13 +141,13 @@ pub async fn get_password_reset_page(
                 &tera::Context::from_serialize(json!({
                     "token": token,
                 }))
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?,
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
             )
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         Ok(Html(template))
     } else {
-        Err(AppError::NotFound(
+        Err(ApiError::NotFound(
             "Invalid password reset link.".to_string(),
         ))
     }
@@ -159,7 +159,7 @@ pub async fn complete_password_reset(
     State(state): State<AppState>,
     Path(token): Path<String>,
     Json(payload): Json<PasswordResetComplete>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Validate request
     payload.validate()?;
 
@@ -181,25 +181,25 @@ pub async fn complete_password_reset(
 
         // Check if token is used
         if used == 1 {
-            return Err(AppError::BadRequest(
+            return Err(ApiError::BadRequest(
                 "This password reset link has already been used.".to_string(),
             ));
         }
 
         // Check if token is expired
         let exp_date = chrono::DateTime::parse_from_rfc3339(&expires_at)
-            .map_err(|_| AppError::InternalServerError("Invalid date format".to_string()))?
+            .map_err(|_| ApiError::InternalServerError("Invalid date format".to_string()))?
             .with_timezone(&Utc);
 
         if exp_date < Utc::now() {
-            return Err(AppError::BadRequest(
+            return Err(ApiError::BadRequest(
                 "This password reset link has expired. Please request a new one.".to_string(),
             ));
         }
 
         (token_id, user_id)
     } else {
-        return Err(AppError::NotFound(
+        return Err(ApiError::NotFound(
             "Invalid password reset link.".to_string(),
         ));
     };
@@ -232,7 +232,7 @@ pub async fn change_password(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(payload): Json<ChangePasswordRequest>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Validate request
     payload.validate()?;
 
@@ -250,12 +250,12 @@ pub async fn change_password(
         let hash: String = row.get(0)?;
         hash
     } else {
-        return Err(AppError::NotFound("User not found.".to_string()));
+        return Err(ApiError::NotFound("User not found.".to_string()));
     };
 
     // Verify current password
     if !verify_password(&payload.current_password, &current_hash)? {
-        return Err(AppError::Unauthorized(
+        return Err(ApiError::Unauthorized(
             "Current password is incorrect.".to_string(),
         ));
     }

@@ -1,6 +1,6 @@
 // src/lib/email.rs
 
-use crate::AppError;
+use crate::ApiError;
 use tracing::info;
 
 /// Email service for sending emails
@@ -29,7 +29,7 @@ impl EmailService {
         username: &str,
         reset_token: &str,
         base_url: &str,
-    ) -> Result<(), AppError> {
+    ) -> Result<(), ApiError> {
         let reset_link = format!("{}/password-reset/{}", base_url, reset_token);
 
         // For now, just log the email content
@@ -57,11 +57,7 @@ impl EmailService {
     /// Send welcome email
     /// Currently logs to console
     /// TODO: Integrate actual email sending
-    pub async fn send_welcome_email(
-        &self,
-        to_email: &str,
-        username: &str,
-    ) -> Result<(), AppError> {
+    pub async fn send_welcome_email(&self, to_email: &str, username: &str) -> Result<(), ApiError> {
         info!(
             "=== WELCOME EMAIL ===\n\
             To: {}\n\

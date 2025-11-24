@@ -1779,10 +1779,7 @@ async fn test_list_articles_with_author_filter_excludes_their_drafts() {
     // Act - List articles filtered by author
     let response = app
         .client
-        .get(format!(
-            "{}/api/articles?author=filterauthor",
-            &app.address
-        ))
+        .get(format!("{}/api/articles?author=filterauthor", &app.address))
         .send()
         .await
         .expect("Failed to execute request");
@@ -2122,14 +2119,13 @@ fn main() {
         "Learn about advanced patterns in Rust programming."
     );
     // Ensure the full content is preserved including code blocks
-    assert!(response_body["body"]
-        .as_str()
-        .unwrap()
-        .contains("```rust"));
-    assert!(response_body["body"]
-        .as_str()
-        .unwrap()
-        .contains("fn main()"));
+    assert!(response_body["body"].as_str().unwrap().contains("```rust"));
+    assert!(
+        response_body["body"]
+            .as_str()
+            .unwrap()
+            .contains("fn main()")
+    );
 }
 
 #[tokio::test]

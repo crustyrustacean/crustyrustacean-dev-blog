@@ -1,13 +1,13 @@
 // src/lib/errors.rs
 
 // dependencies
+use crate::response::ApiResponse;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
 
 // Unified error type for the application
 #[derive(Debug, thiserror::Error)]
-pub enum AppError {
+pub enum ApiError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
@@ -35,66 +35,50 @@ pub enum AppError {
 }
 
 // Implement From for validator::ValidationErrors
-impl From<validator::ValidationErrors> for AppError {
+impl From<validator::ValidationErrors> for ApiError {
     fn from(err: validator::ValidationErrors) -> Self {
-        AppError::BadRequest(err.to_string())
+        ApiError::BadRequest(err.to_string())
     }
 }
 
 // Implement From for libsql::Error
-impl From<libsql::Error> for AppError {
+impl From<libsql::Error> for ApiError {
     fn from(err: libsql::Error) -> Self {
-        AppError::InternalServerError(err.to_string())
+        ApiError::InternalServerError(err.to_string())
     }
 }
 
 // Implement From for uuid::Error
-impl From<uuid::Error> for AppError {
+impl From<uuid::Error> for ApiError {
     fn from(err: uuid::Error) -> Self {
-        AppError::BadRequest(err.to_string())
+        ApiError::BadRequest(err.to_string())
     }
 }
 
 // Implement From for chrono::ParseError
-impl From<chrono::ParseError> for AppError {
+impl From<chrono::ParseError> for ApiError {
     fn from(err: chrono::ParseError) -> Self {
-        AppError::BadRequest(err.to_string())
+        ApiError::BadRequest(err.to_string())
     }
 }
 
-#[derive(Serialize)]
-struct ErrorResponse {
-    errors: ErrorBody,
-}
-
-#[derive(Serialize)]
-struct ErrorBody {
-    body: Vec<String>,
-}
-
-// implement the IntoResponse trait for the AppError type
-impl IntoResponse for AppError {
+// implement the IntoResponse trait for the ApiError type
+impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
-            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
-            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
-            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
-            AppError::Conflict(msg) => (StatusCode::CONFLICT, msg),
-            AppError::UnprocessableEntity(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
-            AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
-            AppError::Tera(err) => (
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
+            ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
+            ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
+            ApiError::UnprocessableEntity(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
+            ApiError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            ApiError::Tera(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Tera template rendering error: {err}"),
             ),
         };
 
-        let error_response = ErrorResponse {
-            errors: ErrorBody {
-                body: vec![message],
-            },
-        };
-
-        (status, axum::Json(error_response)).into_response()
+        ApiResponse::<()>::error(&message, status).into_response()
     }
 }

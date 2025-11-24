@@ -4,9 +4,12 @@
 
 // dependencies
 use crate::auth::OptionalUser;
-use crate::errors::AppError;
+use crate::errors::ApiError;
 use crate::state::AppState;
-use axum::{extract::State, response::{Html, IntoResponse}};
+use axum::{
+    extract::State,
+    response::{Html, IntoResponse},
+};
 use axum_macros::debug_handler;
 use chrono::{Datelike, Utc};
 use serde::Serialize;
@@ -24,13 +27,13 @@ struct RegisterPageContent {
 pub async fn get_login_page(
     State(state): State<AppState>,
     optional_user: OptionalUser,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
         let conn = state
             .db
             .connect()
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         let mut rows = conn
             .query(
@@ -38,19 +41,19 @@ pub async fn get_login_page(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let email: String = row
                 .get(1)
-                .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -74,9 +77,10 @@ pub async fn get_login_page(
         "current_year": Utc::now().year()
     });
 
-    let html = state.templates
+    let html = state
+        .templates
         .render("auth/login.html", &tera::Context::from_serialize(&context)?)
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }
@@ -85,15 +89,19 @@ pub async fn get_login_page(
 #[debug_handler]
 pub async fn get_register_page(
     State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<impl IntoResponse, ApiError> {
     let register_content = RegisterPageContent {
         title: "Register".to_string(),
         error: None,
     };
 
-    let html = state.templates
-        .render("auth/register.html", &tera::Context::from_serialize(&register_content)?)
-        .map_err(|e| AppError::InternalServerError(format!("Template error: {}", e)))?;
+    let html = state
+        .templates
+        .render(
+            "auth/register.html",
+            &tera::Context::from_serialize(&register_content)?,
+        )
+        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
 
     Ok(Html(html))
 }
