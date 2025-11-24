@@ -1881,14 +1881,15 @@ dependencies = [
  "httpdate",
  "idna",
  "mime",
- "native-tls",
  "nom 8.0.0",
  "percent-encoding",
  "quoted_printable",
+ "rustls 0.23.35",
  "socket2 0.6.1",
  "tokio",
- "tokio-native-tls",
+ "tokio-rustls 0.26.4",
  "url",
+ "webpki-roots 1.0.4",
 ]
 
 [[package]]
@@ -3160,6 +3161,7 @@ version = "0.23.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "533f54bc6a7d4f647e46ad909549eda97bf5afc1585190ef692b4286b198bd8f"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
