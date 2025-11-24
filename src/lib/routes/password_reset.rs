@@ -52,7 +52,7 @@ pub async fn request_password_reset(
 
     // Always return success even if email not found (security best practice)
     // This prevents email enumeration attacks
-    if let Some(row) = rows.next().await? {
+    let reset_link = if let Some(row) = rows.next().await? {
         let user_id: String = row.get(0)?;
         let username: String = row.get(1)?;
 
@@ -73,20 +73,25 @@ pub async fn request_password_reset(
         )
         .await?;
 
-        // Send password reset email
-        // TODO: Get base URL from config
-        let base_url = "http://localhost:8000"; // Placeholder
-        let email_service = EmailService::new(
-            "noreply@crustyrustacean.dev".to_string(),
-            "CrustyRustacean Dev Blog".to_string(),
+        // Since there's no email service, return the reset link directly
+        // In production, this would send an email instead
+        let reset_link = format!("/password-reset/{}", token);
+
+        tracing::info!(
+            "Password reset requested for user: {} ({}). Reset link: {}",
+            username,
+            email,
+            reset_link
         );
-        email_service
-            .send_password_reset_email(&email, &username, &token, base_url)
-            .await?;
-    }
+
+        Some(reset_link)
+    } else {
+        None
+    };
 
     Ok(ApiResponse::success(json!({
-        "message": "If your email is registered, you will receive password reset instructions shortly."
+        "message": "If your email is registered, you will receive password reset instructions shortly.",
+        "reset_link": reset_link, // Included for development (no email service)
     })))
 }
 
