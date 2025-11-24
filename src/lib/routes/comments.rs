@@ -35,10 +35,7 @@ pub async fn add_comment(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if article exists
     let mut article_rows = conn
@@ -47,17 +44,17 @@ pub async fn add_comment(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let article_id: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Create comment
     let comment_id = Uuid::new_v4();
@@ -74,8 +71,7 @@ pub async fn add_comment(
             now.to_rfc3339(),
         ],
     )
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    .await?;
 
     // Get author profile
     let mut author_rows = conn
@@ -84,17 +80,17 @@ pub async fn add_comment(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let author_row = author_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::InternalServerError("Author not found".to_string()))?;
 
     let username: String = author_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let bio: Option<String> = author_row.get(1).ok();
     let image: Option<String> = author_row.get(2).ok();
 
@@ -124,10 +120,7 @@ pub async fn get_comments(
     State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> Result<Json<MultipleCommentsResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if article exists
     let mut article_rows = conn
@@ -136,17 +129,17 @@ pub async fn get_comments(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     let article_id: String = article_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Get all comments for the article
     let mut comment_rows = conn
@@ -159,42 +152,42 @@ pub async fn get_comments(
             libsql::params![article_id],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut comments = Vec::new();
 
     while let Some(row) = comment_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let comment_id_str: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let comment_id = Uuid::parse_str(&comment_id_str)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let body: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         let created_at_str: String = row
             .get(2)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .with_timezone(&Utc);
 
         let updated_at_str: String = row
             .get(3)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .with_timezone(&Utc);
 
         let username: String = row
             .get(5)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(6).ok();
         let image: Option<String> = row.get(7).ok();
 
@@ -226,10 +219,7 @@ pub async fn delete_comment(
     Path((slug, comment_id)): Path<(String, String)>,
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if article exists
     let mut article_rows = conn
@@ -238,12 +228,12 @@ pub async fn delete_comment(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let _article_row = article_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     // Check if comment exists and verify ownership
@@ -253,17 +243,17 @@ pub async fn delete_comment(
             libsql::params![comment_id.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let comment_row = comment_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Comment not found".to_string()))?;
 
     let author_id: String = comment_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Verify the user is the comment author
     if author_id != user.user_id.to_string() {
@@ -277,8 +267,7 @@ pub async fn delete_comment(
         "DELETE FROM comments WHERE id = ?",
         libsql::params![comment_id],
     )
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

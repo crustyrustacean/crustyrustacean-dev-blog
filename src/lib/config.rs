@@ -23,8 +23,7 @@ pub struct AppConfig {
     pub external_stylesheet: String,
     pub override_stylesheet: String,
     pub app_version: String,
-    pub email_config: Option<EmailConfig>,
-    pub base_url: String,
+    pub allowed_origins: Vec<String>,
 }
 
 // implement the TryFrom trait for the AppConfig type
@@ -51,38 +50,22 @@ impl TryFrom<&SecretStore> for AppConfig {
         // Get version from Cargo.toml at compile time
         let app_version = env!("CARGO_PKG_VERSION").to_string();
 
-        // Get base URL (optional, defaults to localhost for development)
-        let base_url = secrets
-            .get("BASE_URL")
-            .unwrap_or_else(|| "http://localhost:8000".to_string());
-
-        // Email configuration (optional - if not provided, emails will be logged to console)
-        let email_config = if let (Some(smtp_host), Some(smtp_username), Some(smtp_password), Some(from_email)) = (
-            secrets.get("SMTP_HOST"),
-            secrets.get("SMTP_USERNAME"),
-            secrets.get("SMTP_PASSWORD"),
-            secrets.get("FROM_EMAIL"),
-        ) {
-            let smtp_port = secrets
-                .get("SMTP_PORT")
-                .and_then(|p| p.parse::<u16>().ok())
-                .unwrap_or(587); // Default to standard SMTP submission port
-
-            let from_name = secrets
-                .get("FROM_NAME")
-                .unwrap_or_else(|| "CrustyRustacean Dev Blog".to_string());
-
-            Some(EmailConfig {
-                smtp_host,
-                smtp_port,
-                smtp_username,
-                smtp_password,
-                from_email,
-                from_name,
+        // Parse allowed origins (optional, defaults to localhost for development)
+        let allowed_origins = secrets
+            .get("ALLOWED_ORIGINS")
+            .map(|s| {
+                s.split(',')
+                    .map(|origin| origin.trim().to_string())
+                    .filter(|origin| !origin.is_empty())
+                    .collect::<Vec<String>>()
             })
-        } else {
-            None
-        };
+            .unwrap_or_else(|| {
+                // Default to localhost for development
+                vec![
+                    "http://localhost:8000".to_string(),
+                    "http://127.0.0.1:8000".to_string(),
+                ]
+            });
 
         Ok(Self {
             jwt_secret,
@@ -90,8 +73,7 @@ impl TryFrom<&SecretStore> for AppConfig {
             external_stylesheet,
             override_stylesheet,
             app_version,
-            email_config,
-            base_url,
+            allowed_origins,
         })
     }
 }

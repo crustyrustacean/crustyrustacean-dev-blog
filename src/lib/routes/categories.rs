@@ -33,10 +33,7 @@ fn slugify(name: &str) -> String {
 pub async fn get_categories(
     State(state): State<AppState>,
 ) -> Result<Json<CategoriesResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get all categories with article counts
     let mut category_rows = conn
@@ -52,25 +49,25 @@ pub async fn get_categories(
             libsql::params![],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let mut categories = Vec::new();
 
     while let Some(row) = category_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let name: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let slug: String = row
             .get(2)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let description: Option<String> = row.get(3).ok();
         let article_count: i64 = row
             .get(4)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         categories.push(CategoryResponse {
             name,
@@ -101,10 +98,7 @@ pub async fn create_category(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Generate slug from name
     let slug = slugify(&create_data.name);
@@ -116,12 +110,12 @@ pub async fn create_category(
             libsql::params![create_data.name.clone(), slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     if existing_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .is_some()
     {
         return Err(ApiError::Conflict(
@@ -140,8 +134,7 @@ pub async fn create_category(
             create_data.description.clone().unwrap_or_default()
         ],
     )
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    .await?;
 
     Ok((
         StatusCode::CREATED,
@@ -161,10 +154,7 @@ pub async fn get_category(
     State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> Result<Json<SingleCategoryResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Get category with article count
     let mut category_rows = conn
@@ -180,24 +170,24 @@ pub async fn get_category(
             libsql::params![slug],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let category_row = category_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Category not found".to_string()))?;
 
     let name: String = category_row
         .get(1)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let slug: String = category_row
         .get(2)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
     let description: Option<String> = category_row.get(3).ok();
     let article_count: i64 = category_row
         .get(4)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     Ok(Json(SingleCategoryResponse {
         category: CategoryResponse {
@@ -228,10 +218,7 @@ pub async fn update_category(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if old category exists
     let mut old_category_rows = conn
@@ -240,17 +227,17 @@ pub async fn update_category(
             libsql::params![old_slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let category_row = old_category_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Category not found".to_string()))?;
 
     let category_id: String = category_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Generate new slug from new name
     let new_slug = slugify(&update_data.name);
@@ -267,12 +254,12 @@ pub async fn update_category(
                 ],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if conflict_rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
             .is_some()
         {
             return Err(ApiError::Conflict(
@@ -291,8 +278,7 @@ pub async fn update_category(
             category_id.clone()
         ],
     )
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    .await?;
 
     // Get article count for response
     let mut count_rows = conn
@@ -301,17 +287,17 @@ pub async fn update_category(
             libsql::params![category_id],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let count_row = count_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::InternalServerError("Failed to get article count".to_string()))?;
 
     let article_count: i64 = count_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     Ok(Json(SingleCategoryResponse {
         category: CategoryResponse {
@@ -329,10 +315,7 @@ pub async fn delete_category(
     Path(slug): Path<String>,
     _user: AuthorUser,
 ) -> Result<StatusCode, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     // Check if category exists
     let mut category_rows = conn
@@ -341,33 +324,31 @@ pub async fn delete_category(
             libsql::params![slug.clone()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let category_row = category_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
         .ok_or_else(|| ApiError::NotFound("Category not found".to_string()))?;
 
     let category_id: String = category_row
         .get(0)
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     // Set category_id to NULL for all articles with this category
     conn.execute(
         "UPDATE articles SET category_id = NULL WHERE category_id = ?",
         libsql::params![category_id.clone()],
     )
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    .await?;
 
     // Delete the category
     conn.execute(
         "DELETE FROM categories WHERE id = ?",
         libsql::params![category_id],
     )
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -378,10 +359,7 @@ pub async fn get_categories_admin_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
@@ -389,19 +367,19 @@ pub async fn get_categories_admin_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

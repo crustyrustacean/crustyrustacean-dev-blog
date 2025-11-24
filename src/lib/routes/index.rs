@@ -28,10 +28,7 @@ pub async fn get_index(
     let user_id_opt = optional_user.user.as_ref().map(|u| u.user_id);
     let user_info = if let Some(auth_user) = optional_user.user.as_ref() {
         // Fetch user details from database
-        let conn = state
-            .db
-            .connect()
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
         let mut rows = conn
             .query(
@@ -39,19 +36,19 @@ pub async fn get_index(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let email: String = row
                 .get(1)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -99,10 +96,7 @@ pub async fn get_index(
         .collect();
 
     // Get additional statistics for the homepage summary in a single optimized query
-    let conn = state
-        .db
-        .connect()
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let (total_articles_count, draft_count, tags_count) = if let Some(user_id) = user_id_opt {
         // Combine all counts in a single query for authenticated users
@@ -117,12 +111,12 @@ pub async fn get_index(
                 libsql::params![user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let total: i64 = row.get(0).unwrap_or(0);
             let drafts: i64 = row.get(1).unwrap_or(0);
@@ -143,12 +137,12 @@ pub async fn get_index(
                 libsql::params![],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let total: i64 = row.get(0).unwrap_or(0);
             let tags: i64 = row.get(1).unwrap_or(0);
@@ -198,10 +192,7 @@ pub async fn get_about(
 
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
-        let conn = state
-            .db
-            .connect()
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
         let mut rows = conn
             .query(
@@ -209,19 +200,19 @@ pub async fn get_about(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let email: String = row
                 .get(1)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -263,10 +254,7 @@ pub async fn get_privacy(
 
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
-        let conn = state
-            .db
-            .connect()
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
         let mut rows = conn
             .query(
@@ -274,19 +262,19 @@ pub async fn get_privacy(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let email: String = row
                 .get(1)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -328,10 +316,7 @@ pub async fn get_terms(
 
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
-        let conn = state
-            .db
-            .connect()
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
         let mut rows = conn
             .query(
@@ -339,19 +324,19 @@ pub async fn get_terms(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let email: String = row
                 .get(1)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 

@@ -126,10 +126,7 @@ pub async fn get_my_favorites_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state.db.connect().map_err(|e| {
-        tracing::error!("Database connection failed: {}", e);
-        ApiError::InternalServerError(e.to_string())
-    })?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
@@ -137,19 +134,19 @@ pub async fn get_my_favorites_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -208,10 +205,7 @@ pub async fn get_authors_page(
     Query(query): Query<ProfilesQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state.db.connect().map_err(|e| {
-        tracing::error!("Database connection failed: {}", e);
-        ApiError::InternalServerError(e.to_string())
-    })?;
+    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
@@ -219,19 +213,19 @@ pub async fn get_authors_page(
             libsql::params![user.user_id.to_string()],
         )
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        ?;
 
     let user_info = if let Some(row) = user_rows
         .next()
         .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+        ?
     {
         let username: String = row
             .get(0)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let email: String = row
             .get(1)
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

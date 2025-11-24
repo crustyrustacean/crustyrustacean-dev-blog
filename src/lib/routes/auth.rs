@@ -30,10 +30,7 @@ pub async fn get_login_page(
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
-        let conn = state
-            .db
-            .connect()
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
 
         let mut rows = conn
             .query(
@@ -41,19 +38,19 @@ pub async fn get_login_page(
                 libsql::params![auth_user.user_id.to_string()],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            ?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?
+            ?
         {
             let username: String = row
                 .get(0)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let email: String = row
                 .get(1)
-                .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+                ?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
