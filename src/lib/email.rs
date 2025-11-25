@@ -79,4 +79,38 @@ impl EmailService {
 
         Ok(())
     }
+
+    /// Send email verification email
+    /// Currently logs to console
+    /// TODO: Integrate actual email sending
+    pub async fn send_email_verification(
+        &self,
+        to_email: &str,
+        username: &str,
+        verification_token: &str,
+        base_url: &str,
+    ) -> Result<(), ApiError> {
+        let verification_link = format!("{}/verify-email/{}", base_url, verification_token);
+
+        // For now, just log the email content
+        // In production, this would send an actual email
+        info!(
+            "=== EMAIL VERIFICATION ===\n\
+            To: {}\n\
+            From: {} <{}>\n\
+            Subject: Verify Your Email - CrustyRustacean Dev Blog\n\n\
+            Hi {},\n\n\
+            Thank you for registering with CrustyRustacean Dev Blog!\n\n\
+            Please click the link below to verify your email address:\n\
+            {}\n\n\
+            This link will expire in 24 hours.\n\n\
+            If you didn't create an account, please ignore this email.\n\n\
+            Best regards,\n\
+            CrustyRustacean Dev Blog Team\n\
+            ==========================",
+            to_email, self.from_name, self.from_email, username, verification_link
+        );
+
+        Ok(())
+    }
 }

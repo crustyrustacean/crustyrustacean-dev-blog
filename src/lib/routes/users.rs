@@ -3,23 +3,26 @@
 use crate::{
     ApiError, AppState,
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
+    email::EmailService,
     models::{
-        ProfileResponse, ProfilesQuery, ProfilesResponse, Role, UserData, UserLogin, UserProfile,
-        UserRegistration, UserResponse, UserUpdate,
+        ProfileResponse, ProfilesQuery, ProfilesResponse, RegistrationSuccessResponse, Role,
+        UserData, UserLogin, UserProfile, UserRegistration, UserResponse, UserUpdate,
     },
 };
 use axum::{
     extract::{Path, Query, State},
+    http::HeaderMap,
     response::Json,
 };
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use uuid::Uuid;
 use validator::Validate;
 
 pub async fn register_user(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<serde_json::Value>,
-) -> Result<Json<UserResponse>, ApiError> {
+) -> Result<Json<RegistrationSuccessResponse>, ApiError> {
     let user_data: UserRegistration = serde_json::from_value(
         payload
             .get("user")
@@ -40,35 +43,23 @@ pub async fn register_user(
             "SELECT id FROM users WHERE email = ? OR username = ?",
             libsql::params![user_data.email.clone(), user_data.username.clone()],
         )
-        .await
-        ?;
+        .await?;
 
-    if existing_user
-        .next()
-        .await
-        ?
-        .is_some()
-    {
+    if existing_user.next().await?.is_some() {
         return Err(ApiError::Conflict(
             "User with this email or username already exists".to_string(),
         ));
     }
 
     // Check if this is the first user (for admin assignment)
-    let mut count_row = conn
-        .query("SELECT COUNT(*) FROM users", ())
-        .await
-        ?;
+    let mut count_row = conn.query("SELECT COUNT(*) FROM users", ()).await?;
 
     let row = count_row
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::InternalServerError("Failed to count users".to_string()))?;
 
-    let user_count: i64 = row
-        .get(0)
-        ?;
+    let user_count: i64 = row.get(0)?;
 
     // First user gets admin role, all others get subscriber role
     let role = if user_count == 0 {
@@ -81,8 +72,9 @@ pub async fn register_user(
     let password_hash = hash_password(&user_data.password)?;
     let now = Utc::now();
 
+    // New users start with email_verified = 0
     conn.execute(
-        "INSERT INTO users (id, username, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO users (id, username, email, password_hash, role, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
         libsql::params![
             user_id.to_string(),
             user_data.username.clone(),
@@ -95,17 +87,56 @@ pub async fn register_user(
     )
     .await?;
 
-    let token = generate_token(user_id, &state.jwt_keys)?;
+    // Generate email verification token
+    let token_id = Uuid::new_v4();
+    let verification_token = Uuid::new_v4().to_string();
+    let expires_at = now + Duration::hours(24);
 
-    let response = UserResponse {
-        user: UserData {
-            email: user_data.email,
-            token,
-            username: user_data.username,
-            bio: None,
-            image: None,
-            role,
-        },
+    conn.execute(
+        "INSERT INTO email_verification_tokens (id, user_id, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+        libsql::params![
+            token_id.to_string(),
+            user_id.to_string(),
+            verification_token.clone(),
+            expires_at.to_rfc3339(),
+            now.to_rfc3339(),
+        ],
+    )
+    .await?;
+
+    // Send verification email
+    let email_service = EmailService::new(
+        "noreply@crustyrustacean.dev".to_string(),
+        "CrustyRustacean Dev Blog".to_string(),
+    );
+
+    // Get host from headers
+    let host = headers
+        .get("host")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("localhost:8000");
+
+    // Determine protocol based on host
+    let protocol = if host.contains("localhost") || host.contains("127.0.0.1") {
+        "http"
+    } else {
+        "https"
+    };
+    let base_url = format!("{}://{}", protocol, host);
+
+    email_service
+        .send_email_verification(
+            &user_data.email,
+            &user_data.username,
+            &verification_token,
+            &base_url,
+        )
+        .await?;
+
+    let response = RegistrationSuccessResponse {
+        message: "Registration successful! Please check your email to verify your account."
+            .to_string(),
+        email: user_data.email,
     };
 
     Ok(Json(response))
@@ -131,35 +162,24 @@ pub async fn login_user(
 
     let mut rows = conn
         .query(
-            "SELECT id, username, email, password_hash, bio, image, role FROM users WHERE email = ?",
+            "SELECT id, username, email, password_hash, bio, image, role, email_verified FROM users WHERE email = ?",
             libsql::params![login_data.email],
         )
-        .await
-        ?;
+        .await?;
 
     let row = rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::Unauthorized("Invalid credentials".to_string()))?;
 
-    let user_id: String = row
-        .get(0)
-        ?;
-    let username: String = row
-        .get(1)
-        ?;
-    let email: String = row
-        .get(2)
-        ?;
-    let password_hash: String = row
-        .get(3)
-        ?;
+    let user_id: String = row.get(0)?;
+    let username: String = row.get(1)?;
+    let email: String = row.get(2)?;
+    let password_hash: String = row.get(3)?;
     let bio: Option<String> = row.get(4).ok();
     let image: Option<String> = row.get(5).ok();
-    let role_str: String = row
-        .get(6)
-        ?;
+    let role_str: String = row.get(6)?;
+    let email_verified: i64 = row.get(7)?;
 
     let role = role_str
         .parse::<Role>()
@@ -170,6 +190,13 @@ pub async fn login_user(
 
     if !verify_password(&login_data.password, &password_hash)? {
         return Err(ApiError::Unauthorized("Invalid credentials".to_string()));
+    }
+
+    // Check if email is verified
+    if email_verified == 0 {
+        return Err(ApiError::Forbidden(
+            "Please verify your email address before logging in. Check your inbox for the verification link.".to_string(),
+        ));
     }
 
     let token = generate_token(user_uuid, &state.jwt_keys)?;

@@ -37,12 +37,14 @@ async fn test_user_registration_happy_path() {
 
     let response_body: Value = parse_json!(response);
 
-    // Verify response structure
-    assert!(response_body["user"].is_object());
-    assert_eq!(response_body["user"]["email"], "test@example.com");
-    assert_eq!(response_body["user"]["username"], "testuser");
-    assert!(response_body["user"]["token"].is_string());
-    assert!(!response_body["user"]["token"].as_str().unwrap().is_empty());
+    // Verify response structure - registration now returns message + email (not token)
+    // User must verify email before logging in
+    assert!(response_body["message"].is_string());
+    assert_eq!(response_body["email"], "test@example.com");
+    assert!(response_body["message"]
+        .as_str()
+        .unwrap()
+        .contains("verify"));
 }
 
 #[tokio::test]

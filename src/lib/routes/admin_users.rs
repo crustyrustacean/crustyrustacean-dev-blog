@@ -131,7 +131,7 @@ pub async fn list_users_admin(
     // Fetch users with article count
     let query_str = format!(
         "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.role, u.created_at,
-                COUNT(a.id) as article_count
+                COUNT(a.id) as article_count, u.email_verified
          FROM users u
          LEFT JOIN articles a ON u.id = a.author_id
          {}
@@ -161,12 +161,12 @@ pub async fn list_users_admin(
     let mut users = Vec::new();
     while let Some(row) = rows
         .next()
-        .await
-?
+        .await?
     {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
         let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
         let role = role_str.parse::<Role>().unwrap_or(Role::Subscriber);
+        let email_verified_int: i64 = row.get(9).unwrap_or(1);
 
         users.push(AdminUserData {
             id: row.get(0).unwrap(),
@@ -176,6 +176,7 @@ pub async fn list_users_admin(
             image: row.get(4).ok(),
             disabled: disabled_int != 0,
             role,
+            email_verified: email_verified_int != 0,
             created_at: row.get(7).unwrap(),
             article_count: row.get::<i32>(8).unwrap_or(0),
         });
@@ -223,24 +224,20 @@ pub async fn get_user_admin(
     let mut rows = conn
         .query(
             "SELECT u.id, u.username, u.email, u.bio, u.image, u.disabled, u.role, u.created_at,
-                    COUNT(a.id) as article_count
+                    COUNT(a.id) as article_count, u.email_verified
              FROM users u
              LEFT JOIN articles a ON u.id = a.author_id
              WHERE u.id = ?
              GROUP BY u.id",
             libsql::params![id.clone()],
         )
-        .await
-?;
+        .await?;
 
-    if let Some(row) = rows
-        .next()
-        .await
-?
-    {
+    if let Some(row) = rows.next().await? {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
         let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
         let role = role_str.parse::<Role>().unwrap_or(Role::Subscriber);
+        let email_verified_int: i64 = row.get(9).unwrap_or(1);
 
         let user_data = AdminUserData {
             id: row.get(0).unwrap(),
@@ -250,6 +247,7 @@ pub async fn get_user_admin(
             image: row.get(4).ok(),
             disabled: disabled_int != 0,
             role,
+            email_verified: email_verified_int != 0,
             created_at: row.get(7).unwrap(),
             article_count: row.get::<i32>(8).unwrap_or(0),
         };

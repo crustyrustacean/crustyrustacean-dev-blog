@@ -706,30 +706,9 @@ async fn test_update_article_with_new_tags() {
     let app = spawn_app().await;
 
     // Register user and get token
-    let register_body = json!({
-        "user": {
-            "username": "tagupdateuser",
-            "email": "tagupdate@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let register_json: Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("tagupdateuser", "tagupdate@example.com", "password123")
+        .await;
 
     // Create an article with initial tags
     let article_body = json!({
@@ -799,30 +778,9 @@ async fn test_update_article_removing_all_tags() {
     let app = spawn_app().await;
 
     // Register user and get token
-    let register_body = json!({
-        "user": {
-            "username": "tagremoveuser",
-            "email": "tagremove@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let register_json: Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("tagremoveuser", "tagremove@example.com", "password123")
+        .await;
 
     // Create an article with tags
     let article_body = json!({
@@ -889,30 +847,9 @@ async fn test_update_article_without_touching_tags() {
     let app = spawn_app().await;
 
     // Register user and get token
-    let register_body = json!({
-        "user": {
-            "username": "tagunchangeduser",
-            "email": "tagunchanged@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let register_json: Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("tagunchangeduser", "tagunchanged@example.com", "password123")
+        .await;
 
     // Create an article with tags
     let article_body = json!({
@@ -985,30 +922,9 @@ async fn test_add_tags_to_tagless_article() {
     let app = spawn_app().await;
 
     // Register user and get token
-    let register_body = json!({
-        "user": {
-            "username": "tagadduser",
-            "email": "tagadd@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let register_json: Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("tagadduser", "tagadd@example.com", "password123")
+        .await;
 
     // Create an article without tags
     let article_body = json!({
@@ -1083,53 +999,12 @@ async fn test_tag_editing_authorization() {
     let app = spawn_app().await;
 
     // Register two users
-    let user1_body = json!({
-        "user": {
-            "username": "tagowner",
-            "email": "tagowner@example.com",
-            "password": "password123"
-        }
-    });
-
-    let user2_body = json!({
-        "user": {
-            "username": "tagthief",
-            "email": "tagthief@example.com",
-            "password": "password123"
-        }
-    });
-
-    let reg1_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&user1_body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let reg2_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&user2_body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let reg1_json: Value = reg1_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-    let reg2_json: Value = reg2_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token1 = reg1_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
-    let token2 = reg2_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token1 = app
+        .register_user("tagowner", "tagowner@example.com", "password123")
+        .await;
+    let token2 = app
+        .register_user("tagthief", "tagthief@example.com", "password123")
+        .await;
 
     // Create article with user1
     let article_body = json!({
@@ -1210,30 +1085,9 @@ async fn test_tag_updates_idempotency() {
     let app = spawn_app().await;
 
     // Register user and get token
-    let register_body = json!({
-        "user": {
-            "username": "idempotentuser",
-            "email": "idempotent@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let register_json: Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("idempotentuser", "idempotent@example.com", "password123")
+        .await;
 
     // Create an article with tags
     let article_body = json!({

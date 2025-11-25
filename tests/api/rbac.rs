@@ -8,17 +8,16 @@ use crate::helpers::{TestUserBuilder, spawn_app};
 async fn test_first_user_gets_admin_role() {
     let app = spawn_app().await;
 
-    // Register the first user
+    // Register the first user using the helper (which verifies email and logs in)
+    let token = app
+        .register_user("firstuser", "first@example.com", "password123")
+        .await;
+
+    // Get current user to check role
     let response = app
         .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&serde_json::json!({
-            "user": {
-                "username": "firstuser",
-                "email": "first@example.com",
-                "password": "password123"
-            }
-        }))
+        .get(format!("{}/api/user", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
         .expect("Failed to execute request");
@@ -40,17 +39,16 @@ async fn test_subsequent_users_get_subscriber_role() {
     // Register first user (will be admin)
     app.register_user_default("admin").await;
 
-    // Register second user
+    // Register second user using the helper (which verifies email and logs in)
+    let token = app
+        .register_user("subscriber", "subscriber@example.com", "password123")
+        .await;
+
+    // Get current user to check role
     let response = app
         .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&serde_json::json!({
-            "user": {
-                "username": "subscriber",
-                "email": "subscriber@example.com",
-                "password": "password123"
-            }
-        }))
+        .get(format!("{}/api/user", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
         .expect("Failed to execute request");
