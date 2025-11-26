@@ -1,7 +1,7 @@
 // src/lib/routes/password_reset.rs
 
 use crate::{
-    ApiError, AppState, EmailService,
+    ApiError, AppState,
     auth::{AuthenticatedUser, hash_password, verify_password},
     models::{ChangePasswordRequest, PasswordResetComplete, PasswordResetRequest},
     response::ApiResponse,
@@ -76,13 +76,13 @@ pub async fn request_password_reset(
         // Send password reset email
         // TODO: Get base URL from config
         let base_url = "http://localhost:8000"; // Placeholder
-        let email_service = EmailService::new(
-            "noreply@crustyrustacean.dev".to_string(),
-            "CrustyRustacean Dev Blog".to_string(),
-        );
-        email_service
+        if let Err(e) = state
+            .email
             .send_password_reset_email(&email, &username, &token, base_url)
-            .await?;
+            .await
+        {
+            tracing::warn!("Failed to send password reset email to {}: {}", email, e);
+        }
     }
 
     Ok(ApiResponse::success(json!({
