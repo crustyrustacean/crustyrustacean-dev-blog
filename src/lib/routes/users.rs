@@ -3,7 +3,6 @@
 use crate::{
     ApiError, AppState,
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
-    email::EmailService,
     models::{
         ProfileResponse, ProfilesQuery, ProfilesResponse, RegistrationSuccessResponse, Role,
         UserData, UserLogin, UserProfile, UserRegistration, UserResponse, UserUpdate,
@@ -105,11 +104,6 @@ pub async fn register_user(
     .await?;
 
     // Send verification email
-    let email_service = EmailService::new(
-        "noreply@crustyrustacean.dev".to_string(),
-        "CrustyRustacean Dev Blog".to_string(),
-    );
-
     // Get host from headers
     let host = headers
         .get("host")
@@ -124,7 +118,8 @@ pub async fn register_user(
     };
     let base_url = format!("{}://{}", protocol, host);
 
-    email_service
+    state
+        .email
         .send_email_verification(
             &user_data.email,
             &user_data.username,

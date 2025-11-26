@@ -95,6 +95,14 @@ impl From<chrono::ParseError> for ApiError {
     }
 }
 
+// Implement From for email::SendError
+impl From<crate::email::SendError> for ApiError {
+    fn from(err: crate::email::SendError) -> Self {
+        tracing::error!("Email sending error: {}", err);
+        ApiError::InternalServerError("Failed to send email".to_string())
+    }
+}
+
 // implement the IntoResponse trait for the ApiError type
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
