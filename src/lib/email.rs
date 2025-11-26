@@ -864,4 +864,352 @@ mod tests {
         let sender = LoggingEmailSender::new();
         assert!(!sender.is_configured());
     }
+
+    #[tokio::test]
+    async fn test_email_service_email_verification() {
+        let mock_sender = Arc::new(MockEmailSender::new());
+        let service = EmailService::new(
+            mock_sender.clone(),
+            "noreply@example.com".to_string(),
+            "Test App".to_string(),
+        );
+
+        let result = service
+            .send_email_verification(
+                "user@example.com",
+                "testuser",
+                "verification-token-abc",
+                "https://example.com",
+            )
+            .await;
+
+        assert!(result.is_ok());
+
+        // Verify the email was constructed correctly
+        let sent = mock_sender.get_sent_emails();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].subject, "Verify Your Email - CrustyRustacean Dev Blog");
+        assert_eq!(sent[0].to[0].email, "user@example.com");
+    }
+}
+
+// ============================================================================
+// Integration Tests (using httpmock for Mailtrap API)
+// ============================================================================
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use httpmock::prelude::*;
+
+    fn create_test_email() -> Email {
+        Email::builder()
+            .from(EmailAddress::with_name("noreply@example.com", "Test App"))
+            .to(EmailAddress::new("user@example.com"))
+            .subject("Test Email")
+            .body("Plain text body", "<p>HTML body</p>")
+            .build()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_success() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/send")
+                .header("Authorization", "Bearer test-api-token")
+                .header("Content-Type", "application/json");
+            then.status(200)
+                .header("Content-Type", "application/json")
+                .json_body(serde_json::json!({
+                    "success": true,
+                    "message_ids": ["msg-123-abc"]
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-api-token", server.base_url());
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.message_id, Some("msg-123-abc".to_string()));
+        assert_eq!(response.message, "Email sent successfully");
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_authentication_failure() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/send");
+            then.status(401)
+                .header("Content-Type", "application/json")
+                .json_body(serde_json::json!({
+                    "error": "Invalid API token"
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("invalid-token", server.base_url());
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SendError::Authentication(_)));
+        if let SendError::Authentication(msg) = err {
+            assert!(msg.contains("Invalid API token"));
+        }
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_validation_error() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/send");
+            then.status(422)
+                .header("Content-Type", "application/json")
+                .json_body(serde_json::json!({
+                    "errors": ["Invalid email address", "Subject too long"]
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-token", server.base_url());
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SendError::Validation(_)));
+        if let SendError::Validation(msg) = err {
+            assert!(msg.contains("Invalid email address"));
+        }
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_rate_limited() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/send");
+            then.status(429)
+                .header("Content-Type", "application/json")
+                .json_body(serde_json::json!({
+                    "error": "Rate limit exceeded. Try again in 60 seconds."
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-token", server.base_url());
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SendError::RateLimited(_)));
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_server_error() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/send");
+            then.status(500)
+                .header("Content-Type", "application/json")
+                .json_body(serde_json::json!({
+                    "error": "Internal server error"
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-token", server.base_url());
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SendError::Provider(_)));
+        if let SendError::Provider(msg) = err {
+            assert!(msg.contains("500"));
+        }
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_success_false_response() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/send");
+            then.status(200)
+                .header("Content-Type", "application/json")
+                .json_body(serde_json::json!({
+                    "success": false
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-token", server.base_url());
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SendError::Provider(_)));
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_request_body_format() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/send")
+                .json_body_partial(r#"{
+                    "from": {"email": "noreply@example.com", "name": "Test App"},
+                    "to": [{"email": "user@example.com"}],
+                    "subject": "Test Email",
+                    "text": "Plain text body",
+                    "html": "<p>HTML body</p>"
+                }"#);
+            then.status(200)
+                .json_body(serde_json::json!({
+                    "success": true,
+                    "message_ids": ["msg-456"]
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-token", server.base_url());
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+        assert!(result.is_ok());
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_text_only_email() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/send");
+            then.status(200)
+                .json_body(serde_json::json!({
+                    "success": true,
+                    "message_ids": ["msg-text-only"]
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-token", server.base_url());
+        let email = Email::builder()
+            .from(EmailAddress::new("sender@example.com"))
+            .to(EmailAddress::new("recipient@example.com"))
+            .subject("Text Only")
+            .text_body("Just plain text")
+            .build()
+            .unwrap();
+
+        let result = sender.send(&email).await;
+        assert!(result.is_ok());
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_html_only_email() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/send");
+            then.status(200)
+                .json_body(serde_json::json!({
+                    "success": true,
+                    "message_ids": ["msg-html-only"]
+                }));
+        });
+
+        let sender = MailtrapSender::with_base_url("test-token", server.base_url());
+        let email = Email::builder()
+            .from(EmailAddress::new("sender@example.com"))
+            .to(EmailAddress::new("recipient@example.com"))
+            .subject("HTML Only")
+            .html_body("<h1>HTML content</h1>")
+            .build()
+            .unwrap();
+
+        let result = sender.send(&email).await;
+        assert!(result.is_ok());
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_is_configured() {
+        let sender_with_token = MailtrapSender::new("valid-token");
+        assert!(sender_with_token.is_configured());
+
+        let sender_empty_token = MailtrapSender::new("");
+        assert!(!sender_empty_token.is_configured());
+    }
+
+    #[tokio::test]
+    async fn test_mailtrap_sender_network_error() {
+        // Use a port that's not listening to simulate network error
+        let sender = MailtrapSender::with_base_url("test-token", "http://127.0.0.1:1");
+        let email = create_test_email();
+
+        let result = sender.send(&email).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, SendError::Network(_)));
+    }
+
+    #[tokio::test]
+    async fn test_email_service_from_config_with_mailtrap() {
+        let config = EmailConfig {
+            mailtrap_api_token: Some("test-token".to_string()),
+            sender_email: "noreply@test.com".to_string(),
+            sender_name: "Test Service".to_string(),
+        };
+
+        let service = EmailService::from_config(&config);
+
+        assert!(service.is_configured());
+        assert_eq!(service.from_email, "noreply@test.com");
+        assert_eq!(service.from_name, "Test Service");
+    }
+
+    #[tokio::test]
+    async fn test_email_service_from_config_without_mailtrap() {
+        let config = EmailConfig {
+            mailtrap_api_token: None,
+            sender_email: "noreply@test.com".to_string(),
+            sender_name: "Test Service".to_string(),
+        };
+
+        let service = EmailService::from_config(&config);
+
+        // Should fall back to LoggingEmailSender which is not "configured"
+        assert!(!service.is_configured());
+    }
 }
