@@ -1,6 +1,7 @@
 // src/lib/config.rs
 
 // dependencies
+use crate::email::EmailConfig;
 use anyhow::{Result, anyhow};
 use shuttle_runtime::{CustomError, SecretStore};
 
@@ -13,6 +14,7 @@ pub struct AppConfig {
     pub override_stylesheet: String,
     pub app_version: String,
     pub allowed_origins: Vec<String>,
+    pub email: EmailConfig,
 }
 
 // implement the TryFrom trait for the AppConfig type
@@ -56,6 +58,17 @@ impl TryFrom<&SecretStore> for AppConfig {
                 ]
             });
 
+        // Load email configuration (all optional - falls back to logging sender)
+        let email = EmailConfig {
+            mailtrap_api_token: secrets.get("MAILTRAP_API_TOKEN").filter(|s| !s.is_empty()),
+            sender_email: secrets
+                .get("MAILTRAP_SENDER_EMAIL")
+                .unwrap_or_else(|| "noreply@example.com".to_string()),
+            sender_name: secrets
+                .get("MAILTRAP_SENDER_NAME")
+                .unwrap_or_else(|| "CrustyRustacean Dev Blog".to_string()),
+        };
+
         Ok(Self {
             jwt_secret,
             templates_dir,
@@ -63,6 +76,7 @@ impl TryFrom<&SecretStore> for AppConfig {
             override_stylesheet,
             app_version,
             allowed_origins,
+            email,
         })
     }
 }
