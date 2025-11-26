@@ -549,6 +549,71 @@ impl EmailService {
         self.sender.send(&email).await
     }
 
+    /// Send an email verification email to a newly registered user
+    pub async fn send_email_verification(
+        &self,
+        to_email: &str,
+        username: &str,
+        verification_token: &str,
+        base_url: &str,
+    ) -> Result<SendResponse, SendError> {
+        let verification_link = format!("{}/verify-email/{}", base_url, verification_token);
+
+        let text_body = format!(
+            "Hi {},\n\n\
+            Thank you for registering with CrustyRustacean Dev Blog!\n\n\
+            Please verify your email address by clicking the link below:\n\
+            {}\n\n\
+            This link will expire in 24 hours.\n\n\
+            If you didn't create an account, please ignore this email.\n\n\
+            Best regards,\n\
+            CrustyRustacean Dev Blog Team",
+            username, verification_link
+        );
+
+        let html_body = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Verify Your Email</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c3e50;">Verify Your Email Address</h2>
+        <p>Hi {},</p>
+        <p>Thank you for registering with CrustyRustacean Dev Blog!</p>
+        <p>Please verify your email address by clicking the button below:</p>
+        <p>
+            <a href="{}" style="display: inline-block; padding: 12px 24px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 4px;">
+                Verify Email
+            </a>
+        </p>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #7f8c8d;">{}</p>
+        <p><strong>This link will expire in 24 hours.</strong></p>
+        <p>If you didn't create an account, please ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="color: #7f8c8d; font-size: 12px;">
+            Best regards,<br>
+            CrustyRustacean Dev Blog Team
+        </p>
+    </div>
+</body>
+</html>"#,
+            username, verification_link, verification_link
+        );
+
+        let email = Email::builder()
+            .from(self.sender_address())
+            .to(EmailAddress::new(to_email))
+            .subject("Verify Your Email - CrustyRustacean Dev Blog")
+            .body(text_body, html_body)
+            .build()?;
+
+        self.sender.send(&email).await
+    }
+
     /// Send a welcome email to a newly registered user
     pub async fn send_welcome_email(
         &self,
