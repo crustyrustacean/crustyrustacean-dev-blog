@@ -1,8 +1,7 @@
 // tests/api/feed_page.rs
 
-use crate::helpers::spawn_app;
+use crate::helpers::{TestUserBuilder, spawn_app};
 use reqwest::StatusCode;
-use serde_json::{Value, json};
 
 #[tokio::test]
 async fn test_feed_page_requires_authentication() {
@@ -26,30 +25,10 @@ async fn test_feed_page_with_authentication() {
     // Arrange
     let app = spawn_app().await;
 
-    // Register user
-    let user_data = json!({
-        "user": {
-            "username": "feeduser",
-            "email": "feeduser@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    // Register user using helper
+    let token = app
+        .register_user("feeduser", "feeduser@example.com", "securepassword123")
+        .await;
 
     // Act - Access feed page with authentication
     let response = app

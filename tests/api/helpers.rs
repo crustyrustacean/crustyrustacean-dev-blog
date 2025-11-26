@@ -213,14 +213,53 @@ impl TestUserBuilder for TestApp {
             .await
             .expect("Failed to register user");
 
-        let body: serde_json::Value = response
+        let status = response.status();
+        if !status.is_success() {
+            let body: serde_json::Value = response
+                .json()
+                .await
+                .expect("Failed to parse error response");
+            panic!("Registration failed with status {}: {:?}", status, body);
+        }
+
+        // Registration now requires email verification, so we need to:
+        // 1. Directly mark the user as verified in the database
+        // 2. Log in to get a token
+
+        // Mark email as verified directly in database
+        let conn = self.db.connect().expect("Failed to connect to test database");
+        conn.execute(
+            "UPDATE users SET email_verified = 1 WHERE email = ?",
+            libsql::params![email],
+        )
+        .await
+        .expect("Failed to verify user email in test");
+
+        // Now log in to get a token
+        let login_data = json!({
+            "user": {
+                "email": email,
+                "password": password
+            }
+        });
+
+        let login_response = self
+            .client
+            .post(format!("{}/api/users/login", &self.address))
+            .header("Content-Type", "application/json")
+            .json(&login_data)
+            .send()
+            .await
+            .expect("Failed to login user");
+
+        let login_body: serde_json::Value = login_response
             .json()
             .await
-            .expect("Failed to parse registration response");
+            .expect("Failed to parse login response");
 
-        body["user"]["token"]
+        login_body["user"]["token"]
             .as_str()
-            .expect("Token not found in response")
+            .expect("Token not found in login response")
             .to_string()
     }
 }

@@ -1,6 +1,6 @@
 // tests/api/sitemap.rs
 
-use crate::helpers::spawn_app;
+use crate::helpers::{TestUserBuilder, spawn_app};
 use reqwest::StatusCode;
 use serde_json::json;
 
@@ -84,30 +84,9 @@ async fn sitemap_includes_articles() {
     let app = spawn_app().await;
 
     // Register a user and create an article
-    let register_body = json!({
-        "user": {
-            "username": "sitemapuser",
-            "email": "sitemap@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    let register_json: serde_json::Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("sitemapuser", "sitemap@example.com", "password123")
+        .await;
 
     // Create an article
     let article_body = json!({
@@ -158,30 +137,9 @@ async fn sitemap_escapes_xml_special_characters() {
     let app = spawn_app().await;
 
     // Register a user
-    let register_body = json!({
-        "user": {
-            "username": "xmluser",
-            "email": "xml@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    let register_json: serde_json::Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("xmluser", "xml@example.com", "password123")
+        .await;
 
     // Create an article with special characters in title (which affects slug)
     let article_body = json!({
@@ -260,30 +218,9 @@ async fn sitemap_articles_sorted_by_update_time() {
     let app = spawn_app().await;
 
     // Register a user
-    let register_body = json!({
-        "user": {
-            "username": "sortuser",
-            "email": "sort@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    let register_json: serde_json::Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("sortuser", "sort@example.com", "password123")
+        .await;
 
     // Create multiple articles
     let articles = vec!["First Article", "Second Article", "Third Article"];

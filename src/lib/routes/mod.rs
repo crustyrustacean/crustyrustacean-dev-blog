@@ -21,6 +21,7 @@ pub mod search;
 pub mod sitemap;
 pub mod tags;
 pub mod users;
+pub mod verify_email;
 
 // re-exports
 pub use account::*;
@@ -43,3 +44,4 @@ pub use search::*;
 pub use sitemap::*;
 pub use tags::*;
 pub use users::*;
+pub use verify_email::*;
