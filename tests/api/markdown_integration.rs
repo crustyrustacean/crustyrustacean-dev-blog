@@ -1,31 +1,15 @@
-use crate::helpers::spawn_app;
+use crate::helpers::{TestUserBuilder, spawn_app};
 use serde_json::json;
 
 #[tokio::test]
 async fn test_create_article_with_markdown() {
     // Arrange
     let app = spawn_app().await;
-    let client = reqwest::Client::new();
 
     // Register a test user
-    let registration_body = json!({
-        "user": {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-    });
-
-    let response = client
-        .post(format!("{}/api/users", &app.address))
-        .json(&registration_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    assert_eq!(response.status().as_u16(), 200);
-    let user_response: serde_json::Value = response.json().await.unwrap();
-    let token = user_response["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("testuser", "test@example.com", "password123")
+        .await;
 
     // Create an article with markdown content
     let markdown_content = r#"# Hello World
@@ -69,7 +53,8 @@ fn main() {
     });
 
     // Act
-    let response = client
+    let response = app
+        .client
         .post(format!("{}/api/articles", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&article_body)
@@ -107,26 +92,11 @@ fn main() {
 async fn test_get_article_returns_rendered_markdown() {
     // Arrange
     let app = spawn_app().await;
-    let client = reqwest::Client::new();
 
-    // Register and create an article first
-    let registration_body = json!({
-        "user": {
-            "username": "testuser2",
-            "email": "test2@example.com",
-            "password": "password123"
-        }
-    });
-
-    let response = client
-        .post(format!("{}/api/users", &app.address))
-        .json(&registration_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    let user_response: serde_json::Value = response.json().await.unwrap();
-    let token = user_response["user"]["token"].as_str().unwrap();
+    // Register user using helper
+    let token = app
+        .register_user("testuser2", "test2@example.com", "password123")
+        .await;
 
     let article_body = json!({
         "article": {
@@ -137,7 +107,8 @@ async fn test_get_article_returns_rendered_markdown() {
         }
     });
 
-    let create_response = client
+    let create_response = app
+        .client
         .post(format!("{}/api/articles", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&article_body)
@@ -149,7 +120,8 @@ async fn test_get_article_returns_rendered_markdown() {
     let slug = create_article_response["article"]["slug"].as_str().unwrap();
 
     // Act - Get the article
-    let response = client
+    let response = app
+        .client
         .get(format!("{}/api/articles/{}", &app.address, slug))
         .send()
         .await

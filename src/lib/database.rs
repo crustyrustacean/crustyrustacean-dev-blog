@@ -527,6 +527,52 @@ impl DatabaseConnection {
         )
         .await?;
 
+        // Add email_verified column to users table (for backward compatibility)
+        // 0 = not verified (default for new users), 1 = verified
+        // Existing users are set to verified (1) to not break existing accounts
+        let _ = conn
+            .execute(
+                r"ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1",
+                (),
+            )
+            .await;
+        // Ignore error if column already exists
+
+        // Create email_verification_tokens table
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS email_verification_tokens (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                token TEXT UNIQUE NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+            "#,
+            (),
+        )
+        .await?;
+
+        // Create indexes for email_verification_tokens
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens (user_id)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token ON email_verification_tokens (token)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires_at ON email_verification_tokens (expires_at)",
+            (),
+        )
+        .await?;
+
         Ok(())
     }
 }

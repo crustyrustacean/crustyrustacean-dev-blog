@@ -10,29 +10,9 @@ async fn test_article_template_renders_successfully_happy_path() {
     let app = spawn_app().await;
 
     // Register user and get token
-    let user_data = json!({
-        "user": {
-            "username": "templateuser",
-            "email": "template@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("templateuser", "template@example.com", "securepassword123")
+        .await;
 
     // Create an article to render
     let article_data = json!({
@@ -153,30 +133,10 @@ async fn test_article_template_renders_with_comments() {
     // Arrange
     let app = spawn_app().await;
 
-    // Register user without profile image
-    let user_data = json!({
-        "user": {
-            "username": "commenter",
-            "email": "commenter@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    // Register user
+    let token = app
+        .register_user("commenter", "commenter@example.com", "securepassword123")
+        .await;
 
     // Create an article
     let article_data = json!({
@@ -252,29 +212,9 @@ async fn test_template_compiles_without_javascript_errors() {
     let app = spawn_app().await;
 
     // Register user
-    let user_data = json!({
-        "user": {
-            "username": "jstest",
-            "email": "jstest@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("jstest", "jstest@example.com", "securepassword123")
+        .await;
 
     // Create an article
     let article_data = json!({
@@ -337,29 +277,9 @@ async fn test_template_renders_consistently() {
     let app = spawn_app().await;
 
     // Register user
-    let user_data = json!({
-        "user": {
-            "username": "consistent",
-            "email": "consistent@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("consistent", "consistent@example.com", "securepassword123")
+        .await;
 
     // Create an article
     let article_data = json!({
@@ -440,29 +360,9 @@ async fn test_editor_page_shows_authenticated_user_in_navbar() {
     let app = spawn_app().await;
 
     // Register user
-    let user_data = json!({
-        "user": {
-            "username": "navbaruser",
-            "email": "navbar@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("navbaruser", "navbar@example.com", "securepassword123")
+        .await;
 
     // Create an article to edit
     let article_data = json!({
@@ -547,29 +447,9 @@ async fn test_new_article_editor_shows_authenticated_user_in_navbar() {
     let app = spawn_app().await;
 
     // Register user
-    let user_data = json!({
-        "user": {
-            "username": "neweditoruser",
-            "email": "neweditor@example.com",
-            "password": "securepassword123"
-        }
-    });
-
-    let registration_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .json(&user_data)
-        .send()
-        .await
-        .expect("Failed to register user");
-
-    let registration_body: Value = registration_response
-        .json()
-        .await
-        .expect("Failed to parse registration response");
-
-    let token = registration_body["user"]["token"].as_str().unwrap();
+    let token = app
+        .register_user("neweditoruser", "neweditor@example.com", "securepassword123")
+        .await;
 
     // Act - Access the new article editor page with authentication
     let response = app

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Email Verification - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                {% if success %}
+                <div class="text-center">
+                    <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
+                    <h2 class="card-title text-success">Email Verified!</h2>
+                    {% if username %}
+                    <p class="text-muted mb-4">Welcome, <strong>{{ username }}</strong>!</p>
+                    {% endif %}
+                    <p class="mb-4">{{ message }}</p>
+                    <a href="/login" class="btn btn-primary w-100">
+                        <i class="fas fa-sign-in-alt me-2"></i>
+                        Go to Login
+                    </a>
+                </div>
+                {% else %}
+                <div class="text-center">
+                    <i class="fas fa-exclamation-circle fa-4x text-danger mb-4"></i>
+                    <h2 class="card-title text-danger">Verification Failed</h2>
+                    <p class="mb-4">{{ message }}</p>
+                    <div class="d-grid gap-2">
+                        <a href="/register" class="btn btn-primary">
+                            <i class="fas fa-user-plus me-2"></i>
+                            Register Again
+                        </a>
+                        <a href="/login" class="btn btn-outline-secondary">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Back to Login
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

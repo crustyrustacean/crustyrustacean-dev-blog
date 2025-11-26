@@ -1,28 +1,16 @@
 // tests/api/auth_navigation.rs
 // Tests for authentication during browser navigation (using cookies)
 
-use crate::helpers::spawn_app;
+use crate::helpers::{TestUserBuilder, spawn_app};
 
 #[tokio::test]
 async fn navigation_to_admin_users_with_cookie_auth() {
     let app = spawn_app().await;
 
-    // Register and login
-    let response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .body(r#"{"user": {"username": "testuser", "email": "test@example.com", "password": "password123"}}"#)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    assert_eq!(response.status(), 200);
-
-    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let token = body["user"]["token"]
-        .as_str()
-        .expect("No token in response");
+    // Register user using helper (auto-verifies and returns token)
+    let token = app
+        .register_user("testuser", "test@example.com", "password123")
+        .await;
 
     // Simulate browser navigation - set cookie and navigate without Authorization header
     let cookie = format!("authToken={}", token);
@@ -60,20 +48,10 @@ async fn navigation_to_admin_users_with_cookie_auth() {
 async fn navigation_to_account_settings_with_cookie_auth() {
     let app = spawn_app().await;
 
-    // Register user
-    let response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .body(r#"{"user": {"username": "testuser", "email": "test@example.com", "password": "password123"}}"#)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let token = body["user"]["token"]
-        .as_str()
-        .expect("No token in response");
+    // Register user using helper
+    let token = app
+        .register_user("testuser", "test@example.com", "password123")
+        .await;
 
     // Navigate to account settings with cookie
     let cookie = format!("authToken={}", token);
@@ -97,20 +75,10 @@ async fn navigation_to_account_settings_with_cookie_auth() {
 async fn navigation_to_admin_dashboard_with_cookie_auth() {
     let app = spawn_app().await;
 
-    // Register user
-    let response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .header("Content-Type", "application/json")
-        .body(r#"{"user": {"username": "testuser", "email": "test@example.com", "password": "password123"}}"#)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    let body: serde_json::Value = response.json().await.expect("Failed to parse JSON");
-    let token = body["user"]["token"]
-        .as_str()
-        .expect("No token in response");
+    // Register user using helper
+    let token = app
+        .register_user("testuser", "test@example.com", "password123")
+        .await;
 
     // Navigate to admin dashboard with cookie
     let cookie = format!("authToken={}", token);
