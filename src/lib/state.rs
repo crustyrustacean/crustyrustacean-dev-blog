@@ -2,6 +2,7 @@
 
 // dependencies
 use crate::auth::Keys;
+use crate::email::EmailService;
 use crate::storage::StorageBackend;
 use crate::{ApiError, AppConfig, DatabaseConnection};
 use once_cell::sync::OnceCell;
@@ -31,6 +32,7 @@ pub struct AppState {
     pub jwt_keys: Keys,
     pub storage: Arc<dyn StorageBackend>,
     pub cached_tags: TagCache,
+    pub email: EmailService,
 }
 
 // simplified setup function
@@ -99,6 +101,7 @@ impl AppState {
     ) -> Result<Self, ApiError> {
         let templates = setup_templates(config)?;
         let jwt_keys = Keys::from_config(config);
+        let email = EmailService::from_config(&config.email);
 
         Ok(Self {
             templates,
@@ -106,6 +109,7 @@ impl AppState {
             jwt_keys,
             storage,
             cached_tags: Arc::new(RwLock::new(None)),
+            email,
         })
     }
 }
@@ -113,6 +117,7 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::email::EmailConfig;
     use std::fs;
     use tempfile::TempDir;
 
@@ -124,6 +129,7 @@ mod tests {
             override_stylesheet: "/static/overrides.css".to_string(),
             app_version: "2.9.0".to_string(),
             allowed_origins: vec!["http://localhost:8000".to_string()],
+            email: EmailConfig::default(),
         }
     }
 
@@ -164,6 +170,7 @@ mod tests {
             override_stylesheet: "".to_string(),
             app_version: "2.9.0".to_string(),
             allowed_origins: vec!["http://localhost:8000".to_string()],
+            email: EmailConfig::default(),
         };
         let _temp_dir = setup_test_templates_dir();
 
@@ -184,6 +191,7 @@ mod tests {
             override_stylesheet: "/static/override-theme.css".to_string(),
             app_version: "2.9.0".to_string(),
             allowed_origins: vec!["http://localhost:8000".to_string()],
+            email: EmailConfig::default(),
         };
         let _temp_dir = setup_test_templates_dir();
 

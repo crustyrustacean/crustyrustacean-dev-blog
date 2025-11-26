@@ -95,6 +95,19 @@ pub async fn register_user(
     )
     .await?;
 
+    // Send welcome email (fire and forget - don't block registration on email delivery)
+    let email_service = state.email.clone();
+    let email_addr = user_data.email.clone();
+    let username_for_email = user_data.username.clone();
+    tokio::spawn(async move {
+        if let Err(e) = email_service
+            .send_welcome_email(&email_addr, &username_for_email)
+            .await
+        {
+            tracing::warn!("Failed to send welcome email to {}: {}", email_addr, e);
+        }
+    });
+
     let token = generate_token(user_id, &state.jwt_keys)?;
 
     let response = UserResponse {
