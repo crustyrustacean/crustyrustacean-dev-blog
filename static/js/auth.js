@@ -12,6 +12,41 @@ class AuthManager {
         this.setupLoginForm();
         this.setupRegisterForm();
         this.setupPasswordToggle();
+        this.checkForRegistrationMessage();
+    }
+
+    /**
+     * Check for registration success message in URL params
+     */
+    checkForRegistrationMessage() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const registered = urlParams.get('registered');
+        const email = urlParams.get('email');
+
+        if (registered === 'true') {
+            const message = email
+                ? `Registration successful! Please check your email (${decodeURIComponent(email)}) for the verification link before logging in.`
+                : 'Registration successful! Please check your email for the verification link before logging in.';
+            this.showVerificationInfo(message);
+
+            // Clean up URL without reloading
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+        }
+    }
+
+    /**
+     * Show verification info message (persistent, doesn't auto-dismiss)
+     */
+    showVerificationInfo(message) {
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-info';
+        alert.innerHTML = `<i class="fas fa-envelope me-2"></i>${message}`;
+
+        const form = document.querySelector('form');
+        if (form) {
+            form.parentNode.insertBefore(alert, form);
+        }
     }
 
     /**
@@ -83,6 +118,13 @@ class AuthManager {
                 }
             };
 
+            // Disable submit button during request
+            const submitBtn = registerForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating Account...';
+            }
+
             try {
                 const response = await fetch('/api/users', {
                     method: 'POST',
@@ -94,15 +136,26 @@ class AuthManager {
 
                 if (response.ok) {
                     const data = await response.json();
-                    this.storeAuthToken(data.user.token);
-                    window.location.href = '/admin';
+                    // Registration successful - redirect to login with verification message
+                    const email = encodeURIComponent(data.email);
+                    window.location.href = `/login?registered=true&email=${email}`;
                 } else {
                     const errorData = await response.json();
                     const errorMessage = this.parseRegistrationErrors(errorData);
                     this.showError(errorMessage);
+                    // Re-enable submit button
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-user-plus me-2"></i>Create Account';
+                    }
                 }
             } catch (error) {
                 this.showError('Network error. Please check your connection and try again.');
+                // Re-enable submit button
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-user-plus me-2"></i>Create Account';
+                }
             }
         });
     }

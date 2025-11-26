@@ -17,6 +17,7 @@ pub struct User {
     pub image: Option<String>,
     pub disabled: bool,
     pub role: Role,
+    pub email_verified: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -92,6 +93,13 @@ pub struct ProfilesQuery {
     pub offset: Option<i32>,
 }
 
+/// Response for successful registration (before email verification)
+#[derive(Debug, Serialize)]
+pub struct RegistrationSuccessResponse {
+    pub message: String,
+    pub email: String,
+}
+
 #[derive(Debug, Deserialize, Validate)]
 pub struct PasswordResetRequest {
     #[validate(email)]
@@ -123,6 +131,7 @@ pub struct AdminUserData {
     pub image: Option<String>,
     pub disabled: bool,
     pub role: Role,
+    pub email_verified: bool,
     pub created_at: String,
     pub article_count: i32,
 }

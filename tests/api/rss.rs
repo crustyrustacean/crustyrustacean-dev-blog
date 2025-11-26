@@ -1,6 +1,6 @@
 // tests/api/rss.rs
 
-use crate::helpers::spawn_app;
+use crate::helpers::{TestUserBuilder, spawn_app};
 use serde_json::json;
 
 #[tokio::test]
@@ -45,30 +45,9 @@ async fn rss_feed_includes_articles() {
     let app = spawn_app().await;
 
     // Register a user and create an article
-    let register_body = json!({
-        "user": {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    let register_json: serde_json::Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("testuser", "test@example.com", "password123")
+        .await;
 
     // Create an article
     let article_body = json!({
@@ -118,30 +97,9 @@ async fn rss_feed_escapes_xml_special_characters() {
     let app = spawn_app().await;
 
     // Register a user
-    let register_body = json!({
-        "user": {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123"
-        }
-    });
-
-    let register_response = app
-        .client
-        .post(format!("{}/api/users", &app.address))
-        .json(&register_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    let register_json: serde_json::Value = register_response
-        .json()
-        .await
-        .expect("Failed to parse response body as JSON");
-
-    let token = register_json["user"]["token"]
-        .as_str()
-        .expect("Token not found in response");
+    let token = app
+        .register_user("testuser", "test@example.com", "password123")
+        .await;
 
     // Create an article with special characters
     let article_body = json!({
