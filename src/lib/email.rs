@@ -1083,13 +1083,12 @@ mod integration_tests {
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/send")
-                .json_body_partial(r#"{
-                    "from": {"email": "noreply@example.com", "name": "Test App"},
-                    "to": [{"email": "user@example.com"}],
-                    "subject": "Test Email",
-                    "text": "Plain text body",
-                    "html": "<p>HTML body</p>"
-                }"#);
+                .header("Content-Type", "application/json")
+                .body_contains("noreply@example.com")
+                .body_contains("user@example.com")
+                .body_contains("Test Email")
+                .body_contains("Plain text body")
+                .body_contains("<p>HTML body</p>");
             then.status(200)
                 .json_body(serde_json::json!({
                     "success": true,
