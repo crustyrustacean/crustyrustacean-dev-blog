@@ -118,7 +118,8 @@ pub async fn register_user(
     };
     let base_url = format!("{}://{}", protocol, host);
 
-    state
+    // Fire-and-forget: registration succeeds even if email fails
+    if let Err(e) = state
         .email
         .send_email_verification(
             &user_data.email,
@@ -126,7 +127,10 @@ pub async fn register_user(
             &verification_token,
             &base_url,
         )
-        .await?;
+        .await
+    {
+        tracing::warn!("Failed to send verification email to {}: {}", user_data.email, e);
+    }
 
     let response = RegistrationSuccessResponse {
         message: "Registration successful! Please check your email to verify your account."
