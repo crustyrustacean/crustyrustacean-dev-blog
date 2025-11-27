@@ -1223,6 +1223,7 @@ mod integration_tests {
     async fn test_email_service_from_config_with_mailtrap() {
         let config = EmailConfig {
             mailtrap_api_token: Some("test-token".to_string()),
+            mailtrap_sandbox_inbox_id: None,
             sender_email: "noreply@test.com".to_string(),
             sender_name: "Test Service".to_string(),
         };
@@ -1238,6 +1239,7 @@ mod integration_tests {
     async fn test_email_service_from_config_without_mailtrap() {
         let config = EmailConfig {
             mailtrap_api_token: None,
+            mailtrap_sandbox_inbox_id: None,
             sender_email: "noreply@test.com".to_string(),
             sender_name: "Test Service".to_string(),
         };
