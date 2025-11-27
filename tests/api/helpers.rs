@@ -81,6 +81,10 @@ fn load_test_secret_store() -> Result<SecretStore> {
         let s = v
             .as_str()
             .ok_or_else(|| anyhow!("Secret {k} must be a string in {}", path))?;
+        // Skip Mailtrap API token in tests - we want to use LoggingEmailSender
+        if k == "MAILTRAP_API_TOKEN" {
+            continue;
+        }
         map.insert(k.clone(), Secret::new(s.to_owned()));
     }
 

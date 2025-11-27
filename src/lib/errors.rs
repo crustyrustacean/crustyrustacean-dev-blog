@@ -29,6 +29,9 @@ pub enum ApiError {
     #[error("Internal server error: {0}")]
     InternalServerError(String),
 
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+
     // Template-specific errors
     #[error(transparent)]
     Tera(#[from] tera::Error),
@@ -99,7 +102,22 @@ impl From<chrono::ParseError> for ApiError {
 impl From<crate::email::SendError> for ApiError {
     fn from(err: crate::email::SendError) -> Self {
         tracing::error!("Email sending error: {}", err);
-        ApiError::InternalServerError("Failed to send email".to_string())
+
+        // Provide user-friendly messages based on error type
+        let message = match &err {
+            crate::email::SendError::Network(_) => {
+                "Unable to send verification email. Please try again later.".to_string()
+            }
+            crate::email::SendError::RateLimited => {
+                "Too many requests. Please wait a moment and try again.".to_string()
+            }
+            crate::email::SendError::Authentication(_) => {
+                "Email service configuration error. Please contact support.".to_string()
+            }
+            _ => "Unable to send verification email. Please try again later.".to_string(),
+        };
+
+        ApiError::ServiceUnavailable(message)
     }
 }
 
@@ -114,6 +132,7 @@ impl IntoResponse for ApiError {
             ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
             ApiError::UnprocessableEntity(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
             ApiError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            ApiError::ServiceUnavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg),
             ApiError::Tera(err) => {
                 // Log the actual template error for debugging
                 tracing::error!("Template rendering error: {}", err);
