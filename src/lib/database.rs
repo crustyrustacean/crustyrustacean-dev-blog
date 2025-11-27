@@ -527,9 +527,8 @@ impl DatabaseConnection {
         )
         .await?;
 
-        // Add email_verified column to users table (for backward compatibility)
+        // Add email_verified column to users table
         // 0 = not verified (default for new users), 1 = verified
-        // Existing users are set to verified (1) to not break existing accounts
         let _ = conn
             .execute(
                 r"ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",

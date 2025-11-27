@@ -180,30 +180,53 @@ pub trait EmailSender: Send + Sync {
 /// Mailtrap HTTP API email sender
 ///
 /// Uses Mailtrap's Send API for transactional emails.
-/// In sandbox mode, emails are captured for inspection rather than delivered.
+/// Supports both production and sandbox modes.
 pub struct MailtrapSender {
     client: reqwest::Client,
     api_token: String,
     base_url: String,
+    inbox_id: Option<String>,
 }
 
 impl MailtrapSender {
-    const DEFAULT_BASE_URL: &'static str = "https://send.api.mailtrap.io";
+    const PRODUCTION_BASE_URL: &'static str = "https://send.api.mailtrap.io";
+    const SANDBOX_BASE_URL: &'static str = "https://sandbox.api.mailtrap.io";
 
+    /// Create a production Mailtrap sender
     pub fn new(api_token: impl Into<String>) -> Self {
         Self {
             client: reqwest::Client::new(),
             api_token: api_token.into(),
-            base_url: Self::DEFAULT_BASE_URL.to_string(),
+            base_url: Self::PRODUCTION_BASE_URL.to_string(),
+            inbox_id: None,
         }
     }
 
-    /// Create with custom base URL (useful for testing)
+    /// Create a sandbox Mailtrap sender (for development/testing)
+    pub fn sandbox(api_token: impl Into<String>, inbox_id: impl Into<String>) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            api_token: api_token.into(),
+            base_url: Self::SANDBOX_BASE_URL.to_string(),
+            inbox_id: Some(inbox_id.into()),
+        }
+    }
+
+    /// Create with custom base URL (useful for unit testing with mocks)
     pub fn with_base_url(api_token: impl Into<String>, base_url: impl Into<String>) -> Self {
         Self {
             client: reqwest::Client::new(),
             api_token: api_token.into(),
             base_url: base_url.into(),
+            inbox_id: None,
+        }
+    }
+
+    /// Get the API endpoint URL
+    fn api_url(&self) -> String {
+        match &self.inbox_id {
+            Some(id) => format!("{}/api/send/{}", self.base_url, id),
+            None => format!("{}/api/send", self.base_url),
         }
     }
 }
@@ -269,7 +292,7 @@ impl EmailSender for MailtrapSender {
 
         let response = self
             .client
-            .post(format!("{}/api/send", self.base_url))
+            .post(self.api_url())
             .header("Authorization", format!("Bearer {}", self.api_token))
             .header("Content-Type", "application/json")
             .json(&request)
@@ -409,6 +432,8 @@ impl EmailSender for LoggingEmailSender {
 #[derive(Clone, Debug)]
 pub struct EmailConfig {
     pub mailtrap_api_token: Option<String>,
+    /// Sandbox inbox ID - if set, uses Mailtrap sandbox instead of production
+    pub mailtrap_sandbox_inbox_id: Option<String>,
     pub sender_email: String,
     pub sender_name: String,
 }
@@ -420,12 +445,20 @@ impl EmailConfig {
             .as_ref()
             .is_some_and(|t| !t.is_empty())
     }
+
+    /// Check if sandbox mode is enabled
+    pub fn is_sandbox(&self) -> bool {
+        self.mailtrap_sandbox_inbox_id
+            .as_ref()
+            .is_some_and(|id| !id.is_empty())
+    }
 }
 
 impl Default for EmailConfig {
     fn default() -> Self {
         Self {
             mailtrap_api_token: None,
+            mailtrap_sandbox_inbox_id: None,
             sender_email: "noreply@example.com".to_string(),
             sender_name: "CrustyRustacean Dev Blog".to_string(),
         }
@@ -457,12 +490,18 @@ impl EmailService {
 
     /// Create an email service from configuration.
     /// Returns a Mailtrap sender if configured, otherwise a logging sender.
+    /// If sandbox inbox ID is set, uses Mailtrap sandbox mode.
     pub fn from_config(config: &EmailConfig) -> Self {
         let sender: Arc<dyn EmailSender> = if config.has_mailtrap() {
-            info!("Email service configured with Mailtrap");
-            Arc::new(MailtrapSender::new(
-                config.mailtrap_api_token.as_ref().unwrap(),
-            ))
+            let token = config.mailtrap_api_token.as_ref().unwrap();
+            if config.is_sandbox() {
+                let inbox_id = config.mailtrap_sandbox_inbox_id.as_ref().unwrap();
+                info!("Email service configured with Mailtrap SANDBOX (inbox: {})", inbox_id);
+                Arc::new(MailtrapSender::sandbox(token, inbox_id))
+            } else {
+                info!("Email service configured with Mailtrap PRODUCTION");
+                Arc::new(MailtrapSender::new(token))
+            }
         } else {
             warn!("No email provider configured - emails will be logged only");
             Arc::new(LoggingEmailSender::new())
@@ -1184,6 +1223,7 @@ mod integration_tests {
     async fn test_email_service_from_config_with_mailtrap() {
         let config = EmailConfig {
             mailtrap_api_token: Some("test-token".to_string()),
+            mailtrap_sandbox_inbox_id: None,
             sender_email: "noreply@test.com".to_string(),
             sender_name: "Test Service".to_string(),
         };
@@ -1199,6 +1239,7 @@ mod integration_tests {
     async fn test_email_service_from_config_without_mailtrap() {
         let config = EmailConfig {
             mailtrap_api_token: None,
+            mailtrap_sandbox_inbox_id: None,
             sender_email: "noreply@test.com".to_string(),
             sender_name: "Test Service".to_string(),
         };

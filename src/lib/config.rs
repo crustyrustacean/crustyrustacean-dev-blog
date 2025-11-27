@@ -59,8 +59,12 @@ impl TryFrom<&SecretStore> for AppConfig {
             });
 
         // Load email configuration (all optional - falls back to logging sender)
+        // If MAILTRAP_SANDBOX_INBOX_ID is set, uses sandbox mode for development
         let email = EmailConfig {
             mailtrap_api_token: secrets.get("MAILTRAP_API_TOKEN").filter(|s| !s.is_empty()),
+            mailtrap_sandbox_inbox_id: secrets
+                .get("MAILTRAP_SANDBOX_INBOX_ID")
+                .filter(|s| !s.is_empty()),
             sender_email: secrets
                 .get("MAILTRAP_SENDER_EMAIL")
                 .unwrap_or_else(|| "noreply@example.com".to_string()),
