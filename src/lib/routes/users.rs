@@ -72,16 +72,15 @@ pub async fn register_user(
     let password_hash = hash_password(&user_data.password)?;
     let now = Utc::now();
 
-    // New users start with email_verified = 0
+    // New users start with email_verified = 0 (literal in SQL to avoid type issues)
     conn.execute(
-        "INSERT INTO users (id, username, email, password_hash, role, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO users (id, username, email, password_hash, role, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
         libsql::params![
             user_id.to_string(),
             user_data.username.clone(),
             user_data.email.clone(),
             password_hash,
             role.to_string(),
-            0_i64,  // email_verified = false
             now.to_rfc3339(),
             now.to_rfc3339(),
         ],
