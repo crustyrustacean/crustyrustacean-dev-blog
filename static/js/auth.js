@@ -134,14 +134,19 @@ class AuthManager {
                     body: JSON.stringify(registerData)
                 });
 
+                console.log('Registration response status:', response.status);
+                console.log('Registration response ok:', response.ok);
+
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('Registration response data:', data);
                     // Registration successful - redirect to login with verification message
                     // Response is wrapped in ApiResponse: { success, data: { email, message } }
                     const email = encodeURIComponent(data.data?.email || data.email || '');
                     window.location.href = `/login?registered=true&email=${email}`;
                 } else {
                     const errorData = await response.json();
+                    console.log('Registration error data:', errorData);
                     const errorMessage = this.parseRegistrationErrors(errorData);
                     this.showError(errorMessage);
                     // Re-enable submit button
@@ -151,6 +156,7 @@ class AuthManager {
                     }
                 }
             } catch (error) {
+                console.error('Registration exception:', error);
                 this.showError('Network error. Please check your connection and try again.');
                 // Re-enable submit button
                 if (submitBtn) {
