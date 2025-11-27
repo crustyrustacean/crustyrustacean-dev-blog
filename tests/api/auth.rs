@@ -37,11 +37,12 @@ async fn test_user_registration_happy_path() {
 
     let response_body: Value = parse_json!(response);
 
-    // Verify response structure - registration now returns message + email (not token)
-    // User must verify email before logging in
-    assert!(response_body["message"].is_string());
-    assert_eq!(response_body["email"], "test@example.com");
-    assert!(response_body["message"]
+    // Verify response structure - wrapped in ApiResponse format
+    // { success: true, data: { message, email } }
+    assert_eq!(response_body["success"], true);
+    assert!(response_body["data"]["message"].is_string());
+    assert_eq!(response_body["data"]["email"], "test@example.com");
+    assert!(response_body["data"]["message"]
         .as_str()
         .unwrap()
         .contains("verify"));
