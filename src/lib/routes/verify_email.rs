@@ -8,9 +8,76 @@ use axum::{
 use chrono::Utc;
 use libsql::params;
 
-/// Verify email address
+/// Show email verification page (does NOT verify - just shows the button)
 /// GET /verify-email/:token
-/// This endpoint is called when user clicks the verification link in their email
+/// This prevents email client link previews from auto-verifying
+pub async fn show_verify_email_page(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> Result<impl IntoResponse, ApiError> {
+    let conn = state.db.connect()?;
+
+    // Check if token exists and is valid (but don't verify yet)
+    let mut rows = conn
+        .query(
+            "SELECT id, user_id, expires_at FROM email_verification_tokens WHERE token = ?",
+            params![token.clone()],
+        )
+        .await?;
+
+    let (valid, expired, already_verified, username) = if let Some(row) = rows.next().await? {
+        let user_id: String = row.get(1)?;
+        let expires_at: String = row.get(2)?;
+
+        // Check if token is expired
+        let exp_date = chrono::DateTime::parse_from_rfc3339(&expires_at)
+            .map_err(|_| ApiError::InternalServerError("Invalid date format".to_string()))?
+            .with_timezone(&Utc);
+
+        if exp_date < Utc::now() {
+            (false, true, false, None)
+        } else {
+            // Get username and verification status
+            let mut user_rows = conn
+                .query(
+                    "SELECT username, email_verified FROM users WHERE id = ?",
+                    params![user_id],
+                )
+                .await?;
+
+            if let Some(user_row) = user_rows.next().await? {
+                let username: String = user_row.get(0)?;
+                let email_verified: i64 = user_row.get(1)?;
+                (true, false, email_verified == 1, Some(username))
+            } else {
+                (false, false, false, None)
+            }
+        }
+    } else {
+        (false, false, false, None)
+    };
+
+    // Render the verification page with a button (not auto-verified)
+    let mut context = tera::Context::new();
+    context.insert("token", &token);
+    context.insert("valid", &valid);
+    context.insert("expired", &expired);
+    context.insert("already_verified", &already_verified);
+    context.insert("show_button", &(valid && !already_verified));
+    if let Some(name) = username {
+        context.insert("username", &name);
+    }
+
+    let template = state
+        .templates
+        .render("auth/verify_email.html", &context)
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+    Ok(Html(template))
+}
+
+/// Actually verify the email (requires POST to prevent link preview auto-verification)
+/// POST /verify-email/:token
 pub async fn verify_email(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -112,6 +179,7 @@ pub async fn verify_email(
     let mut context = tera::Context::new();
     context.insert("success", &success);
     context.insert("message", &message);
+    context.insert("verified", &true); // Indicates this is the result page
     if let Some(name) = username {
         context.insert("username", &name);
     }
