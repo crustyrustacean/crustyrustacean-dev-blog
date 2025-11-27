@@ -7,6 +7,7 @@ use crate::{
         ProfileResponse, ProfilesQuery, ProfilesResponse, RegistrationSuccessResponse, Role,
         UserData, UserLogin, UserProfile, UserRegistration, UserResponse, UserUpdate,
     },
+    response::ApiResponse,
 };
 use axum::{
     extract::{Path, Query, State},
@@ -21,7 +22,7 @@ pub async fn register_user(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(payload): Json<serde_json::Value>,
-) -> Result<Json<RegistrationSuccessResponse>, ApiError> {
+) -> Result<ApiResponse<RegistrationSuccessResponse>, ApiError> {
     let user_data: UserRegistration = serde_json::from_value(
         payload
             .get("user")
@@ -135,7 +136,7 @@ pub async fn register_user(
         email: user_data.email,
     };
 
-    Ok(Json(response))
+    Ok(ApiResponse::success(response))
 }
 
 pub async fn login_user(
