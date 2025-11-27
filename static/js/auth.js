@@ -137,7 +137,8 @@ class AuthManager {
                 if (response.ok) {
                     const data = await response.json();
                     // Registration successful - redirect to login with verification message
-                    const email = encodeURIComponent(data.email);
+                    // Response is wrapped in ApiResponse: { success, data: { email, message } }
+                    const email = encodeURIComponent(data.data?.email || data.email || '');
                     window.location.href = `/login?registered=true&email=${email}`;
                 } else {
                     const errorData = await response.json();
