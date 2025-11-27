@@ -21,7 +21,7 @@ use crate::routes::{
     newsletter_unsubscribed_page, register_user, request_password_reset, search_articles,
     send_newsletter, subscribe, unfavorite_article, unfollow_user, unsubscribe, update_article,
     update_category, update_current_user, update_media_metadata, update_newsletter, update_tag,
-    update_user_admin, upload_markdown_file, upload_media, show_verify_email_page, verify_email,
+    update_user_admin, upload_markdown_file, upload_media, verify_email,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -199,8 +199,8 @@ impl App {
             .route("/password-reset/{token}", get(get_password_reset_page))
             .route("/api/password-reset/{token}", post(complete_password_reset))
             .route("/api/account/password", post(change_password))
-            // Email verification routes (GET shows page, POST verifies)
-            .route("/verify-email/{token}", get(show_verify_email_page).post(verify_email))
+            // Email verification route
+            .route("/verify-email/{token}", get(verify_email))
             .nest_service(
                 "/static",
                 // Static file service with aggressive caching for versioned assets
