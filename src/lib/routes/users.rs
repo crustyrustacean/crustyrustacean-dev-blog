@@ -74,13 +74,14 @@ pub async fn register_user(
 
     // New users start with email_verified = 0
     conn.execute(
-        "INSERT INTO users (id, username, email, password_hash, role, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
+        "INSERT INTO users (id, username, email, password_hash, role, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         libsql::params![
             user_id.to_string(),
             user_data.username.clone(),
             user_data.email.clone(),
             password_hash,
             role.to_string(),
+            0_i64,  // email_verified = false
             now.to_rfc3339(),
             now.to_rfc3339(),
         ],
