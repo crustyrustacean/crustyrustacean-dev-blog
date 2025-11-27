@@ -36,7 +36,7 @@ class AuthManager {
     }
 
     /**
-     * Show verification info message (persistent, doesn't auto-dismiss)
+     * Show verification info message (auto-dismisses after 8 seconds)
      */
     showVerificationInfo(message) {
         const alert = document.createElement('div');
@@ -47,6 +47,13 @@ class AuthManager {
         if (form) {
             form.parentNode.insertBefore(alert, form);
         }
+
+        // Auto-dismiss after 8 seconds
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 8000);
     }
 
     /**
@@ -134,19 +141,14 @@ class AuthManager {
                     body: JSON.stringify(registerData)
                 });
 
-                console.log('Registration response status:', response.status);
-                console.log('Registration response ok:', response.ok);
-
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Registration response data:', data);
                     // Registration successful - redirect to login with verification message
                     // Response is wrapped in ApiResponse: { success, data: { email, message } }
                     const email = encodeURIComponent(data.data?.email || data.email || '');
                     window.location.href = `/login?registered=true&email=${email}`;
                 } else {
                     const errorData = await response.json();
-                    console.log('Registration error data:', errorData);
                     const errorMessage = this.parseRegistrationErrors(errorData);
                     this.showError(errorMessage);
                     // Re-enable submit button
@@ -156,7 +158,6 @@ class AuthManager {
                     }
                 }
             } catch (error) {
-                console.error('Registration exception:', error);
                 this.showError('Network error. Please check your connection and try again.');
                 // Re-enable submit button
                 if (submitBtn) {
