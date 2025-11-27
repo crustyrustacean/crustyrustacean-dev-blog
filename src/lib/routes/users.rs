@@ -81,6 +81,7 @@ pub async fn register_user(
             user_data.email.clone(),
             password_hash,
             role.to_string(),
+            0_i64,
             now.to_rfc3339(),
             now.to_rfc3339(),
         ],

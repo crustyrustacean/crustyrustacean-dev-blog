@@ -532,7 +532,7 @@ impl DatabaseConnection {
         // Existing users are set to verified (1) to not break existing accounts
         let _ = conn
             .execute(
-                r"ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1",
+                r"ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
                 (),
             )
             .await;
