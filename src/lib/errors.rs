@@ -108,7 +108,7 @@ impl From<crate::email::SendError> for ApiError {
             crate::email::SendError::Network(_) => {
                 "Unable to send verification email. Please try again later.".to_string()
             }
-            crate::email::SendError::RateLimited => {
+            crate::email::SendError::RateLimited(_) => {
                 "Too many requests. Please wait a moment and try again.".to_string()
             }
             crate::email::SendError::Authentication(_) => {
