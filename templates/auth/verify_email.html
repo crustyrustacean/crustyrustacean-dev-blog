@@ -7,6 +7,8 @@
     <div class="col-md-6 col-lg-4">
         <div class="card shadow">
             <div class="card-body p-5">
+                {% if verified %}
+                {# POST result - show success or failure message #}
                 {% if success %}
                 <div class="text-center">
                     <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
@@ -25,6 +27,71 @@
                     <i class="fas fa-exclamation-circle fa-4x text-danger mb-4"></i>
                     <h2 class="card-title text-danger">Verification Failed</h2>
                     <p class="mb-4">{{ message }}</p>
+                    <div class="d-grid gap-2">
+                        <a href="/register" class="btn btn-primary">
+                            <i class="fas fa-user-plus me-2"></i>
+                            Register Again
+                        </a>
+                        <a href="/login" class="btn btn-outline-secondary">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Back to Login
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                {% elif show_button %}
+                {# GET request with valid token - show verify button #}
+                <div class="text-center">
+                    <i class="fas fa-envelope-open-text fa-4x text-primary mb-4"></i>
+                    <h2 class="card-title">Verify Your Email</h2>
+                    {% if username %}
+                    <p class="text-muted mb-3">Hello, <strong>{{ username }}</strong>!</p>
+                    {% endif %}
+                    <p class="mb-4">Click the button below to verify your email address and complete your registration.</p>
+                    <form method="POST" action="/verify-email/{{ token }}">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Verify My Email
+                        </button>
+                    </form>
+                </div>
+                {% elif already_verified %}
+                {# Already verified #}
+                <div class="text-center">
+                    <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
+                    <h2 class="card-title text-success">Already Verified</h2>
+                    {% if username %}
+                    <p class="text-muted mb-3">Hello, <strong>{{ username }}</strong>!</p>
+                    {% endif %}
+                    <p class="mb-4">Your email has already been verified. You can log in now.</p>
+                    <a href="/login" class="btn btn-primary w-100">
+                        <i class="fas fa-sign-in-alt me-2"></i>
+                        Go to Login
+                    </a>
+                </div>
+                {% elif expired %}
+                {# Expired token #}
+                <div class="text-center">
+                    <i class="fas fa-clock fa-4x text-warning mb-4"></i>
+                    <h2 class="card-title text-warning">Link Expired</h2>
+                    <p class="mb-4">This verification link has expired. Please register again to receive a new verification email.</p>
+                    <div class="d-grid gap-2">
+                        <a href="/register" class="btn btn-primary">
+                            <i class="fas fa-user-plus me-2"></i>
+                            Register Again
+                        </a>
+                        <a href="/login" class="btn btn-outline-secondary">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Back to Login
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                {# Invalid token #}
+                <div class="text-center">
+                    <i class="fas fa-exclamation-circle fa-4x text-danger mb-4"></i>
+                    <h2 class="card-title text-danger">Invalid Link</h2>
+                    <p class="mb-4">This verification link is invalid. It may have already been used or expired.</p>
                     <div class="d-grid gap-2">
                         <a href="/register" class="btn btn-primary">
                             <i class="fas fa-user-plus me-2"></i>
