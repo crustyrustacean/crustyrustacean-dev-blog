@@ -479,3 +479,127 @@ async fn change_password_requires_authentication() {
     // Assert
     assert_eq!(response.status().as_u16(), 401);
 }
+
+#[tokio::test]
+async fn password_reset_invalidates_existing_tokens() {
+    // Arrange
+    let app = spawn_app().await;
+    let email = "test@example.com";
+    let old_password = "password123";
+    let new_password = "newpassword456";
+
+    // Register user and get their token
+    let old_token = app.register_user("testuser", email, old_password).await;
+
+    // Verify the old token works
+    let response = app
+        .client
+        .get(format!("{}/api/user", &app.address))
+        .header("Authorization", format!("Bearer {}", old_token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Request password reset
+    app.client
+        .post(format!("{}/api/password-reset/request", &app.address))
+        .json(&json!({ "email": email }))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Get the reset token from database
+    let reset_token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT token FROM password_reset_tokens ORDER BY created_at DESC LIMIT 1",
+                (),
+            )
+            .await
+            .expect("Failed to query token");
+
+        let token: String = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No token found")
+            .get(0)
+            .expect("Failed to get token");
+
+        drop(rows);
+        drop(conn);
+        token
+    };
+
+    // Complete password reset
+    let response = app
+        .client
+        .post(format!("{}/api/password-reset/{}", &app.address, reset_token))
+        .json(&json!({ "password": new_password }))
+        .send()
+        .await
+        .expect("Failed to execute request");
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Act - Try to use the old token
+    let response = app
+        .client
+        .get(format!("{}/api/user", &app.address))
+        .header("Authorization", format!("Bearer {}", old_token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Old token should be invalid (401)
+    assert_eq!(response.status().as_u16(), 401);
+}
+
+#[tokio::test]
+async fn change_password_invalidates_existing_tokens() {
+    // Arrange
+    let app = spawn_app().await;
+    let email = "test@example.com";
+    let old_password = "password123";
+    let new_password = "newpassword456";
+
+    // Register user and get their token
+    let old_token = app.register_user("testuser", email, old_password).await;
+
+    // Verify the old token works
+    let response = app
+        .client
+        .get(format!("{}/api/user", &app.address))
+        .header("Authorization", format!("Bearer {}", old_token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Change password using the old token
+    let response = app
+        .client
+        .post(format!("{}/api/account/password", &app.address))
+        .header("Authorization", format!("Bearer {}", old_token))
+        .json(&json!({
+            "current_password": old_password,
+            "new_password": new_password
+        }))
+        .send()
+        .await
+        .expect("Failed to execute request");
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Act - Try to use the old token again
+    let response = app
+        .client
+        .get(format!("{}/api/user", &app.address))
+        .header("Authorization", format!("Bearer {}", old_token))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert - Old token should be invalid (401)
+    assert_eq!(response.status().as_u16(), 401);
+}
