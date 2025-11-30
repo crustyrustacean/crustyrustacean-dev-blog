@@ -187,9 +187,18 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showSuccess('Password changed successfully!');
+                    showSuccess('Password changed successfully! You will be redirected to login...');
                     passwordForm.reset();
                     passwordMismatch.classList.add('d-none');
+
+                    // Clear auth token since it's now invalid
+                    localStorage.removeItem('authToken');
+                    document.cookie = 'authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
+                    // Redirect to login after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
                 } else {
                     const errorMsg = data.errors?.body?.[0] || data.message || 'Failed to change password. Please try again.';
                     showError(errorMsg);
