@@ -9,6 +9,7 @@ use crate::{
 use axum::{
     Json,
     extract::{Path, State},
+    http::HeaderMap,
     response::{Html, IntoResponse},
 };
 use chrono::{Duration, Utc};
@@ -34,6 +35,7 @@ pub async fn get_password_reset_request_page(
 /// POST /api/password-reset/request
 pub async fn request_password_reset(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<PasswordResetRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     // Validate request
@@ -74,11 +76,21 @@ pub async fn request_password_reset(
         .await?;
 
         // Send password reset email
-        // TODO: Get base URL from config
-        let base_url = "http://localhost:8000"; // Placeholder
+        // Derive base URL from request headers
+        let host = headers
+            .get("host")
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("localhost:8000");
+        let protocol = if host.contains("localhost") || host.contains("127.0.0.1") {
+            "http"
+        } else {
+            "https"
+        };
+        let base_url = format!("{}://{}", protocol, host);
+
         if let Err(e) = state
             .email
-            .send_password_reset_email(&email, &username, &token, base_url)
+            .send_password_reset_email(&email, &username, &token, &base_url)
             .await
         {
             tracing::warn!("Failed to send password reset email to {}: {}", email, e);
