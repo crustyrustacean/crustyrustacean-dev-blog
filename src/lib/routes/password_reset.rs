@@ -213,11 +213,12 @@ pub async fn complete_password_reset(
 
     // Hash new password
     let password_hash = hash_password(&payload.password)?;
+    let now = Utc::now().to_rfc3339();
 
-    // Update user password
+    // Update user password and password_changed_at to invalidate existing tokens
     conn.execute(
-        "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
-        params![password_hash, Utc::now().to_rfc3339(), user_id.clone()],
+        "UPDATE users SET password_hash = ?, updated_at = ?, password_changed_at = ? WHERE id = ?",
+        params![password_hash, now.clone(), now, user_id.clone()],
     )
     .await?;
 
@@ -269,13 +270,15 @@ pub async fn change_password(
 
     // Hash new password
     let new_password_hash = hash_password(&payload.new_password)?;
+    let now = Utc::now().to_rfc3339();
 
-    // Update password
+    // Update password and password_changed_at to invalidate existing tokens
     conn.execute(
-        "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+        "UPDATE users SET password_hash = ?, updated_at = ?, password_changed_at = ? WHERE id = ?",
         params![
             new_password_hash,
-            Utc::now().to_rfc3339(),
+            now.clone(),
+            now,
             user.user_id.to_string()
         ],
     )
