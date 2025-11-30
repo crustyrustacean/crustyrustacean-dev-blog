@@ -33,6 +33,7 @@ pub struct AppState {
     pub storage: Arc<dyn StorageBackend>,
     pub cached_tags: TagCache,
     pub email: EmailService,
+    pub allowed_origins: Vec<String>,
 }
 
 // simplified setup function
@@ -97,11 +98,12 @@ impl AppState {
     pub fn new(
         db: DatabaseConnection,
         storage: Arc<dyn StorageBackend>,
-        config: &AppConfig,
+        config: AppConfig,
     ) -> Result<Self, ApiError> {
-        let templates = setup_templates(config)?;
-        let jwt_keys = Keys::from_config(config);
+        let templates = setup_templates(&config)?;
+        let jwt_keys = Keys::from_config(&config);
         let email = EmailService::from_config(&config.email);
+        let allowed_origins = config.allowed_origins;
 
         Ok(Self {
             templates,
@@ -110,6 +112,7 @@ impl AppState {
             storage,
             cached_tags: Arc::new(RwLock::new(None)),
             email,
+            allowed_origins,
         })
     }
 }

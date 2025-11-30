@@ -30,23 +30,19 @@ pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse
         }
     }
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut tag_rows = conn
         .query("SELECT name FROM tags ORDER BY name ASC", libsql::params![])
-        .await
-        ?;
+        .await?;
 
     let mut tags = Vec::new();
 
-    while let Some(row) = tag_rows
-        .next()
-        .await
-        ?
-    {
-        let tag_name: String = row
-            .get(0)
-            ?;
+    while let Some(row) = tag_rows.next().await? {
+        let tag_name: String = row.get(0)?;
         tags.push(tag_name);
     }
 
@@ -76,7 +72,10 @@ pub async fn update_tag(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if old tag exists
     let mut old_tag_rows = conn
@@ -84,18 +83,14 @@ pub async fn update_tag(
             "SELECT id FROM tags WHERE name = ?",
             libsql::params![old_name.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let tag_row = old_tag_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Tag not found".to_string()))?;
 
-    let _tag_id: String = tag_row
-        .get(0)
-        ?;
+    let _tag_id: String = tag_row.get(0)?;
 
     // Check if new name already exists (and it's not the same tag)
     if old_name != update_data.name {
@@ -104,15 +99,9 @@ pub async fn update_tag(
                 "SELECT id FROM tags WHERE name = ?",
                 libsql::params![update_data.name.clone()],
             )
-            .await
-            ?;
+            .await?;
 
-        if new_tag_rows
-            .next()
-            .await
-            ?
-            .is_some()
-        {
+        if new_tag_rows.next().await?.is_some() {
             return Err(ApiError::Conflict(
                 "A tag with this name already exists".to_string(),
             ));
@@ -136,7 +125,10 @@ pub async fn delete_tag(
     Path(name): Path<String>,
     _user: AuthorUser, // Requires author or admin role
 ) -> Result<StatusCode, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if tag exists
     let mut tag_rows = conn
@@ -144,18 +136,14 @@ pub async fn delete_tag(
             "SELECT id FROM tags WHERE name = ?",
             libsql::params![name.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let tag_row = tag_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Tag not found".to_string()))?;
 
-    let tag_id: String = tag_row
-        .get(0)
-        ?;
+    let tag_id: String = tag_row.get(0)?;
 
     // Delete article_tags relationships first (CASCADE should handle this, but being explicit)
     conn.execute(
@@ -166,8 +154,7 @@ pub async fn delete_tag(
 
     // Delete the tag
     conn.execute("DELETE FROM tags WHERE id = ?", libsql::params![tag_id])
-        .await
-        ?;
+        .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -177,27 +164,21 @@ pub async fn get_tags_admin_page(
     user: AuthorUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

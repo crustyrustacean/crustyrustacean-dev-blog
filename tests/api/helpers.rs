@@ -6,7 +6,7 @@
 use anyhow::{Context, Result, anyhow};
 use crustyrustacean_dev_blog_lib::config::AppConfig;
 use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
-use crustyrustacean_dev_blog_lib::startup::App;
+use crustyrustacean_dev_blog_lib::service::AppService;
 use crustyrustacean_dev_blog_lib::state::AppState;
 use crustyrustacean_dev_blog_lib::storage::{OpenDalStorage, StorageBackend};
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
@@ -138,11 +138,11 @@ pub async fn spawn_app() -> TestApp {
     let storage: Arc<dyn StorageBackend> = Arc::new(OpenDalStorage::new(operator));
 
     // set up the app state
-    let app_state = AppState::new(db_connection.clone(), storage, &app_config)
+    let app_state = AppState::new(db_connection.clone(), storage, app_config)
         .expect("Unable to build the Tera templates");
 
     // create the test application
-    let application = App::new(app_config, app_state);
+    let application = AppService::new(app_state);
 
     // create a listener
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -231,7 +231,10 @@ impl TestUserBuilder for TestApp {
         // 2. Log in to get a token
 
         // Mark email as verified directly in database
-        let conn = self.db.connect().expect("Failed to connect to test database");
+        let conn = self
+            .db
+            .connect()
+            .expect("Failed to connect to test database");
         conn.execute(
             "UPDATE users SET email_verified = 1 WHERE email = ?",
             libsql::params![email],

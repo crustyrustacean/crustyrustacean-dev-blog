@@ -848,7 +848,11 @@ async fn test_update_article_without_touching_tags() {
 
     // Register user and get token
     let token = app
-        .register_user("tagunchangeduser", "tagunchanged@example.com", "password123")
+        .register_user(
+            "tagunchangeduser",
+            "tagunchanged@example.com",
+            "password123",
+        )
         .await;
 
     // Create an article with tags

@@ -41,22 +41,19 @@ pub async fn get_account_page(
         "image": image.clone(),
     });
 
-    let template = state
-        .templates
-        .render(
-            "account/settings.html",
-            &tera::Context::from_serialize(json!({
-                "user": user_info,
-                "username": username,
-                "email": email,
-                "bio": bio,
-                "image": image,
-                "authenticated": true,
-                "current_year": chrono::Utc::now().year(),
-            }))
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
-        )
-        ?;
+    let template = state.templates.render(
+        "account/settings.html",
+        &tera::Context::from_serialize(json!({
+            "user": user_info,
+            "username": username,
+            "email": email,
+            "bio": bio,
+            "image": image,
+            "authenticated": true,
+            "current_year": chrono::Utc::now().year(),
+        }))
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?,
+    )?;
 
     Ok(Html(template))
 }

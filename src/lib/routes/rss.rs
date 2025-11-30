@@ -9,7 +9,10 @@ use axum::{
 use chrono::Utc;
 
 pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Get the latest 20 articles with author information
     let mut article_rows = conn
@@ -25,37 +28,18 @@ pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, Api
             "#,
             libsql::params![],
         )
-        .await
-        ?;
+        .await?;
 
     let mut items = Vec::new();
 
-    while let Some(row) = article_rows
-        .next()
-        .await
-        ?
-    {
-        let slug: String = row
-            .get(0)
-            ?;
-        let title: String = row
-            .get(1)
-            ?;
-        let description: String = row
-            .get(2)
-            ?;
-        let _body: String = row
-            .get(3)
-            ?;
-        let created_at_str: String = row
-            .get(4)
-            ?;
-        let _updated_at_str: String = row
-            .get(5)
-            ?;
-        let username: String = row
-            .get(6)
-            ?;
+    while let Some(row) = article_rows.next().await? {
+        let slug: String = row.get(0)?;
+        let title: String = row.get(1)?;
+        let description: String = row.get(2)?;
+        let _body: String = row.get(3)?;
+        let created_at_str: String = row.get(4)?;
+        let _updated_at_str: String = row.get(5)?;
+        let username: String = row.get(6)?;
         let author_email: Option<String> = row.get(7).ok();
 
         // Parse the created_at timestamp

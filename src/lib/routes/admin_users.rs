@@ -24,19 +24,15 @@ pub async fn get_admin_users_page(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Fetch basic user count for display
-    let mut count_rows = conn
-        .query("SELECT COUNT(*) FROM users", ())
-        .await
-?;
+    let mut count_rows = conn.query("SELECT COUNT(*) FROM users", ()).await?;
 
-    let user_count: i32 = if let Some(row) = count_rows
-        .next()
-        .await
-?
-    {
+    let user_count: i32 = if let Some(row) = count_rows.next().await? {
         row.get(0).unwrap_or(0)
     } else {
         0
@@ -48,20 +44,11 @@ pub async fn get_admin_users_page(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-?
-    {
-        let username: String = row
-            .get(0)
-    ?;
-        let email: String = row
-            .get(1)
-    ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -75,18 +62,14 @@ pub async fn get_admin_users_page(
         serde_json::json!(null)
     };
 
-    let html = state
-        .templates
-        .render(
-            "admin/users.html",
-            &tera::Context::from_serialize(serde_json::json!({
-                "user": user_info,
-                "user_count": user_count,
-                "current_year": chrono::Utc::now().year(),
-            }))
-    ?,
-        )
-?;
+    let html = state.templates.render(
+        "admin/users.html",
+        &tera::Context::from_serialize(serde_json::json!({
+            "user": user_info,
+            "user_count": user_count,
+            "current_year": chrono::Utc::now().year(),
+        }))?,
+    )?;
 
     Ok(Html(html))
 }
@@ -98,7 +81,10 @@ pub async fn list_users_admin(
     _user: AdminUser, // Require admin authentication
     Query(query): Query<AdminUsersQuery>,
 ) -> Result<Json<ApiResponse<AdminUsersResponse>>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
@@ -159,10 +145,7 @@ pub async fn list_users_admin(
         })?;
 
     let mut users = Vec::new();
-    while let Some(row) = rows
-        .next()
-        .await?
-    {
+    while let Some(row) = rows.next().await? {
         let disabled_int: i64 = row.get(5).unwrap_or(0);
         let role_str: String = row.get(6).unwrap_or_else(|_| "subscriber".to_string());
         let role = role_str.parse::<Role>().unwrap_or(Role::Subscriber);
@@ -193,14 +176,9 @@ pub async fn list_users_admin(
 
     let mut count_rows = conn
         .query(&count_query, libsql::params_from_iter(count_params))
-        .await
-?;
+        .await?;
 
-    let users_count: i32 = if let Some(row) = count_rows
-        .next()
-        .await
-?
-    {
+    let users_count: i32 = if let Some(row) = count_rows.next().await? {
         row.get(0).unwrap_or(0)
     } else {
         0
@@ -219,7 +197,10 @@ pub async fn get_user_admin(
     _user: AdminUser,
     Path(id): Path<String>,
 ) -> Result<Json<ApiResponse<AdminUserResponse>>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -282,7 +263,10 @@ pub async fn update_user_admin(
         ApiError::UnprocessableEntity(error_messages.join(", "))
     })?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if user exists
     let mut check_rows = conn
@@ -290,15 +274,9 @@ pub async fn update_user_admin(
             "SELECT id FROM users WHERE id = ?",
             libsql::params![id.clone()],
         )
-        .await
-?;
+        .await?;
 
-    if check_rows
-        .next()
-        .await
-?
-        .is_none()
-    {
+    if check_rows.next().await?.is_none() {
         return Err(ApiError::NotFound("User not found".to_string()));
     }
 
@@ -363,7 +341,10 @@ pub async fn delete_user_admin(
         ));
     }
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if user exists
     let mut check_rows = conn
@@ -371,15 +352,9 @@ pub async fn delete_user_admin(
             "SELECT id FROM users WHERE id = ?",
             libsql::params![id.clone()],
         )
-        .await
-?;
+        .await?;
 
-    if check_rows
-        .next()
-        .await
-?
-        .is_none()
-    {
+    if check_rows.next().await?.is_none() {
         return Err(ApiError::NotFound("User not found".to_string()));
     }
 
