@@ -22,7 +22,10 @@ pub async fn create_api_key(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Generate API key
     let api_key = generate_api_key();
@@ -57,7 +60,10 @@ pub async fn list_api_keys(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<ApiKeysResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -69,20 +75,10 @@ pub async fn list_api_keys(
 
     let mut api_keys = Vec::new();
 
-    while let Some(row) = rows
-        .next()
-        .await
-        ?
-    {
-        let id: String = row
-            .get(0)
-            ?;
-        let name: String = row
-            .get(1)
-            ?;
-        let created_at: String = row
-            .get(2)
-            ?;
+    while let Some(row) = rows.next().await? {
+        let id: String = row.get(0)?;
+        let name: String = row.get(1)?;
+        let created_at: String = row.get(2)?;
         let last_used_at: Option<String> = row.get(3).ok();
         let expires_at: Option<String> = row.get(4).ok();
 
@@ -119,7 +115,10 @@ pub async fn delete_api_key(
     user: AuthenticatedUser,
     Path(key_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Delete the API key (only if it belongs to the user)
     let result = conn
@@ -127,8 +126,7 @@ pub async fn delete_api_key(
             "DELETE FROM api_keys WHERE id = ? AND user_id = ?",
             libsql::params![key_id.to_string(), user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
     if result == 0 {
         return Err(ApiError::NotFound("API key not found".to_string()));

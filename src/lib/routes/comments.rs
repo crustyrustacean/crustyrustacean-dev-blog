@@ -35,7 +35,10 @@ pub async fn add_comment(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if article exists
     let mut article_rows = conn
@@ -43,18 +46,14 @@ pub async fn add_comment(
             "SELECT id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row
-        .get(0)
-        ?;
+    let article_id: String = article_row.get(0)?;
 
     // Create comment
     let comment_id = Uuid::new_v4();
@@ -79,18 +78,14 @@ pub async fn add_comment(
             "SELECT username, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
     let author_row = author_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::InternalServerError("Author not found".to_string()))?;
 
-    let username: String = author_row
-        .get(0)
-        ?;
+    let username: String = author_row.get(0)?;
     let bio: Option<String> = author_row.get(1).ok();
     let image: Option<String> = author_row.get(2).ok();
 
@@ -120,7 +115,10 @@ pub async fn get_comments(
     State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> Result<Json<MultipleCommentsResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if article exists
     let mut article_rows = conn
@@ -128,18 +126,14 @@ pub async fn get_comments(
             "SELECT id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row
-        .get(0)
-        ?;
+    let article_id: String = article_row.get(0)?;
 
     // Get all comments for the article
     let mut comment_rows = conn
@@ -156,38 +150,19 @@ pub async fn get_comments(
 
     let mut comments = Vec::new();
 
-    while let Some(row) = comment_rows
-        .next()
-        .await
-        ?
-    {
-        let comment_id_str: String = row
-            .get(0)
-            ?;
-        let comment_id = Uuid::parse_str(&comment_id_str)
-            ?;
+    while let Some(row) = comment_rows.next().await? {
+        let comment_id_str: String = row.get(0)?;
+        let comment_id = Uuid::parse_str(&comment_id_str)?;
 
-        let body: String = row
-            .get(1)
-            ?;
+        let body: String = row.get(1)?;
 
-        let created_at_str: String = row
-            .get(2)
-            ?;
-        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            ?
-            .with_timezone(&Utc);
+        let created_at_str: String = row.get(2)?;
+        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)?.with_timezone(&Utc);
 
-        let updated_at_str: String = row
-            .get(3)
-            ?;
-        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-            ?
-            .with_timezone(&Utc);
+        let updated_at_str: String = row.get(3)?;
+        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)?.with_timezone(&Utc);
 
-        let username: String = row
-            .get(5)
-            ?;
+        let username: String = row.get(5)?;
         let bio: Option<String> = row.get(6).ok();
         let image: Option<String> = row.get(7).ok();
 
@@ -219,7 +194,10 @@ pub async fn delete_comment(
     Path((slug, comment_id)): Path<(String, String)>,
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if article exists
     let mut article_rows = conn
@@ -227,13 +205,11 @@ pub async fn delete_comment(
             "SELECT id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let _article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
     // Check if comment exists and verify ownership
@@ -242,18 +218,14 @@ pub async fn delete_comment(
             "SELECT author_id FROM comments WHERE id = ?",
             libsql::params![comment_id.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let comment_row = comment_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Comment not found".to_string()))?;
 
-    let author_id: String = comment_row
-        .get(0)
-        ?;
+    let author_id: String = comment_row.get(0)?;
 
     // Verify the user is the comment author
     if author_id != user.user_id.to_string() {
