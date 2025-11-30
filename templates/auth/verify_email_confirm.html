@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Email - CrustyRustacean Dev Blog{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    {% if valid %}
+                        <i class="fas fa-envelope-open-text fa-3x text-primary mb-3"></i>
+                        <h2 class="card-title">Verify Your Email</h2>
+                        <p class="text-muted">{{ message }}</p>
+                    {% elif expired %}
+                        <i class="fas fa-clock fa-3x text-warning mb-3"></i>
+                        <h2 class="card-title">Link Expired</h2>
+                        <p class="text-muted">{{ message }}</p>
+                    {% else %}
+                        <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
+                        <h2 class="card-title">Invalid Link</h2>
+                        <p class="text-muted">{{ message }}</p>
+                    {% endif %}
+                </div>
+
+                {% if valid %}
+                    <form method="POST" action="/verify-email/{{ token }}">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Verify My Email
+                            </button>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="d-grid">
+                        <a href="/register" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>
+                            Register Again
+                        </a>
+                    </div>
+                {% endif %}
+
+                <hr class="my-4">
+
+                <div class="text-center">
+                    <p class="mb-0">
+                        Already verified?
+                        <a href="/login" class="text-decoration-none fw-bold">Sign in here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

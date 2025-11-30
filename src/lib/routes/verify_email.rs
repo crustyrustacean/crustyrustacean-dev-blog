@@ -8,9 +8,67 @@ use axum::{
 use chrono::Utc;
 use libsql::params;
 
-/// Verify email address
+/// Display email verification page (does NOT verify - just shows the form)
 /// GET /verify-email/:token
-/// This endpoint is called when user clicks the verification link in their email
+pub async fn get_verify_email_page(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> Result<impl IntoResponse, ApiError> {
+    let conn = state.db.connect()?;
+
+    // Check if token exists and is valid (but don't verify yet)
+    let mut rows = conn
+        .query(
+            "SELECT id, user_id, expires_at FROM email_verification_tokens WHERE token = ?",
+            params![token.clone()],
+        )
+        .await?;
+
+    let (valid, expired, message) = if let Some(row) = rows.next().await? {
+        let expires_at: String = row.get(2)?;
+
+        let exp_date = chrono::DateTime::parse_from_rfc3339(&expires_at)
+            .map_err(|_| ApiError::InternalServerError("Invalid date format".to_string()))?
+            .with_timezone(&Utc);
+
+        if exp_date < Utc::now() {
+            (
+                false,
+                true,
+                "This verification link has expired. Please register again.",
+            )
+        } else {
+            (
+                true,
+                false,
+                "Click the button below to verify your email address.",
+            )
+        }
+    } else {
+        (
+            false,
+            false,
+            "Invalid verification link. It may have already been used.",
+        )
+    };
+
+    // Render the verification page with a form/button
+    let mut context = tera::Context::new();
+    context.insert("token", &token);
+    context.insert("valid", &valid);
+    context.insert("expired", &expired);
+    context.insert("message", &message);
+
+    let template = state
+        .templates
+        .render("auth/verify_email_confirm.html", &context)
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+    Ok(Html(template))
+}
+
+/// Actually perform the email verification
+/// POST /verify-email/:token
 pub async fn verify_email(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -30,13 +88,11 @@ pub async fn verify_email(
         let user_id: String = row.get(1)?;
         let expires_at: String = row.get(2)?;
 
-        // Check if token is expired
         let exp_date = chrono::DateTime::parse_from_rfc3339(&expires_at)
             .map_err(|_| ApiError::InternalServerError("Invalid date format".to_string()))?
             .with_timezone(&Utc);
 
         if exp_date < Utc::now() {
-            // Token expired - delete it and show error
             conn.execute(
                 "DELETE FROM email_verification_tokens WHERE id = ?",
                 params![token_id],
@@ -49,7 +105,6 @@ pub async fn verify_email(
                 None,
             )
         } else {
-            // Get username for the welcome message
             let mut user_rows = conn
                 .query(
                     "SELECT username, email_verified FROM users WHERE id = ?",
@@ -62,14 +117,12 @@ pub async fn verify_email(
                 let email_verified: i64 = user_row.get(1)?;
 
                 if email_verified == 1 {
-                    // Already verified
                     (
                         true,
                         "Your email has already been verified. You can log in now.".to_string(),
                         Some(username),
                     )
                 } else {
-                    // Mark email as verified
                     let now = Utc::now();
                     conn.execute(
                         "UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?",
@@ -77,7 +130,6 @@ pub async fn verify_email(
                     )
                     .await?;
 
-                    // Delete the verification token (it's been used)
                     conn.execute(
                         "DELETE FROM email_verification_tokens WHERE id = ?",
                         params![token_id],
@@ -92,7 +144,6 @@ pub async fn verify_email(
                     )
                 }
             } else {
-                // User not found (shouldn't happen, but handle gracefully)
                 (
                     false,
                     "User not found. The account may have been deleted.".to_string(),
@@ -101,7 +152,6 @@ pub async fn verify_email(
             }
         }
     } else {
-        // Token not found
         (
             false,
             "Invalid verification link. It may have already been used or expired.".to_string(),
@@ -109,7 +159,6 @@ pub async fn verify_email(
         )
     };
 
-    // Render the verification result page
     let mut context = tera::Context::new();
     context.insert("success", &success);
     context.insert("message", &message);
