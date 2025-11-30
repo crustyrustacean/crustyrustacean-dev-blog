@@ -35,7 +35,10 @@ pub async fn register_user(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if user already exists
     let mut existing_user = conn
@@ -156,7 +159,10 @@ pub async fn login_user(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -217,33 +223,28 @@ pub async fn get_current_user(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<UserResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
             "SELECT username, email, bio, image, role FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
     let row = rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let username: String = row
-        .get(0)
-        ?;
-    let email: String = row
-        .get(1)
-        ?;
+    let username: String = row.get(0)?;
+    let email: String = row.get(1)?;
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
-    let role_str: String = row
-        .get(4)
-        ?;
+    let role_str: String = row.get(4)?;
 
     let role = role_str
         .parse::<Role>()
@@ -282,7 +283,10 @@ pub async fn update_current_user(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let now = Utc::now();
     let mut updates = Vec::new();
@@ -321,8 +325,7 @@ pub async fn update_current_user(
     let query = format!("UPDATE users SET {} WHERE id = ?", updates.join(", "));
 
     conn.execute(&query, libsql::params_from_iter(values))
-        .await
-        ?;
+        .await?;
 
     // Fetch updated user
     get_current_user(State(state), user).await
@@ -348,28 +351,25 @@ async fn get_profile_internal(
     username: String,
     user: Option<AuthenticatedUser>,
 ) -> Result<Json<ProfileResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
             "SELECT id, username, bio, image FROM users WHERE username = ?",
             libsql::params![username],
         )
-        .await
-        ?;
+        .await?;
 
     let row = rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Profile not found".to_string()))?;
 
-    let profile_id: String = row
-        .get(0)
-        ?;
-    let profile_username: String = row
-        .get(1)
-        ?;
+    let profile_id: String = row.get(0)?;
+    let profile_username: String = row.get(1)?;
     let bio: Option<String> = row.get(2).ok();
     let image: Option<String> = row.get(3).ok();
 
@@ -382,14 +382,9 @@ async fn get_profile_internal(
                 "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
                 libsql::params![current_user.user_id.to_string(), profile_uuid.to_string(),],
             )
-            .await
-            ?;
+            .await?;
 
-        follow_rows
-            .next()
-            .await
-            ?
-            .is_some()
+        follow_rows.next().await?.is_some()
     } else {
         false
     };
@@ -411,7 +406,10 @@ pub async fn follow_user(
     Path(username): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<ProfileResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Get the user to follow
     let mut rows = conn
@@ -419,18 +417,14 @@ pub async fn follow_user(
             "SELECT id FROM users WHERE username = ?",
             libsql::params![username.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let row = rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let following_id: String = row
-        .get(0)
-        ?;
+    let following_id: String = row.get(0)?;
     let following_uuid = Uuid::parse_str(&following_id)
         .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
 
@@ -449,7 +443,10 @@ pub async fn unfollow_user(
     Path(username): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<ProfileResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Get the user to unfollow
     let mut rows = conn
@@ -457,18 +454,14 @@ pub async fn unfollow_user(
             "SELECT id FROM users WHERE username = ?",
             libsql::params![username.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let row = rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let following_id: String = row
-        .get(0)
-        ?;
+    let following_id: String = row.get(0)?;
     let following_uuid = Uuid::parse_str(&following_id)
         .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
 
@@ -487,7 +480,10 @@ pub async fn list_profiles(
     user: AuthenticatedUser,
     Query(query): Query<ProfilesQuery>,
 ) -> Result<Json<ProfilesResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let limit = query.limit.unwrap_or(20).min(100);
     let offset = query.offset.unwrap_or(0);
@@ -512,24 +508,13 @@ pub async fn list_profiles(
         )
     };
 
-    let mut rows = conn
-        .query(&sql, params)
-        .await
-        ?;
+    let mut rows = conn.query(&sql, params).await?;
 
     let mut profiles = Vec::new();
 
-    while let Some(row) = rows
-        .next()
-        .await
-        ?
-    {
-        let profile_id: String = row
-            .get(0)
-            ?;
-        let username: String = row
-            .get(1)
-            ?;
+    while let Some(row) = rows.next().await? {
+        let profile_id: String = row.get(0)?;
+        let username: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -547,14 +532,9 @@ pub async fn list_profiles(
                 "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
                 libsql::params![user.user_id.to_string(), profile_id],
             )
-            .await
-            ?;
+            .await?;
 
-        let following = follow_rows
-            .next()
-            .await
-            ?
-            .is_some();
+        let following = follow_rows.next().await?.is_some();
 
         let profile = UserProfile {
             username,

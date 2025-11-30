@@ -42,10 +42,12 @@ async fn test_user_registration_happy_path() {
     assert_eq!(response_body["success"], true);
     assert!(response_body["data"]["message"].is_string());
     assert_eq!(response_body["data"]["email"], "test@example.com");
-    assert!(response_body["data"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("verify"));
+    assert!(
+        response_body["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("verify")
+    );
 }
 
 #[tokio::test]

@@ -30,27 +30,21 @@ pub async fn get_login_page(
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
-        let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+        let conn = state
+            .db
+            .connect()
+            .map_err(ApiError::from_connection_error)?;
 
         let mut rows = conn
             .query(
                 "SELECT username, email, bio, image FROM users WHERE id = ?",
                 libsql::params![auth_user.user_id.to_string()],
             )
-            .await
-            ?;
+            .await?;
 
-        if let Some(row) = rows
-            .next()
-            .await
-            ?
-        {
-            let username: String = row
-                .get(0)
-                ?;
-            let email: String = row
-                .get(1)
-                ?;
+        if let Some(row) = rows.next().await? {
+            let username: String = row.get(0)?;
+            let email: String = row.get(1)?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 

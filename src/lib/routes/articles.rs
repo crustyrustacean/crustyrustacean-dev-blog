@@ -99,8 +99,7 @@ async fn associate_tags_with_article(
             "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
             libsql::params![tag_id.to_string(), tag_name.clone()],
         )
-        .await
-        ?;
+        .await?;
 
         // Get the tag ID (either newly created or existing)
         let mut tag_rows = conn
@@ -108,25 +107,17 @@ async fn associate_tags_with_article(
                 "SELECT id FROM tags WHERE name = ?",
                 libsql::params![tag_name.clone()],
             )
-            .await
-            ?;
+            .await?;
 
-        if let Some(tag_row) = tag_rows
-            .next()
-            .await
-            ?
-        {
-            let existing_tag_id: String = tag_row
-                .get(0)
-                ?;
+        if let Some(tag_row) = tag_rows.next().await? {
+            let existing_tag_id: String = tag_row.get(0)?;
 
             // Link article to tag
             conn.execute(
                 "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
                 libsql::params![article_id, existing_tag_id],
             )
-            .await
-            ?;
+            .await?;
 
             associated_tags.push(tag_name.clone());
         }
@@ -152,10 +143,7 @@ pub async fn create_article(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Generate base slug from title
     let base_slug = slugify(&article_data.title);
@@ -170,15 +158,9 @@ pub async fn create_article(
                 "SELECT id FROM articles WHERE slug = ?",
                 libsql::params![slug.clone()],
             )
-            .await
-            ?;
+            .await?;
 
-        if slug_check
-            .next()
-            .await
-            ?
-            .is_none()
-        {
+        if slug_check.next().await?.is_none() {
             break; // Slug is unique
         }
 
@@ -205,17 +187,10 @@ pub async fn create_article(
                 "SELECT id FROM categories WHERE slug = ?",
                 libsql::params![cat_slug.clone()],
             )
-            .await
-            ?;
+            .await?;
 
-        if let Some(cat_row) = cat_rows
-            .next()
-            .await
-            ?
-        {
-            let cat_id: String = cat_row
-                .get(0)
-                ?;
+        if let Some(cat_row) = cat_rows.next().await? {
+            let cat_id: String = cat_row.get(0)?;
             (Some(cat_id), Some(cat_slug.clone()))
         } else {
             return Err(ApiError::BadRequest(format!(
@@ -264,18 +239,14 @@ pub async fn create_article(
             "SELECT username, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
     let author_row = author_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::InternalServerError("Author not found".to_string()))?;
 
-    let username: String = author_row
-        .get(0)
-        ?;
+    let username: String = author_row.get(0)?;
     let bio: Option<String> = author_row.get(1).ok();
     let image: Option<String> = author_row.get(2).ok();
 
@@ -316,10 +287,7 @@ pub async fn get_article(
     Path(slug): Path<String>,
     optional_user: OptionalUser,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Get the article with author information
     let mut article_rows = conn
@@ -336,45 +304,25 @@ pub async fn get_article(
             "#,
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_slug: String = article_row
-        .get(0)
-        ?;
-    let title: String = article_row
-        .get(1)
-        ?;
-    let description: String = article_row
-        .get(2)
-        ?;
-    let body: String = article_row
-        .get(3)
-        ?;
-    let created_at_str: String = article_row
-        .get(4)
-        ?;
-    let updated_at_str: String = article_row
-        .get(5)
-        ?;
-    let author_id_str: String = article_row
-        .get(6)
-        ?;
-    let username: String = article_row
-        .get(7)
-        ?;
+    let article_slug: String = article_row.get(0)?;
+    let title: String = article_row.get(1)?;
+    let description: String = article_row.get(2)?;
+    let body: String = article_row.get(3)?;
+    let created_at_str: String = article_row.get(4)?;
+    let updated_at_str: String = article_row.get(5)?;
+    let author_id_str: String = article_row.get(6)?;
+    let username: String = article_row.get(7)?;
     let bio: Option<String> = article_row.get(8).ok();
     let image: Option<String> = article_row.get(9).ok();
     let category_slug: Option<String> = article_row.get(10).ok();
-    let draft: i64 = article_row
-        .get(11)
-        ?;
+    let draft: i64 = article_row.get(11)?;
     let is_draft = draft_int_to_bool(draft);
 
     // If article is a draft, only the author can see it
@@ -394,18 +342,14 @@ pub async fn get_article(
             "SELECT id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_id_row = article_id_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::InternalServerError("Article ID not found".to_string()))?;
 
-    let article_id_str: String = article_id_row
-        .get(0)
-        ?;
+    let article_id_str: String = article_id_row.get(0)?;
 
     // Get tags for this article
     let mut tag_rows = conn
@@ -418,18 +362,11 @@ pub async fn get_article(
             "#,
             libsql::params![article_id_str.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let mut tag_names = Vec::new();
-    while let Some(tag_row) = tag_rows
-        .next()
-        .await
-        ?
-    {
-        let tag_name: String = tag_row
-            .get(0)
-            ?;
+    while let Some(tag_row) = tag_rows.next().await? {
+        let tag_name: String = tag_row.get(0)?;
         tag_names.push(tag_name);
     }
 
@@ -439,17 +376,10 @@ pub async fn get_article(
             "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
             libsql::params![article_id_str],
         )
-        .await
-        ?;
+        .await?;
 
-    let favorites_count = if let Some(fav_row) = favorites_rows
-        .next()
-        .await
-        ?
-    {
-        let count: i64 = fav_row
-            .get(0)
-            ?;
+    let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
+        let count: i64 = fav_row.get(0)?;
         count as i32
     } else {
         0
@@ -492,30 +422,18 @@ pub async fn get_editor_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -564,27 +482,17 @@ pub async fn get_edit_article_page(
     let article = article_response.0.article;
 
     // Check if the current user is the author
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     let mut author_check = conn
         .query(
             "SELECT author_id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
-    if let Some(row) = author_check
-        .next()
-        .await
-        ?
-    {
-        let author_id_str: String = row
-            .get(0)
-            ?;
+    if let Some(row) = author_check.next().await? {
+        let author_id_str: String = row.get(0)?;
         let author_id = Uuid::parse_str(&author_id_str)
             .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
 
@@ -603,20 +511,11 @@ pub async fn get_edit_article_page(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -676,20 +575,11 @@ pub async fn get_admin_dashboard(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -785,10 +675,7 @@ pub async fn update_article(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Check if article exists and user is the author
     let mut article_rows = conn
@@ -796,21 +683,15 @@ pub async fn update_article(
             "SELECT id, author_id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let _article_id_str: String = article_row
-        .get(0)
-        ?;
-    let author_id_str: String = article_row
-        .get(1)
-        ?;
+    let _article_id_str: String = article_row.get(0)?;
+    let author_id_str: String = article_row.get(1)?;
 
     let author_id = Uuid::parse_str(&author_id_str)
         .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
@@ -860,17 +741,10 @@ pub async fn update_article(
                     "SELECT id FROM categories WHERE slug = ?",
                     libsql::params![cat_slug.clone()],
                 )
-                .await
-                ?;
+                .await?;
 
-            if let Some(cat_row) = cat_rows
-                .next()
-                .await
-                ?
-            {
-                let cat_id: String = cat_row
-                    .get(0)
-                    ?;
+            if let Some(cat_row) = cat_rows.next().await? {
+                let cat_id: String = cat_row.get(0)?;
                 updates.push("category_id = ?");
                 params.push(cat_id);
             } else {
@@ -896,9 +770,7 @@ pub async fn update_article(
             libsql_params.push(libsql::Value::from(param.clone()));
         }
 
-        conn.execute(&sql, libsql_params)
-            .await
-            ?;
+        conn.execute(&sql, libsql_params).await?;
     }
 
     // Handle tag updates if provided
@@ -909,26 +781,21 @@ pub async fn update_article(
                 "SELECT id FROM articles WHERE slug = ?",
                 libsql::params![slug.clone()],
             )
-            .await
-            ?;
+            .await?;
 
         let id_row = id_rows
             .next()
-            .await
-            ?
+            .await?
             .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-        let article_id: String = id_row
-            .get(0)
-            ?;
+        let article_id: String = id_row.get(0)?;
 
         // Delete existing tag associations
         conn.execute(
             "DELETE FROM article_tags WHERE article_id = ?",
             libsql::params![article_id.clone()],
         )
-        .await
-        ?;
+        .await?;
 
         // Add new tags using helper function
         associate_tags_with_article(&conn, &article_id, tag_list).await?;
@@ -955,10 +822,7 @@ pub async fn delete_article(
     user: AuthorUser,
     Path(slug): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Check if article exists and user is the author
     let mut article_rows = conn
@@ -966,21 +830,15 @@ pub async fn delete_article(
             "SELECT id, author_id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id_str: String = article_row
-        .get(0)
-        ?;
-    let author_id_str: String = article_row
-        .get(1)
-        ?;
+    let article_id_str: String = article_row.get(0)?;
+    let author_id_str: String = article_row.get(1)?;
 
     let author_id = Uuid::parse_str(&author_id_str)
         .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
@@ -997,24 +855,21 @@ pub async fn delete_article(
         "DELETE FROM article_tags WHERE article_id = ?",
         libsql::params![article_id_str.clone()],
     )
-    .await
-    ?;
+    .await?;
 
     // Delete user favorites
     conn.execute(
         "DELETE FROM user_favorites WHERE article_id = ?",
         libsql::params![article_id_str.clone()],
     )
-    .await
-    ?;
+    .await?;
 
     // Delete the article
     conn.execute(
         "DELETE FROM articles WHERE id = ?",
         libsql::params![article_id_str],
     )
-    .await
-    ?;
+    .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1023,10 +878,7 @@ pub async fn list_articles(
     State(state): State<AppState>,
     Query(query): Query<ArticleQuery>,
 ) -> Result<Json<MultipleArticlesResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     let limit = query.limit.unwrap_or(20).min(100);
     let offset = query.offset.unwrap_or(0);
@@ -1090,48 +942,23 @@ pub async fn list_articles(
     params.push(libsql::Value::from(limit));
     params.push(libsql::Value::from(offset));
 
-    let mut article_rows = conn
-        .query(&sql, params)
-        .await
-        ?;
+    let mut article_rows = conn.query(&sql, params).await?;
 
     let mut articles = Vec::new();
 
-    while let Some(row) = article_rows
-        .next()
-        .await
-        ?
-    {
-        let _article_id: String = row
-            .get(0)
-            ?;
-        let slug: String = row
-            .get(1)
-            ?;
-        let title: String = row
-            .get(2)
-            ?;
-        let description: String = row
-            .get(3)
-            ?;
-        let body: String = row
-            .get(4)
-            ?;
-        let created_at_str: String = row
-            .get(5)
-            ?;
-        let updated_at_str: String = row
-            .get(6)
-            ?;
-        let username: String = row
-            .get(7)
-            ?;
+    while let Some(row) = article_rows.next().await? {
+        let _article_id: String = row.get(0)?;
+        let slug: String = row.get(1)?;
+        let title: String = row.get(2)?;
+        let description: String = row.get(3)?;
+        let body: String = row.get(4)?;
+        let created_at_str: String = row.get(5)?;
+        let updated_at_str: String = row.get(6)?;
+        let username: String = row.get(7)?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
-        let draft: i64 = row
-            .get(11)
-            ?;
+        let draft: i64 = row.get(11)?;
         let is_draft = draft_int_to_bool(draft);
 
         // Get tags from GROUP_CONCAT result (comma-separated string)
@@ -1141,9 +968,7 @@ pub async fn list_articles(
             .unwrap_or_default();
 
         // Get favorites count from the query
-        let favorites_count: i64 = row
-            .get(13)
-            ?;
+        let favorites_count: i64 = row.get(13)?;
         let favorites_count = favorites_count as i32;
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -1207,30 +1032,18 @@ pub async fn get_article_page(
 
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
-        let conn = state
-            .db
-            .connect()
-            ?;
+        let conn = state.db.connect()?;
 
         let mut rows = conn
             .query(
                 "SELECT username, email, bio, image FROM users WHERE id = ?",
                 libsql::params![auth_user.user_id.to_string()],
             )
-            .await
-            ?;
+            .await?;
 
-        if let Some(row) = rows
-            .next()
-            .await
-            ?
-        {
-            let username: String = row
-                .get(0)
-                ?;
-            let email: String = row
-                .get(1)
-                ?;
+        if let Some(row) = rows.next().await? {
+            let username: String = row.get(0)?;
+            let email: String = row.get(1)?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -1273,30 +1086,18 @@ pub async fn get_articles_list_page(
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info if authenticated
     let user_info = if let Some(auth_user) = optional_user.user {
-        let conn = state
-            .db
-            .connect()
-            ?;
+        let conn = state.db.connect()?;
 
         let mut rows = conn
             .query(
                 "SELECT username, email, bio, image FROM users WHERE id = ?",
                 libsql::params![auth_user.user_id.to_string()],
             )
-            .await
-            ?;
+            .await?;
 
-        if let Some(row) = rows
-            .next()
-            .await
-            ?
-        {
-            let username: String = row
-                .get(0)
-                ?;
-            let email: String = row
-                .get(1)
-                ?;
+        if let Some(row) = rows.next().await? {
+            let username: String = row.get(0)?;
+            let email: String = row.get(1)?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
@@ -1334,10 +1135,7 @@ pub async fn get_articles_list_page(
     };
 
     // Get total count of published articles for pagination
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Build WHERE clause for total count (same filters as list_articles)
     let mut where_clauses = Vec::new();
@@ -1471,10 +1269,7 @@ pub async fn favorite_article(
     user: AuthenticatedUser,
     Path(slug): Path<String>,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Get the article ID by slug
     let mut article_rows = conn
@@ -1482,26 +1277,21 @@ pub async fn favorite_article(
             "SELECT id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row
-        .get(0)
-        ?;
+    let article_id: String = article_row.get(0)?;
 
     // Insert favorite (ignore if already exists - idempotent)
     conn.execute(
         "INSERT OR IGNORE INTO user_favorites (user_id, article_id) VALUES (?, ?)",
         libsql::params![user.user_id.to_string(), article_id],
     )
-    .await
-    ?;
+    .await?;
 
     // Return the article with updated favorite status
     get_article_with_user_context(State(state), Path(slug), Some(user)).await
@@ -1512,10 +1302,7 @@ pub async fn unfavorite_article(
     user: AuthenticatedUser,
     Path(slug): Path<String>,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Get the article ID by slug
     let mut article_rows = conn
@@ -1523,26 +1310,21 @@ pub async fn unfavorite_article(
             "SELECT id FROM articles WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row
-        .get(0)
-        ?;
+    let article_id: String = article_row.get(0)?;
 
     // Remove favorite (ignore if doesn't exist - idempotent)
     conn.execute(
         "DELETE FROM user_favorites WHERE user_id = ? AND article_id = ?",
         libsql::params![user.user_id.to_string(), article_id],
     )
-    .await
-    ?;
+    .await?;
 
     // Return the article with updated favorite status
     get_article_with_user_context(State(state), Path(slug), Some(user)).await
@@ -1554,10 +1336,7 @@ async fn get_article_with_user_context(
     Path(slug): Path<String>,
     user: Option<AuthenticatedUser>,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Get the article with author information
     let mut article_rows = conn
@@ -1579,43 +1358,22 @@ async fn get_article_with_user_context(
 
     let article_row = article_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row
-        .get(0)
-        ?;
-    let article_slug: String = article_row
-        .get(1)
-        ?;
-    let title: String = article_row
-        .get(2)
-        ?;
-    let description: String = article_row
-        .get(3)
-        ?;
-    let body: String = article_row
-        .get(4)
-        ?;
-    let created_at_str: String = article_row
-        .get(5)
-        ?;
-    let updated_at_str: String = article_row
-        .get(6)
-        ?;
-    let _author_id: String = article_row
-        .get(7)
-        ?;
-    let username: String = article_row
-        .get(8)
-        ?;
+    let article_id: String = article_row.get(0)?;
+    let article_slug: String = article_row.get(1)?;
+    let title: String = article_row.get(2)?;
+    let description: String = article_row.get(3)?;
+    let body: String = article_row.get(4)?;
+    let created_at_str: String = article_row.get(5)?;
+    let updated_at_str: String = article_row.get(6)?;
+    let _author_id: String = article_row.get(7)?;
+    let username: String = article_row.get(8)?;
     let bio: Option<String> = article_row.get(9).ok();
     let image: Option<String> = article_row.get(10).ok();
     let category_slug: Option<String> = article_row.get(11).ok();
-    let draft: i64 = article_row
-        .get(12)
-        ?;
+    let draft: i64 = article_row.get(12)?;
     let is_draft = draft_int_to_bool(draft);
 
     // Parse the timestamps
@@ -1637,18 +1395,11 @@ async fn get_article_with_user_context(
             "#,
             libsql::params![article_id.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let mut tag_names = Vec::new();
-    while let Some(tag_row) = tag_rows
-        .next()
-        .await
-        ?
-    {
-        let tag_name: String = tag_row
-            .get(0)
-            ?;
+    while let Some(tag_row) = tag_rows.next().await? {
+        let tag_name: String = tag_row.get(0)?;
         tag_names.push(tag_name);
     }
 
@@ -1658,17 +1409,10 @@ async fn get_article_with_user_context(
             "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
             libsql::params![article_id.clone()],
         )
-        .await
-        ?;
+        .await?;
 
-    let favorites_count = if let Some(fav_row) = favorites_rows
-        .next()
-        .await
-        ?
-    {
-        let count: i64 = fav_row
-            .get(0)
-            ?;
+    let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
+        let count: i64 = fav_row.get(0)?;
         count as i32
     } else {
         0
@@ -1681,14 +1425,9 @@ async fn get_article_with_user_context(
                 "SELECT 1 FROM user_favorites WHERE user_id = ? AND article_id = ?",
                 libsql::params![auth_user.user_id.to_string(), article_id],
             )
-            .await
-            ?;
+            .await?;
 
-        user_fav_rows
-            .next()
-            .await
-            ?
-            .is_some()
+        user_fav_rows.next().await?.is_some()
     } else {
         false
     };
@@ -1730,10 +1469,7 @@ pub async fn get_articles_feed(
     user: AuthenticatedUser,
     Query(query): Query<FeedQuery>,
 ) -> Result<Json<MultipleArticlesResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     let limit = query.limit.unwrap_or(20).min(100);
     let offset = query.offset.unwrap_or(0);
@@ -1755,48 +1491,23 @@ pub async fn get_articles_feed(
 
     let params = libsql::params![user.user_id.to_string(), limit, offset];
 
-    let mut article_rows = conn
-        .query(sql, params)
-        .await
-        ?;
+    let mut article_rows = conn.query(sql, params).await?;
 
     let mut articles = Vec::new();
 
-    while let Some(row) = article_rows
-        .next()
-        .await
-        ?
-    {
-        let article_id: String = row
-            .get(0)
-            ?;
-        let slug: String = row
-            .get(1)
-            ?;
-        let title: String = row
-            .get(2)
-            ?;
-        let description: String = row
-            .get(3)
-            ?;
-        let body: String = row
-            .get(4)
-            ?;
-        let created_at_str: String = row
-            .get(5)
-            ?;
-        let updated_at_str: String = row
-            .get(6)
-            ?;
-        let username: String = row
-            .get(7)
-            ?;
+    while let Some(row) = article_rows.next().await? {
+        let article_id: String = row.get(0)?;
+        let slug: String = row.get(1)?;
+        let title: String = row.get(2)?;
+        let description: String = row.get(3)?;
+        let body: String = row.get(4)?;
+        let created_at_str: String = row.get(5)?;
+        let updated_at_str: String = row.get(6)?;
+        let username: String = row.get(7)?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
-        let draft: i64 = row
-            .get(11)
-            ?;
+        let draft: i64 = row.get(11)?;
         let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -1817,18 +1528,11 @@ pub async fn get_articles_feed(
                 "#,
                 libsql::params![article_id.clone()],
             )
-            .await
-            ?;
+            .await?;
 
         let mut tag_names = Vec::new();
-        while let Some(tag_row) = tag_rows
-            .next()
-            .await
-            ?
-        {
-            let tag_name: String = tag_row
-                .get(0)
-                ?;
+        while let Some(tag_row) = tag_rows.next().await? {
+            let tag_name: String = tag_row.get(0)?;
             tag_names.push(tag_name);
         }
 
@@ -1838,17 +1542,10 @@ pub async fn get_articles_feed(
                 "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
                 libsql::params![article_id.clone()],
             )
-            .await
-            ?;
+            .await?;
 
-        let favorites_count = if let Some(fav_row) = favorites_rows
-            .next()
-            .await
-            ?
-        {
-            let count: i64 = fav_row
-                .get(0)
-                ?;
+        let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
+            let count: i64 = fav_row.get(0)?;
             count as i32
         } else {
             0
@@ -1860,14 +1557,9 @@ pub async fn get_articles_feed(
                 "SELECT 1 FROM user_favorites WHERE user_id = ? AND article_id = ?",
                 libsql::params![user.user_id.to_string(), article_id],
             )
-            .await
-            ?;
+            .await?;
 
-        let favorited = user_fav_rows
-            .next()
-            .await
-            ?
-            .is_some();
+        let favorited = user_fav_rows.next().await?.is_some();
 
         let author = UserProfile {
             username,
@@ -1911,30 +1603,18 @@ pub async fn get_articles_feed_page(
     Query(query): Query<FeedQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -1976,17 +1656,10 @@ pub async fn get_articles_feed_page(
             "SELECT COUNT(*) FROM user_follows WHERE follower_id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let following_count = if let Some(row) = following_rows
-        .next()
-        .await
-        ?
-    {
-        let count: i64 = row
-            .get(0)
-            ?;
+    let following_count = if let Some(row) = following_rows.next().await? {
+        let count: i64 = row.get(0)?;
         count
     } else {
         0
@@ -2062,10 +1735,7 @@ pub async fn mobile_upload_article(
         .unwrap_or_default();
 
     // Create the article using the same logic as create_article
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Generate base slug from title
     let base_slug = slugify(&title);
@@ -2080,15 +1750,9 @@ pub async fn mobile_upload_article(
                 "SELECT id FROM articles WHERE slug = ?",
                 libsql::params![slug.clone()],
             )
-            .await
-            ?;
+            .await?;
 
-        if slug_check
-            .next()
-            .await
-            ?
-            .is_none()
-        {
+        if slug_check.next().await?.is_none() {
             break; // Slug is unique
         }
 
@@ -2126,8 +1790,7 @@ pub async fn mobile_upload_article(
                 "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
                 libsql::params![tag_id.to_string(), tag_name.clone()],
             )
-            .await
-            ?;
+            .await?;
 
             // Get the tag ID (either the one we just created or the existing one)
             let mut tag_rows = conn
@@ -2135,25 +1798,17 @@ pub async fn mobile_upload_article(
                     "SELECT id FROM tags WHERE name = ?",
                     libsql::params![tag_name.clone()],
                 )
-                .await
-                ?;
+                .await?;
 
-            if let Some(tag_row) = tag_rows
-                .next()
-                .await
-                ?
-            {
-                let tag_id_str: String = tag_row
-                    .get(0)
-                    ?;
+            if let Some(tag_row) = tag_rows.next().await? {
+                let tag_id_str: String = tag_row.get(0)?;
 
                 // Associate tag with article
                 conn.execute(
                     "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
                     libsql::params![article_id.to_string(), tag_id_str],
                 )
-                .await
-                ?;
+                .await?;
             }
         }
     }
@@ -2308,30 +1963,18 @@ pub async fn get_api_keys_admin_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -2368,10 +2011,7 @@ pub async fn list_user_drafts(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<MultipleArticlesResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     // Query only draft articles for the current user
     let sql = r#"
@@ -2388,48 +2028,23 @@ pub async fn list_user_drafts(
 
     let params = libsql::params![user.user_id.to_string()];
 
-    let mut article_rows = conn
-        .query(sql, params)
-        .await
-        ?;
+    let mut article_rows = conn.query(sql, params).await?;
 
     let mut articles = Vec::new();
 
-    while let Some(row) = article_rows
-        .next()
-        .await
-        ?
-    {
-        let article_id: String = row
-            .get(0)
-            ?;
-        let slug: String = row
-            .get(1)
-            ?;
-        let title: String = row
-            .get(2)
-            ?;
-        let description: String = row
-            .get(3)
-            ?;
-        let body: String = row
-            .get(4)
-            ?;
-        let created_at_str: String = row
-            .get(5)
-            ?;
-        let updated_at_str: String = row
-            .get(6)
-            ?;
-        let username: String = row
-            .get(7)
-            ?;
+    while let Some(row) = article_rows.next().await? {
+        let article_id: String = row.get(0)?;
+        let slug: String = row.get(1)?;
+        let title: String = row.get(2)?;
+        let description: String = row.get(3)?;
+        let body: String = row.get(4)?;
+        let created_at_str: String = row.get(5)?;
+        let updated_at_str: String = row.get(6)?;
+        let username: String = row.get(7)?;
         let bio: Option<String> = row.get(8).ok();
         let image: Option<String> = row.get(9).ok();
         let category_slug: Option<String> = row.get(10).ok();
-        let draft: i64 = row
-            .get(11)
-            ?;
+        let draft: i64 = row.get(11)?;
         let is_draft = draft_int_to_bool(draft);
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
@@ -2450,18 +2065,11 @@ pub async fn list_user_drafts(
                 "#,
                 libsql::params![article_id.clone()],
             )
-            .await
-            ?;
+            .await?;
 
         let mut tag_names = Vec::new();
-        while let Some(tag_row) = tag_rows
-            .next()
-            .await
-            ?
-        {
-            let tag_name: String = tag_row
-                .get(0)
-                ?;
+        while let Some(tag_row) = tag_rows.next().await? {
+            let tag_name: String = tag_row.get(0)?;
             tag_names.push(tag_name);
         }
 
@@ -2471,17 +2079,10 @@ pub async fn list_user_drafts(
                 "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
                 libsql::params![article_id],
             )
-            .await
-            ?;
+            .await?;
 
-        let favorites_count = if let Some(fav_row) = favorites_rows
-            .next()
-            .await
-            ?
-        {
-            let count: i64 = fav_row
-                .get(0)
-                ?;
+        let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
+            let count: i64 = fav_row.get(0)?;
             count as i32
         } else {
             0
@@ -2529,30 +2130,18 @@ pub async fn get_drafts_admin_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        ?;
+    let conn = state.db.connect()?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

@@ -317,10 +317,8 @@ impl EmailSender for MailtrapSender {
                 Err(SendError::Provider("Send reported failure".to_string()))
             }
         } else {
-            let error_body: MailtrapErrorResponse = response
-                .json()
-                .await
-                .unwrap_or(MailtrapErrorResponse {
+            let error_body: MailtrapErrorResponse =
+                response.json().await.unwrap_or(MailtrapErrorResponse {
                     errors: None,
                     error: Some("Unknown error".to_string()),
                 });
@@ -496,7 +494,10 @@ impl EmailService {
             let token = config.mailtrap_api_token.as_ref().unwrap();
             if config.is_sandbox() {
                 let inbox_id = config.mailtrap_sandbox_inbox_id.as_ref().unwrap();
-                info!("Email service configured with Mailtrap SANDBOX (inbox: {})", inbox_id);
+                info!(
+                    "Email service configured with Mailtrap SANDBOX (inbox: {})",
+                    inbox_id
+                );
                 Arc::new(MailtrapSender::sandbox(token, inbox_id))
             } else {
                 info!("Email service configured with Mailtrap PRODUCTION");
@@ -927,7 +928,10 @@ mod tests {
         // Verify the email was constructed correctly
         let sent = mock_sender.get_sent_emails();
         assert_eq!(sent.len(), 1);
-        assert_eq!(sent[0].subject, "Verify Your Email - CrustyRustacean Dev Blog");
+        assert_eq!(
+            sent[0].subject,
+            "Verify Your Email - CrustyRustacean Dev Blog"
+        );
         assert_eq!(sent[0].to[0].email, "user@example.com");
     }
 }
@@ -1124,11 +1128,10 @@ mod integration_tests {
                 .path("/api/send")
                 .header("Authorization", "Bearer test-token")
                 .header("Content-Type", "application/json");
-            then.status(200)
-                .json_body(serde_json::json!({
-                    "success": true,
-                    "message_ids": ["msg-456"]
-                }));
+            then.status(200).json_body(serde_json::json!({
+                "success": true,
+                "message_ids": ["msg-456"]
+            }));
         });
 
         let sender = MailtrapSender::with_base_url("test-token", server.base_url());
@@ -1147,11 +1150,10 @@ mod integration_tests {
 
         let mock = server.mock(|when, then| {
             when.method(POST).path("/api/send");
-            then.status(200)
-                .json_body(serde_json::json!({
-                    "success": true,
-                    "message_ids": ["msg-text-only"]
-                }));
+            then.status(200).json_body(serde_json::json!({
+                "success": true,
+                "message_ids": ["msg-text-only"]
+            }));
         });
 
         let sender = MailtrapSender::with_base_url("test-token", server.base_url());
@@ -1175,11 +1177,10 @@ mod integration_tests {
 
         let mock = server.mock(|when, then| {
             when.method(POST).path("/api/send");
-            then.status(200)
-                .json_body(serde_json::json!({
-                    "success": true,
-                    "message_ids": ["msg-html-only"]
-                }));
+            then.status(200).json_body(serde_json::json!({
+                "success": true,
+                "message_ids": ["msg-html-only"]
+            }));
         });
 
         let sender = MailtrapSender::with_base_url("test-token", server.base_url());

@@ -126,27 +126,21 @@ pub async fn get_my_favorites_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
@@ -205,27 +199,21 @@ pub async fn get_authors_page(
     Query(query): Query<ProfilesQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

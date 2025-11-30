@@ -4,12 +4,12 @@
 use crustyrustacean_dev_blog_lib::OpenDalStorage;
 use crustyrustacean_dev_blog_lib::config::AppConfig;
 use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
-use crustyrustacean_dev_blog_lib::startup::App;
+use crustyrustacean_dev_blog_lib::service::AppService;
 use crustyrustacean_dev_blog_lib::state::AppState;
 use crustyrustacean_dev_blog_lib::storage::StorageBackend;
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
 use opendal::Operator;
-use shuttle_runtime::{CustomError, SecretStore, Secrets};
+use shuttle_runtime::{CustomError, Error, SecretStore, Secrets};
 use std::sync::Arc;
 
 // Shuttle entry point
@@ -22,7 +22,7 @@ async fn main(
     turso_client: libsql::Database,
     #[shuttle_opendal::Opendal(scheme = "s3")] operator: Operator,
     #[Secrets] secrets: SecretStore,
-) -> shuttle_axum::ShuttleAxum {
+) -> Result<AppService, Error> {
     // initialize tracing
     tracing::info!("Starting tracing...");
     let subscriber = get_subscriber(
@@ -52,12 +52,12 @@ async fn main(
 
     // Build the application state
     tracing::info!("Building application state...");
-    let app_state = AppState::new(db, storage, &app_config).map_err(CustomError::new)?;
+    let app_state = AppState::new(db, storage, app_config).map_err(CustomError::new)?;
 
     // Initialize the application
     tracing::info!("Initializing the application...");
-    let app = App::new(app_config, app_state);
+    let app_service = AppService::new(app_state);
 
     // Return the Axum router to Shuttle
-    Ok(app.router.into())
+    Ok(app_service)
 }

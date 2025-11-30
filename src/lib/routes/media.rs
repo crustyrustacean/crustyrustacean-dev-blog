@@ -122,7 +122,10 @@ pub async fn upload_media(
         .map_err(|e| ApiError::InternalServerError(format!("Storage upload failed: {}", e)))?;
 
     // Create media record in database
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
@@ -185,7 +188,10 @@ pub async fn list_media(
     user: AuthenticatedUser,
     Query(query): Query<MediaQuery>,
 ) -> Result<Json<MultipleMediaResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
@@ -225,60 +231,25 @@ pub async fn list_media(
         )
     };
 
-    let mut rows = conn
-        .query(&sql, libsql::params_from_iter(params))
-        .await
-        ?;
+    let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
 
     let mut media_list = Vec::new();
-    while let Some(row) = rows
-        .next()
-        .await
-        ?
-    {
+    while let Some(row) = rows.next().await? {
         let media = Media {
-            id: row
-                .get(0)
-                ?,
-            user_id: row
-                .get(1)
-                ?,
-            filename: row
-                .get(2)
-                ?,
-            storage_path: row
-                .get(3)
-                ?,
-            title: row
-                .get(4)
-                ?,
-            alt_text: row
-                .get(5)
-                ?,
-            caption: row
-                .get(6)
-                ?,
-            description: row
-                .get(7)
-                ?,
-            mime_type: row
-                .get(8)
-                ?,
-            file_size: row
-                .get(9)
-                ?,
-            width: row
-                .get(10)
-                ?,
-            height: row
-                .get(11)
-                ?,
-            uploaded_at: row
-                .get(12)
-                ?,
-            updated_at: row
-                .get(13)
-                ?,
+            id: row.get(0)?,
+            user_id: row.get(1)?,
+            filename: row.get(2)?,
+            storage_path: row.get(3)?,
+            title: row.get(4)?,
+            alt_text: row.get(5)?,
+            caption: row.get(6)?,
+            description: row.get(7)?,
+            mime_type: row.get(8)?,
+            file_size: row.get(9)?,
+            width: row.get(10)?,
+            height: row.get(11)?,
+            uploaded_at: row.get(12)?,
+            updated_at: row.get(13)?,
         };
         media_list.push(media.into());
     }
@@ -289,16 +260,10 @@ pub async fn list_media(
             "SELECT COUNT(*) as count FROM media_library WHERE user_id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let media_count = if let Some(row) = count_rows
-        .next()
-        .await
-        ?
-    {
-        row.get::<i64>(0)
-            ?
+    let media_count = if let Some(row) = count_rows.next().await? {
+        row.get::<i64>(0)?
     } else {
         0
     };
@@ -316,7 +281,10 @@ pub async fn get_media_metadata(
     user: AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<Json<SingleMediaResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
@@ -329,57 +297,24 @@ pub async fn get_media_metadata(
         "#,
             libsql::params![id],
         )
-        .await
-        ?;
+        .await?;
 
-    let media = if let Some(row) = rows
-        .next()
-        .await
-        ?
-    {
+    let media = if let Some(row) = rows.next().await? {
         Media {
-            id: row
-                .get(0)
-                ?,
-            user_id: row
-                .get(1)
-                ?,
-            filename: row
-                .get(2)
-                ?,
-            storage_path: row
-                .get(3)
-                ?,
-            title: row
-                .get(4)
-                ?,
-            alt_text: row
-                .get(5)
-                ?,
-            caption: row
-                .get(6)
-                ?,
-            description: row
-                .get(7)
-                ?,
-            mime_type: row
-                .get(8)
-                ?,
-            file_size: row
-                .get(9)
-                ?,
-            width: row
-                .get(10)
-                ?,
-            height: row
-                .get(11)
-                ?,
-            uploaded_at: row
-                .get(12)
-                ?,
-            updated_at: row
-                .get(13)
-                ?,
+            id: row.get(0)?,
+            user_id: row.get(1)?,
+            filename: row.get(2)?,
+            storage_path: row.get(3)?,
+            title: row.get(4)?,
+            alt_text: row.get(5)?,
+            caption: row.get(6)?,
+            description: row.get(7)?,
+            mime_type: row.get(8)?,
+            file_size: row.get(9)?,
+            width: row.get(10)?,
+            height: row.get(11)?,
+            uploaded_at: row.get(12)?,
+            updated_at: row.get(13)?,
         }
     } else {
         return Err(ApiError::NotFound("Media not found".to_string()));
@@ -405,7 +340,10 @@ pub async fn update_media_metadata(
     Path(id): Path<String>,
     Json(payload): Json<UpdateMedia>,
 ) -> Result<Json<SingleMediaResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // First, check if media exists and user owns it
     let mut check_rows = conn
@@ -413,16 +351,10 @@ pub async fn update_media_metadata(
             "SELECT user_id FROM media_library WHERE id = ?",
             libsql::params![id.clone()],
         )
-        .await
-        ?;
+        .await?;
 
-    let owner_id: String = if let Some(row) = check_rows
-        .next()
-        .await
-        ?
-    {
-        row.get(0)
-            ?
+    let owner_id: String = if let Some(row) = check_rows.next().await? {
+        row.get(0)?
     } else {
         return Err(ApiError::NotFound("Media not found".to_string()));
     };
@@ -464,57 +396,24 @@ pub async fn update_media_metadata(
         "#,
             libsql::params![id],
         )
-        .await
-        ?;
+        .await?;
 
-    let media = if let Some(row) = rows
-        .next()
-        .await
-        ?
-    {
+    let media = if let Some(row) = rows.next().await? {
         Media {
-            id: row
-                .get(0)
-                ?,
-            user_id: row
-                .get(1)
-                ?,
-            filename: row
-                .get(2)
-                ?,
-            storage_path: row
-                .get(3)
-                ?,
-            title: row
-                .get(4)
-                ?,
-            alt_text: row
-                .get(5)
-                ?,
-            caption: row
-                .get(6)
-                ?,
-            description: row
-                .get(7)
-                ?,
-            mime_type: row
-                .get(8)
-                ?,
-            file_size: row
-                .get(9)
-                ?,
-            width: row
-                .get(10)
-                ?,
-            height: row
-                .get(11)
-                ?,
-            uploaded_at: row
-                .get(12)
-                ?,
-            updated_at: row
-                .get(13)
-                ?,
+            id: row.get(0)?,
+            user_id: row.get(1)?,
+            filename: row.get(2)?,
+            storage_path: row.get(3)?,
+            title: row.get(4)?,
+            alt_text: row.get(5)?,
+            caption: row.get(6)?,
+            description: row.get(7)?,
+            mime_type: row.get(8)?,
+            file_size: row.get(9)?,
+            width: row.get(10)?,
+            height: row.get(11)?,
+            uploaded_at: row.get(12)?,
+            updated_at: row.get(13)?,
         }
     } else {
         return Err(ApiError::NotFound(
@@ -534,7 +433,10 @@ pub async fn delete_media(
     user: AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Fetch media to get storage path and verify ownership
     let mut rows = conn
@@ -542,20 +444,10 @@ pub async fn delete_media(
             "SELECT user_id, storage_path FROM media_library WHERE id = ?",
             libsql::params![id.clone()],
         )
-        .await
-        ?;
+        .await?;
 
-    let (owner_id, storage_path): (String, String) = if let Some(row) = rows
-        .next()
-        .await
-        ?
-    {
-        (
-            row.get(0)
-                ?,
-            row.get(1)
-                ?,
-        )
+    let (owner_id, storage_path): (String, String) = if let Some(row) = rows.next().await? {
+        (row.get(0)?, row.get(1)?)
     } else {
         return Err(ApiError::NotFound("Media not found".to_string()));
     };
@@ -589,32 +481,24 @@ pub async fn download_media(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Response, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut rows = conn
         .query(
             "SELECT storage_path, filename, mime_type FROM media_library WHERE id = ?",
             libsql::params![id],
         )
-        .await
-        ?;
+        .await?;
 
-    let (storage_path, filename, mime_type): (String, String, String) = if let Some(row) = rows
-        .next()
-        .await
-        ?
-    {
-        (
-            row.get(0)
-                ?,
-            row.get(1)
-                ?,
-            row.get(2)
-                ?,
-        )
-    } else {
-        return Err(ApiError::NotFound("Media not found".to_string()));
-    };
+    let (storage_path, filename, mime_type): (String, String, String) =
+        if let Some(row) = rows.next().await? {
+            (row.get(0)?, row.get(1)?, row.get(2)?)
+        } else {
+            return Err(ApiError::NotFound("Media not found".to_string()));
+        };
 
     // Download from storage
     let file_data =
@@ -649,27 +533,21 @@ pub async fn get_media_library_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

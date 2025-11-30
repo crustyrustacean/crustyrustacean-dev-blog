@@ -655,7 +655,10 @@ pub async fn admin_newsletters_page(
     auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<Html<String>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Get user info for template
     let mut user_rows = conn
@@ -663,20 +666,11 @@ pub async fn admin_newsletters_page(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![auth_user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 

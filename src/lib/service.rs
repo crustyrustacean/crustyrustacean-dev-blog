@@ -1,7 +1,6 @@
 // src/lib/startup.rs
 
 // dependencies
-use crate::config::AppConfig;
 use crate::routes::{
     add_comment, admin_newsletters_page, change_password, complete_password_reset,
     confirm_subscription, create_api_key, create_article, create_category, create_newsletter,
@@ -30,6 +29,8 @@ use axum::{
     http::{HeaderName, HeaderValue, Method, header},
     routing::{get, post},
 };
+use shuttle_runtime::Service;
+use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tower_http::{
     compression::CompressionLayer,
@@ -42,21 +43,20 @@ use tower_http::{
 use tracing::Level;
 
 // struct type to represent the application
-pub struct App {
-    pub config: AppConfig,
+pub struct AppService {
     pub router: Router,
 }
 
 // methods to build the application
-impl App {
+impl AppService {
     // create a new application instance
-    pub fn new(config: AppConfig, state: AppState) -> Self {
-        let router = Self::build_router(state, config.allowed_origins.clone());
-        Self { config, router }
+    pub fn new(state: AppState) -> Self {
+        let router = Self::build_router(state);
+        Self { router }
     }
 
     // build the application router with all routes and middleware layers
-    pub fn build_router(state: AppState, allowed_origins: Vec<String>) -> Router {
+    pub fn build_router(state: AppState) -> Router {
         // define the tracing layer
         let trace_layer = TraceLayer::new_for_http()
             .make_span_with(
@@ -217,13 +217,14 @@ impl App {
                     ),
             )
             .fallback(handle_404_simple)
-            .with_state(state)
+            .with_state(state.clone())
             .layer(CompressionLayer::new())
             .layer(
                 CorsLayer::new()
                     // Parse allowed origins from config
                     .allow_origin(
-                        allowed_origins
+                        state
+                            .allowed_origins
                             .iter()
                             .filter_map(|origin| origin.parse().ok())
                             .collect::<Vec<_>>(),
@@ -237,11 +238,7 @@ impl App {
                         Method::OPTIONS,
                     ])
                     // Allow headers needed for JWT authentication
-                    .allow_headers([
-                        header::AUTHORIZATION,
-                        header::CONTENT_TYPE,
-                        header::ACCEPT,
-                    ])
+                    .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT])
                     // Allow credentials (cookies, authorization headers)
                     .allow_credentials(true)
                     // Cache preflight requests for 1 hour
@@ -270,6 +267,23 @@ impl App {
     /// run the application until stopped (utility function to faciliate local integration testing)
     pub async fn run_until_stopped(self, listener: TcpListener) -> Result<(), anyhow::Error> {
         axum::serve(listener, self.router).await?;
+        Ok(())
+    }
+}
+
+// implement the Shuttle `Service` trait for the `AppService` type
+#[shuttle_runtime::async_trait]
+impl Service for AppService {
+    async fn bind(mut self, addr: SocketAddr) -> Result<(), shuttle_runtime::Error> {
+        let router = self.router;
+
+        let listener = TcpListener::bind(addr).await?;
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await?;
+
         Ok(())
     }
 }

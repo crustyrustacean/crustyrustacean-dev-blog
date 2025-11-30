@@ -86,7 +86,8 @@ pub async fn verify_email(
 
                     (
                         true,
-                        "Your email has been verified successfully! You can now log in.".to_string(),
+                        "Your email has been verified successfully! You can now log in."
+                            .to_string(),
                         Some(username),
                     )
                 }

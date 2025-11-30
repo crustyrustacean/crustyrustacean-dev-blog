@@ -126,14 +126,16 @@ async fn update_tag_happy_path() {
     let token = fixture.get_token("tagupdater");
 
     // Create article with a tag
-    fixture.app.create_article(
-        &token,
-        "Test article",
-        "Testing tag update",
-        "Body content",
-        vec!["oldtag"],
-    )
-    .await;
+    fixture
+        .app
+        .create_article(
+            &token,
+            "Test article",
+            "Testing tag update",
+            "Body content",
+            vec!["oldtag"],
+        )
+        .await;
 
     // Act - Update the tag
     let update_body = json!({
@@ -156,7 +158,8 @@ async fn update_tag_happy_path() {
     assert_eq!(body["tag"], "newtag");
 
     // Verify the old tag no longer exists and new tag exists
-    let tags_response = fixture.app
+    let tags_response = fixture
+        .app
         .client
         .get(format!("{}/api/tags", &fixture.app.address))
         .send()
@@ -243,14 +246,16 @@ async fn update_tag_with_duplicate_name() {
     let token = fixture.get_token("testuser");
 
     // Create article with two tags
-    fixture.app.create_article(
-        &token,
-        "Test article",
-        "Testing",
-        "Body content",
-        vec!["tag1", "tag2"],
-    )
-    .await;
+    fixture
+        .app
+        .create_article(
+            &token,
+            "Test article",
+            "Testing",
+            "Body content",
+            vec!["tag1", "tag2"],
+        )
+        .await;
 
     // Act - Try to rename tag1 to tag2 (which already exists)
     let update_body = json!({

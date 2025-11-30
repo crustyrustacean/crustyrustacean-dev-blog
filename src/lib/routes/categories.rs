@@ -33,7 +33,10 @@ fn slugify(name: &str) -> String {
 pub async fn get_categories(
     State(state): State<AppState>,
 ) -> Result<Json<CategoriesResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Get all categories with article counts
     let mut category_rows = conn
@@ -48,26 +51,15 @@ pub async fn get_categories(
             "#,
             libsql::params![],
         )
-        .await
-        ?;
+        .await?;
 
     let mut categories = Vec::new();
 
-    while let Some(row) = category_rows
-        .next()
-        .await
-        ?
-    {
-        let name: String = row
-            .get(1)
-            ?;
-        let slug: String = row
-            .get(2)
-            ?;
+    while let Some(row) = category_rows.next().await? {
+        let name: String = row.get(1)?;
+        let slug: String = row.get(2)?;
         let description: Option<String> = row.get(3).ok();
-        let article_count: i64 = row
-            .get(4)
-            ?;
+        let article_count: i64 = row.get(4)?;
 
         categories.push(CategoryResponse {
             name,
@@ -98,7 +90,10 @@ pub async fn create_category(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Generate slug from name
     let slug = slugify(&create_data.name);
@@ -109,15 +104,9 @@ pub async fn create_category(
             "SELECT id FROM categories WHERE name = ? OR slug = ?",
             libsql::params![create_data.name.clone(), slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
-    if existing_rows
-        .next()
-        .await
-        ?
-        .is_some()
-    {
+    if existing_rows.next().await?.is_some() {
         return Err(ApiError::Conflict(
             "A category with this name or slug already exists".to_string(),
         ));
@@ -154,7 +143,10 @@ pub async fn get_category(
     State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> Result<Json<SingleCategoryResponse>, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Get category with article count
     let mut category_rows = conn
@@ -169,25 +161,17 @@ pub async fn get_category(
             "#,
             libsql::params![slug],
         )
-        .await
-        ?;
+        .await?;
 
     let category_row = category_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Category not found".to_string()))?;
 
-    let name: String = category_row
-        .get(1)
-        ?;
-    let slug: String = category_row
-        .get(2)
-        ?;
+    let name: String = category_row.get(1)?;
+    let slug: String = category_row.get(2)?;
     let description: Option<String> = category_row.get(3).ok();
-    let article_count: i64 = category_row
-        .get(4)
-        ?;
+    let article_count: i64 = category_row.get(4)?;
 
     Ok(Json(SingleCategoryResponse {
         category: CategoryResponse {
@@ -218,7 +202,10 @@ pub async fn update_category(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if old category exists
     let mut old_category_rows = conn
@@ -226,18 +213,14 @@ pub async fn update_category(
             "SELECT id FROM categories WHERE slug = ?",
             libsql::params![old_slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let category_row = old_category_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Category not found".to_string()))?;
 
-    let category_id: String = category_row
-        .get(0)
-        ?;
+    let category_id: String = category_row.get(0)?;
 
     // Generate new slug from new name
     let new_slug = slugify(&update_data.name);
@@ -253,15 +236,9 @@ pub async fn update_category(
                     category_id.clone()
                 ],
             )
-            .await
-            ?;
+            .await?;
 
-        if conflict_rows
-            .next()
-            .await
-            ?
-            .is_some()
-        {
+        if conflict_rows.next().await?.is_some() {
             return Err(ApiError::Conflict(
                 "A category with this name or slug already exists".to_string(),
             ));
@@ -286,18 +263,14 @@ pub async fn update_category(
             "SELECT COUNT(*) FROM articles WHERE category_id = ?",
             libsql::params![category_id],
         )
-        .await
-        ?;
+        .await?;
 
     let count_row = count_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::InternalServerError("Failed to get article count".to_string()))?;
 
-    let article_count: i64 = count_row
-        .get(0)
-        ?;
+    let article_count: i64 = count_row.get(0)?;
 
     Ok(Json(SingleCategoryResponse {
         category: CategoryResponse {
@@ -315,7 +288,10 @@ pub async fn delete_category(
     Path(slug): Path<String>,
     _user: AuthorUser,
 ) -> Result<StatusCode, ApiError> {
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     // Check if category exists
     let mut category_rows = conn
@@ -323,18 +299,14 @@ pub async fn delete_category(
             "SELECT id FROM categories WHERE slug = ?",
             libsql::params![slug.clone()],
         )
-        .await
-        ?;
+        .await?;
 
     let category_row = category_rows
         .next()
-        .await
-        ?
+        .await?
         .ok_or_else(|| ApiError::NotFound("Category not found".to_string()))?;
 
-    let category_id: String = category_row
-        .get(0)
-        ?;
+    let category_id: String = category_row.get(0)?;
 
     // Set category_id to NULL for all articles with this category
     conn.execute(
@@ -359,27 +331,21 @@ pub async fn get_categories_admin_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state.db.connect().map_err(ApiError::from_connection_error)?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
 
     let mut user_rows = conn
         .query(
             "SELECT username, email, bio, image FROM users WHERE id = ?",
             libsql::params![user.user_id.to_string()],
         )
-        .await
-        ?;
+        .await?;
 
-    let user_info = if let Some(row) = user_rows
-        .next()
-        .await
-        ?
-    {
-        let username: String = row
-            .get(0)
-            ?;
-        let email: String = row
-            .get(1)
-            ?;
+    let user_info = if let Some(row) = user_rows.next().await? {
+        let username: String = row.get(0)?;
+        let email: String = row.get(1)?;
         let bio: Option<String> = row.get(2).ok();
         let image: Option<String> = row.get(3).ok();
 
