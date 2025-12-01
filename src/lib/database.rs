@@ -537,6 +537,16 @@ impl DatabaseConnection {
             .await;
         // Ignore error if column already exists
 
+        // Add password_changed_at column to users table
+        // Used to invalidate JWT tokens issued before password was changed
+        let _ = conn
+            .execute(
+                r"ALTER TABLE users ADD COLUMN password_changed_at TEXT",
+                (),
+            )
+            .await;
+        // Ignore error if column already exists
+
         // Create email_verification_tokens table
         conn.execute(
             r#"

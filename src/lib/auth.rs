@@ -110,7 +110,7 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         let user_id =
             Uuid::parse_str(&token_data.claims.sub).map_err(|_| AuthError::InvalidToken)?;
 
-        // Fetch user role from database
+        // Fetch user role and password_changed_at from database
         let conn = state
             .db
             .connect()
@@ -118,7 +118,7 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
 
         let row = conn
             .query(
-                "SELECT role FROM users WHERE id = ? AND disabled = 0",
+                "SELECT role, password_changed_at FROM users WHERE id = ? AND disabled = 0",
                 libsql::params![user_id.to_string()],
             )
             .await
@@ -131,6 +131,17 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         let role_str: String = row
             .get(0)
             .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+        // Check if token was issued before or at the same time password was changed
+        // Using <= ensures tokens issued in the same second as the password change are also invalidated
+        let password_changed_at: Option<String> = row.get(1).ok();
+        if let Some(changed_at) = password_changed_at {
+            if let Ok(changed_time) = chrono::DateTime::parse_from_rfc3339(&changed_at) {
+                if token_data.claims.iat <= changed_time.timestamp() {
+                    return Err(AuthError::InvalidToken.into());
+                }
+            }
+        }
 
         let role = role_str
             .parse::<crate::models::Role>()
