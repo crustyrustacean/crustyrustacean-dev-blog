@@ -135,12 +135,11 @@ impl FromRequestParts<crate::AppState> for AuthenticatedUser {
         // Check if token was issued before or at the same time password was changed
         // Using <= ensures tokens issued in the same second as the password change are also invalidated
         let password_changed_at: Option<String> = row.get(1).ok();
-        if let Some(changed_at) = password_changed_at {
-            if let Ok(changed_time) = chrono::DateTime::parse_from_rfc3339(&changed_at) {
-                if token_data.claims.iat <= changed_time.timestamp() {
-                    return Err(AuthError::InvalidToken.into());
-                }
-            }
+        if let Some(changed_at) = password_changed_at
+            && let Ok(changed_time) = chrono::DateTime::parse_from_rfc3339(&changed_at)
+            && token_data.claims.iat <= changed_time.timestamp()
+        {
+            return Err(AuthError::InvalidToken.into());
         }
 
         let role = role_str

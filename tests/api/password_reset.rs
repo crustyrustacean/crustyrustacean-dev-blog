@@ -536,7 +536,10 @@ async fn password_reset_invalidates_existing_tokens() {
     // Complete password reset
     let response = app
         .client
-        .post(format!("{}/api/password-reset/{}", &app.address, reset_token))
+        .post(format!(
+            "{}/api/password-reset/{}",
+            &app.address, reset_token
+        ))
         .json(&json!({ "password": new_password }))
         .send()
         .await

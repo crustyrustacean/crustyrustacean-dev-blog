@@ -14,13 +14,14 @@ use crate::routes::{
     get_media_metadata, get_my_favorites_page, get_newsletter, get_newsletter_stats,
     get_password_reset_page, get_password_reset_request_page, get_privacy, get_profile,
     get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags,
-    get_tags_admin_page, get_terms, get_user_admin, handle_404_simple, health_check, list_api_keys,
-    list_articles, list_media, list_newsletters, list_profiles, list_user_drafts, list_users_admin,
-    login_user, mobile_upload_article, newsletter_confirmed_page, newsletter_page,
-    newsletter_unsubscribed_page, register_user, request_password_reset, search_articles,
-    send_newsletter, subscribe, unfavorite_article, unfollow_user, unsubscribe, update_article,
-    update_category, update_current_user, update_media_metadata, update_newsletter, update_tag,
-    update_user_admin, upload_markdown_file, upload_media, get_verify_email_page, verify_email,
+    get_tags_admin_page, get_terms, get_user_admin, get_verify_email_page, handle_404_simple,
+    health_check, list_api_keys, list_articles, list_media, list_newsletters, list_profiles,
+    list_user_drafts, list_users_admin, login_user, mobile_upload_article,
+    newsletter_confirmed_page, newsletter_page, newsletter_unsubscribed_page, register_user,
+    request_password_reset, search_articles, send_newsletter, subscribe, unfavorite_article,
+    unfollow_user, unsubscribe, update_article, update_category, update_current_user,
+    update_media_metadata, update_newsletter, update_tag, update_user_admin, upload_markdown_file,
+    upload_media, verify_email,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -198,12 +199,12 @@ impl AppService {
             .route("/api/password-reset/request", post(request_password_reset))
             .route("/password-reset/{token}", get(get_password_reset_page))
             .route("/api/password-reset/{token}", post(complete_password_reset))
-            .route(
-                "/api/account/password",
-                post(change_password),
-            )
+            .route("/api/account/password", post(change_password))
             // Email verification route
-            .route("/verify-email/{token}", get(get_verify_email_page).post(verify_email))
+            .route(
+                "/verify-email/{token}",
+                get(get_verify_email_page).post(verify_email),
+            )
             .nest_service(
                 "/static",
                 // Static file service with aggressive caching for versioned assets
