@@ -1,6 +1,6 @@
 // src/lib/routes/sitemap.rs
 
-use crate::{ApiError, AppState};
+use crate::{ApiError, AppState, escape_xml};
 use axum::{
     extract::State,
     http::{StatusCode, header},
@@ -73,8 +73,8 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, ApiE
             .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
             .with_timezone(&Utc);
 
-        // Format as W3C Datetime (ISO 8601)
-        let lastmod = updated_at.format("%Y-%m-%dT%H:%M:%S%z").to_string();
+        // Format as W3C Datetime (ISO 8601) - use to_rfc3339() for correct timezone format
+        let lastmod = updated_at.to_rfc3339();
 
         // Escape the slug for XML
         let slug_escaped = escape_xml(&slug);
@@ -109,29 +109,4 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, ApiE
         sitemap,
     )
         .into_response())
-}
-
-// Helper function to escape XML special characters
-fn escape_xml(input: &str) -> String {
-    input
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_escape_xml() {
-        assert_eq!(escape_xml("Hello & goodbye"), "Hello &amp; goodbye");
-        assert_eq!(escape_xml("<tag>"), "&lt;tag&gt;");
-        assert_eq!(
-            escape_xml("It's \"quoted\" & <escaped>"),
-            "It&apos;s &quot;quoted&quot; &amp; &lt;escaped&gt;"
-        );
-    }
 }
