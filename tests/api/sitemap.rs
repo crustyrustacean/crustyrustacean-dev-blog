@@ -213,6 +213,79 @@ async fn sitemap_returns_valid_xml_when_no_articles() {
 }
 
 #[tokio::test]
+async fn sitemap_excludes_draft_articles() {
+    // Arrange
+    let app = spawn_app().await;
+
+    // Register a user
+    let token = app
+        .register_user("draftuser", "draft@example.com", "password123")
+        .await;
+
+    // Create a published article
+    let published_article = json!({
+        "article": {
+            "title": "Published Sitemap Article",
+            "description": "This should appear in the sitemap",
+            "body": "Published content",
+            "tagList": []
+        }
+    });
+
+    app.client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&published_article)
+        .send()
+        .await
+        .expect("Failed to create published article");
+
+    // Create a draft article
+    let draft_article = json!({
+        "article": {
+            "title": "Draft Sitemap Article",
+            "description": "This should NOT appear in the sitemap",
+            "body": "Draft content",
+            "tagList": [],
+            "draft": true
+        }
+    });
+
+    app.client
+        .post(format!("{}/api/articles", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&draft_article)
+        .send()
+        .await
+        .expect("Failed to create draft article");
+
+    // Act - Get sitemap
+    let response = app
+        .client
+        .get(format!("{}/sitemap.xml", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.text().await.expect("Failed to get response body");
+
+    // Published article should be in sitemap
+    assert!(
+        body.contains("published-sitemap-article"),
+        "Published article should appear in sitemap"
+    );
+
+    // Draft article should NOT be in sitemap
+    assert!(
+        !body.contains("draft-sitemap-article"),
+        "Draft article should NOT appear in sitemap"
+    );
+}
+
+#[tokio::test]
 async fn sitemap_articles_sorted_by_update_time() {
     // Arrange
     let app = spawn_app().await;

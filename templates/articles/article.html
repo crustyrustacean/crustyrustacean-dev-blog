@@ -2,6 +2,14 @@
 
 {% block title %}{{ article.title }} - CrustyRustacean Dev Blog{% endblock %}
 
+{% block meta_description %}
+<meta name="description" content="{{ article.description | truncate(length=160) }}">
+{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://crusty-rustacean.com/articles/{{ article.slug }}">
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row">
@@ -190,6 +198,36 @@
     </div>
 </div>
 {% endif %}
+
+<!-- JSON-LD Structured Data for SEO -->
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "{{ article.title | escape }}",
+    "description": "{{ article.description | escape }}",
+    "author": {
+        "@type": "Person",
+        "name": "{{ article.author.username | escape }}"{% if article.author.image %},
+        "image": "{{ article.author.image }}"{% endif %}
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "CrustyRustacean Dev Blog",
+        "logo": {
+            "@type": "ImageObject",
+            "url": "https://crusty-rustacean.com/static/favicon.png"
+        }
+    },
+    "datePublished": "{{ article.createdAt | date(format="%Y-%m-%dT%H:%M:%SZ") }}",
+    "dateModified": "{{ article.updatedAt | date(format="%Y-%m-%dT%H:%M:%SZ") }}",
+    "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://crusty-rustacean.com/articles/{{ article.slug }}"
+    }{% if article.tagList and article.tagList | length > 0 %},
+    "keywords": "{{ article.tagList | join(sep=", ") }}"{% endif %}
+}
+</script>
 {% endblock %}
 
 {% block scripts %}
