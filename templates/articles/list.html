@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}All Articles - CrustyRustacean Dev Blog{% endblock %}
+{% block title %}All Articles{% if pagination and pagination.current_page > 1 %} - Page {{ pagination.current_page }}{% endif %} - CrustyRustacean Dev Blog{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Browse all articles on CrustyRustacean Dev Blog. Explore tutorials, guides, and insights about Rust programming and software development.">
+{% endblock %}
+
+{% block canonical %}
+<link rel="canonical" href="https://crusty-rustacean.com/articles">
+{% endblock %}
+
+{% block robots %}
+{% if pagination and pagination.current_page > 1 %}
+<meta name="robots" content="noindex, follow">
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <!-- Hero Image Section -->

@@ -14,12 +14,13 @@ pub async fn get_sitemap(State(state): State<AppState>) -> Result<Response, ApiE
         .connect()
         .map_err(ApiError::from_connection_error)?;
 
-    // Get all articles with their update times
+    // Get all published articles with their update times (exclude drafts)
     let mut article_rows = conn
         .query(
             r#"
             SELECT slug, updated_at
             FROM articles
+            WHERE draft = 0
             ORDER BY updated_at DESC
             "#,
             libsql::params![],
