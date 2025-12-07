@@ -1,6 +1,6 @@
 // src/lib/routes/rss.rs
 
-use crate::{ApiError, AppState};
+use crate::{ApiError, AppState, escape_xml};
 use axum::{
     extract::State,
     http::{StatusCode, header},
@@ -106,29 +106,4 @@ pub async fn get_rss_feed(State(state): State<AppState>) -> Result<Response, Api
         rss_feed,
     )
         .into_response())
-}
-
-// Helper function to escape XML special characters
-fn escape_xml(input: &str) -> String {
-    input
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_escape_xml() {
-        assert_eq!(escape_xml("Hello & goodbye"), "Hello &amp; goodbye");
-        assert_eq!(escape_xml("<tag>"), "&lt;tag&gt;");
-        assert_eq!(
-            escape_xml("It's \"quoted\" & <escaped>"),
-            "It&apos;s &quot;quoted&quot; &amp; &lt;escaped&gt;"
-        );
-    }
 }
