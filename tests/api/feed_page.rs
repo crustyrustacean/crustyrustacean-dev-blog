@@ -1,6 +1,6 @@
 // tests/api/feed_page.rs
 
-use crate::helpers::{TestUserBuilder, spawn_app};
+use crate::helpers::{assert_body_contains, HtmlResponseValidator, TestUserBuilder, spawn_app};
 use reqwest::StatusCode;
 
 #[tokio::test]
@@ -24,11 +24,7 @@ async fn test_feed_page_requires_authentication() {
 async fn test_feed_page_with_authentication() {
     // Arrange
     let app = spawn_app().await;
-
-    // Register user using helper
-    let token = app
-        .register_user("feeduser", "feeduser@example.com", "securepassword123")
-        .await;
+    let token = app.register_user_default("feeduser").await;
 
     // Act - Access feed page with authentication
     let response = app
@@ -42,18 +38,6 @@ async fn test_feed_page_with_authentication() {
     // Assert - Should return HTML page (200 OK)
     assert_eq!(response.status(), StatusCode::OK);
 
-    // Check that it returns HTML content
-    let content_type = response
-        .headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-
-    // Should be HTML, not JSON
-    assert!(content_type.contains("text/html") || content_type.is_empty());
-
-    // Check that the response body contains HTML
-    let body = response.text().await.expect("Failed to get response body");
-    assert!(body.contains("<html") || body.contains("<!DOCTYPE html"));
-    assert!(body.contains("Your Personal Feed")); // Should contain the feed title
+    let body = response.assert_html_response().await;
+    assert_body_contains(&body, &["Your Personal Feed"]);
 }

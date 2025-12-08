@@ -295,6 +295,21 @@ pub trait TestArticleBuilder {
         )
         .await
     }
+
+    /// Create a draft article and return its slug
+    async fn create_draft_article(
+        &self,
+        token: &str,
+        title: &str,
+        description: &str,
+        body: &str,
+    ) -> String;
+
+    /// Create a draft article with minimal parameters
+    async fn create_draft_article_simple(&self, token: &str, title: &str) -> String {
+        self.create_draft_article(token, title, "Draft description", "Draft body content")
+            .await
+    }
 }
 
 #[async_trait]
@@ -341,6 +356,100 @@ impl TestArticleBuilder for TestApp {
         body["article"]["slug"]
             .as_str()
             .expect("Slug not found in response")
+            .to_string()
+    }
+
+    async fn create_draft_article(
+        &self,
+        token: &str,
+        title: &str,
+        description: &str,
+        body: &str,
+    ) -> String {
+        let article_data = json!({
+            "article": {
+                "title": title,
+                "description": description,
+                "body": body,
+                "draft": true
+            }
+        });
+
+        let response = self
+            .client
+            .post(format!("{}/api/articles", &self.address))
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&article_data)
+            .send()
+            .await
+            .expect("Failed to create draft article");
+
+        let status = response.status();
+        let body: serde_json::Value = response
+            .json()
+            .await
+            .expect("Failed to parse draft article response");
+
+        if !status.is_success() {
+            panic!(
+                "Draft article creation failed with status {}: {:?}",
+                status, body
+            );
+        }
+
+        body["article"]["slug"]
+            .as_str()
+            .expect("Slug not found in draft response")
+            .to_string()
+    }
+}
+
+/// Trait for adding comments to articles
+#[async_trait]
+pub trait TestCommentBuilder {
+    /// Add a comment to an article and return the comment ID as string
+    async fn add_comment(&self, token: &str, slug: &str, body: &str) -> String;
+
+    /// Add a simple comment with default text
+    async fn add_comment_simple(&self, token: &str, slug: &str) -> String {
+        self.add_comment(token, slug, "This is a test comment.")
+            .await
+    }
+}
+
+#[async_trait]
+impl TestCommentBuilder for TestApp {
+    async fn add_comment(&self, token: &str, slug: &str, comment_body: &str) -> String {
+        let comment_data = json!({
+            "comment": {
+                "body": comment_body
+            }
+        });
+
+        let response = self
+            .client
+            .post(format!("{}/api/articles/{}/comments", &self.address, slug))
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&comment_data)
+            .send()
+            .await
+            .expect("Failed to add comment");
+
+        let status = response.status();
+        let body: serde_json::Value = response
+            .json()
+            .await
+            .expect("Failed to parse comment response");
+
+        if !status.is_success() {
+            panic!("Comment creation failed with status {}: {:?}", status, body);
+        }
+
+        body["comment"]["id"]
+            .as_str()
+            .expect("Comment ID not found in response")
             .to_string()
     }
 }
@@ -564,6 +673,42 @@ pub fn assert_body_contains(body: &str, expected: &[&str]) {
         );
     }
 }
+
+/// Assert that the navbar shows authenticated state (username visible, no login/register links)
+pub fn assert_navbar_authenticated(body: &str, username: &str) {
+    // Username should be visible in navbar
+    assert!(
+        body.contains(username),
+        "Username '{}' should appear in navbar when authenticated",
+        username
+    );
+
+    // Login and Register links should not both be visible
+    let body_lowercase = body.to_lowercase();
+    let has_login_link =
+        body_lowercase.contains(">login<") || body_lowercase.contains("login</a>");
+    let has_register_link =
+        body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
+
+    assert!(
+        !(has_login_link && has_register_link),
+        "Login and Register links should not both be visible when user is authenticated"
+    );
+}
+
+/// Assert that an HTML page contains the expected JavaScript file with version
+pub fn assert_js_loaded(body: &str, js_file: &str, version: &str) {
+    let expected = format!("{}?v={}", js_file, version);
+    assert!(
+        body.contains(&expected),
+        "Expected JavaScript file '{}' with version '{}' not found in response",
+        js_file,
+        version
+    );
+}
+
+/// Get the current app version from Cargo.toml (matches APP_VERSION in templates)
+pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ============================================================================
 // Test Fixture Builder
