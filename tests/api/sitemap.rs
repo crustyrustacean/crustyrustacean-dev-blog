@@ -1,8 +1,7 @@
 // tests/api/sitemap.rs
 
-use crate::helpers::{TestUserBuilder, spawn_app};
+use crate::helpers::{TestArticleBuilder, TestUserBuilder, spawn_app};
 use reqwest::StatusCode;
-use serde_json::json;
 
 #[tokio::test]
 async fn sitemap_returns_valid_xml() {
@@ -82,29 +81,17 @@ async fn sitemap_includes_static_pages() {
 async fn sitemap_includes_articles() {
     // Arrange
     let app = spawn_app().await;
+    let token = app.register_user_default("sitemapuser").await;
 
-    // Register a user and create an article
-    let token = app
-        .register_user("sitemapuser", "sitemap@example.com", "password123")
-        .await;
-
-    // Create an article
-    let article_body = json!({
-        "article": {
-            "title": "Sitemap Test Article",
-            "description": "This should appear in the sitemap",
-            "body": "Article content here",
-            "tagList": ["sitemap"]
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/articles", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&article_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    // Create an article using helper
+    app.create_article(
+        &token,
+        "Sitemap Test Article",
+        "This should appear in the sitemap",
+        "Article content here",
+        vec!["sitemap"],
+    )
+    .await;
 
     // Act - Get sitemap
     let response = app
@@ -135,29 +122,17 @@ async fn sitemap_includes_articles() {
 async fn sitemap_escapes_xml_special_characters() {
     // Arrange
     let app = spawn_app().await;
+    let token = app.register_user_default("xmluser").await;
 
-    // Register a user
-    let token = app
-        .register_user("xmluser", "xml@example.com", "password123")
-        .await;
-
-    // Create an article with special characters in title (which affects slug)
-    let article_body = json!({
-        "article": {
-            "title": "Test & Special <Characters>",
-            "description": "Testing XML escaping",
-            "body": "Content",
-            "tagList": []
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/articles", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&article_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    // Create an article with special characters in title
+    app.create_article(
+        &token,
+        "Test & Special <Characters>",
+        "Testing XML escaping",
+        "Content",
+        vec![],
+    )
+    .await;
 
     // Act
     let response = app
@@ -173,8 +148,6 @@ async fn sitemap_escapes_xml_special_characters() {
     let body = response.text().await.expect("Failed to get response body");
 
     // The slug will be generated from the title, and should be properly escaped
-    // Even though the slug itself might not have special chars,
-    // we're testing that the XML is well-formed
     assert!(
         body.contains("</loc>"),
         "Should contain properly closed loc tags"
@@ -216,48 +189,26 @@ async fn sitemap_returns_valid_xml_when_no_articles() {
 async fn sitemap_excludes_draft_articles() {
     // Arrange
     let app = spawn_app().await;
+    let token = app.register_user_default("draftuser").await;
 
-    // Register a user
-    let token = app
-        .register_user("draftuser", "draft@example.com", "password123")
-        .await;
+    // Create a published article using helper
+    app.create_article(
+        &token,
+        "Published Sitemap Article",
+        "This should appear in the sitemap",
+        "Published content",
+        vec![],
+    )
+    .await;
 
-    // Create a published article
-    let published_article = json!({
-        "article": {
-            "title": "Published Sitemap Article",
-            "description": "This should appear in the sitemap",
-            "body": "Published content",
-            "tagList": []
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/articles", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&published_article)
-        .send()
-        .await
-        .expect("Failed to create published article");
-
-    // Create a draft article
-    let draft_article = json!({
-        "article": {
-            "title": "Draft Sitemap Article",
-            "description": "This should NOT appear in the sitemap",
-            "body": "Draft content",
-            "tagList": [],
-            "draft": true
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/articles", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&draft_article)
-        .send()
-        .await
-        .expect("Failed to create draft article");
+    // Create a draft article using helper
+    app.create_draft_article(
+        &token,
+        "Draft Sitemap Article",
+        "This should NOT appear in the sitemap",
+        "Draft content",
+    )
+    .await;
 
     // Act - Get sitemap
     let response = app
@@ -289,32 +240,12 @@ async fn sitemap_excludes_draft_articles() {
 async fn sitemap_articles_sorted_by_update_time() {
     // Arrange
     let app = spawn_app().await;
+    let token = app.register_user_default("sortuser").await;
 
-    // Register a user
-    let token = app
-        .register_user("sortuser", "sort@example.com", "password123")
-        .await;
-
-    // Create multiple articles
-    let articles = vec!["First Article", "Second Article", "Third Article"];
-
-    for title in articles {
-        let article_body = json!({
-            "article": {
-                "title": title,
-                "description": "Testing sort order",
-                "body": "Content",
-                "tagList": []
-            }
-        });
-
-        app.client
-            .post(format!("{}/api/articles", &app.address))
-            .header("Authorization", format!("Bearer {}", token))
-            .json(&article_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+    // Create multiple articles using helper
+    for title in ["First Article", "Second Article", "Third Article"] {
+        app.create_article(&token, title, "Testing sort order", "Content", vec![])
+            .await;
     }
 
     // Act

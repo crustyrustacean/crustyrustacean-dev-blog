@@ -1,7 +1,6 @@
 // tests/api/rss.rs
 
-use crate::helpers::{TestUserBuilder, spawn_app};
-use serde_json::json;
+use crate::helpers::{TestArticleBuilder, TestUserBuilder, spawn_app};
 
 #[tokio::test]
 async fn rss_feed_returns_valid_xml() {
@@ -43,29 +42,17 @@ async fn rss_feed_returns_valid_xml() {
 async fn rss_feed_includes_articles() {
     // Arrange
     let app = spawn_app().await;
+    let token = app.register_user_default("testuser").await;
 
-    // Register a user and create an article
-    let token = app
-        .register_user("testuser", "test@example.com", "password123")
-        .await;
-
-    // Create an article
-    let article_body = json!({
-        "article": {
-            "title": "Test Article for RSS",
-            "description": "This should appear in the RSS feed",
-            "body": "Article content here",
-            "tagList": ["test"]
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/articles", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&article_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    // Create an article using helper
+    app.create_article(
+        &token,
+        "Test Article for RSS",
+        "This should appear in the RSS feed",
+        "Article content here",
+        vec!["test"],
+    )
+    .await;
 
     // Act - Get RSS feed
     let response = app
@@ -95,29 +82,17 @@ async fn rss_feed_includes_articles() {
 async fn rss_feed_escapes_xml_special_characters() {
     // Arrange
     let app = spawn_app().await;
+    let token = app.register_user_default("testuser").await;
 
-    // Register a user
-    let token = app
-        .register_user("testuser", "test@example.com", "password123")
-        .await;
-
-    // Create an article with special characters
-    let article_body = json!({
-        "article": {
-            "title": "Test & Special <Characters>",
-            "description": "Description with 'quotes' & \"tags\"",
-            "body": "Content",
-            "tagList": []
-        }
-    });
-
-    app.client
-        .post(format!("{}/api/articles", &app.address))
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&article_body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    // Create an article with special characters using helper
+    app.create_article(
+        &token,
+        "Test & Special <Characters>",
+        "Description with 'quotes' & \"tags\"",
+        "Content",
+        vec![],
+    )
+    .await;
 
     // Act
     let response = app
