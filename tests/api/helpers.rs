@@ -407,6 +407,7 @@ impl TestArticleBuilder for TestApp {
 
 /// Trait for adding comments to articles
 #[async_trait]
+#[allow(dead_code)]
 pub trait TestCommentBuilder {
     /// Add a comment to an article and return the comment ID as string
     async fn add_comment(&self, token: &str, slug: &str, body: &str) -> String;
