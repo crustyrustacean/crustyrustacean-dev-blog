@@ -86,7 +86,9 @@ class AuthManager {
                 if (response.ok) {
                     const data = await response.json();
                     this.storeAuthToken(data.user.token);
-                    window.location.href = '/admin';
+                    // Redirect based on user role: admins go to admin dashboard, others to articles
+                    const redirectUrl = data.user.role === 'admin' ? '/admin' : '/articles';
+                    window.location.href = redirectUrl;
                 } else {
                     const errorData = await response.json();
                     this.showError(errorData.message || 'Login failed. Please try again.');
