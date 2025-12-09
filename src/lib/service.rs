@@ -11,9 +11,9 @@ use crate::routes::{
     get_articles_feed_page, get_articles_list_page, get_authors_page, get_categories,
     get_categories_admin_page, get_category, get_comments, get_current_user, get_drafts_admin_page,
     get_edit_article_page, get_editor_page, get_index, get_login_page, get_media_library_page,
-    get_media_metadata, get_my_favorites_page, get_newsletter, get_newsletter_stats,
-    get_password_reset_page, get_password_reset_request_page, get_privacy, get_profile,
-    get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags,
+    get_media_metadata, get_my_favorites_page, get_my_profile_page, get_newsletter,
+    get_newsletter_stats, get_password_reset_page, get_password_reset_request_page, get_privacy,
+    get_profile, get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags,
     get_tags_admin_page, get_terms, get_user_admin, get_verify_email_page, handle_404_simple,
     health_check, list_api_keys, list_articles, list_media, list_newsletters, list_profiles,
     list_user_drafts, list_users_admin, login_user, mobile_upload_article,
@@ -86,6 +86,7 @@ impl AppService {
                 get(get_password_reset_request_page),
             )
             .route("/account", get(get_account_page))
+            .route("/profile", get(get_my_profile_page))
             .route("/profiles/{username}", get(get_profile_page))
             .route("/profiles", get(get_authors_page))
             .route("/favorites", get(get_my_favorites_page))
