@@ -155,8 +155,7 @@ pub async fn get_profile_page(
                 a.slug,
                 a.description,
                 a.created_at,
-                a.id,
-                COALESCE(a.reading_time, 5) as reading_time
+                a.id
             FROM articles a
             WHERE a.author_id = ? AND a.draft = 0
             ORDER BY a.created_at DESC
@@ -173,7 +172,8 @@ pub async fn get_profile_page(
         let description: String = row.get(2).unwrap_or_default();
         let created_at: String = row.get(3)?;
         let article_id: String = row.get(4)?;
-        let reading_time: i64 = row.get(5).unwrap_or(5);
+        // reading_time column doesn't exist in DB, use default estimate
+        let reading_time: i64 = 5;
 
         // Get tags for this article
         let mut tag_rows = conn
