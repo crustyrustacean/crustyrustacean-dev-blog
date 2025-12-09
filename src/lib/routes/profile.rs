@@ -197,7 +197,7 @@ pub async fn get_profile_page(
         // Count favorites for this article
         let mut fav_rows = conn
             .query(
-                "SELECT COUNT(*) FROM article_favorites WHERE article_id = ?",
+                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
                 libsql::params![article_id.clone()],
             )
             .await?;
