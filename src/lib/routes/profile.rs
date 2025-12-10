@@ -17,6 +17,7 @@ use axum_macros::debug_handler;
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::error::Error;
 
 // Query parameters for profile page pagination
 #[derive(Debug, Deserialize)]
@@ -408,7 +409,15 @@ pub async fn get_authors_page(
             "profile/authors.html",
             &tera::Context::from_serialize(&context)?,
         )
-        .map_err(|e| ApiError::InternalServerError(format!("Template error: {}", e)))?;
+        .map_err(|e| {
+            // Log the full error chain for debugging
+            let mut error_details = format!("Template error: {}", e);
+            if let Some(source) = e.source() {
+                error_details.push_str(&format!(" | Cause: {}", source));
+            }
+            tracing::error!("{}", error_details);
+            ApiError::InternalServerError(error_details)
+        })?;
 
     Ok(Html(html))
 }
