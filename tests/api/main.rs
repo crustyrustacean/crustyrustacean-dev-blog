@@ -22,6 +22,7 @@ mod markdown_integration;
 mod media;
 mod newsletters;
 mod password_reset;
+mod profile;
 mod rbac;
 mod robots;
 mod rss;
