@@ -15,8 +15,14 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use chrono::Datelike;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+// Query parameters for profile page pagination
+#[derive(Debug, Deserialize)]
+pub struct ProfilePageQuery {
+    pub page: Option<i64>,
+}
 
 // struct type to represent a basic user profile for the template
 #[derive(Debug, Serialize)]
@@ -43,24 +49,43 @@ struct ArticleSummary {
     reading_time: i64,
 }
 
+// Default articles per page for profile
+const ARTICLES_PER_PAGE: i64 = 10;
+
 // handler which renders the profile page template
 #[debug_handler]
 pub async fn get_profile_page(
     State(state): State<AppState>,
     Path(username): Path<String>,
+    Query(query): Query<ProfilePageQuery>,
     optional_user: OptionalUser,
 ) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
 
-    // Fetch the profile user from the database
-    let mut user_rows = conn
+    // Pagination parameters
+    let current_page = query.page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * ARTICLES_PER_PAGE;
+
+    // Fetch profile user with article count, followers count, and following count in a single query
+    let mut profile_rows = conn
         .query(
-            "SELECT id, username, bio, image FROM users WHERE username = ?",
+            r#"
+            SELECT
+                u.id,
+                u.username,
+                u.bio,
+                u.image,
+                (SELECT COUNT(*) FROM articles WHERE author_id = u.id AND draft = 0) as articles_count,
+                (SELECT COUNT(*) FROM user_follows WHERE following_id = u.id) as followers_count,
+                (SELECT COUNT(*) FROM user_follows WHERE follower_id = u.id) as following_count
+            FROM users u
+            WHERE u.username = ?
+            "#,
             libsql::params![username.clone()],
         )
         .await?;
 
-    let profile_row = user_rows
+    let profile_row = profile_rows
         .next()
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("User '{}' not found", username)))?;
@@ -69,56 +94,33 @@ pub async fn get_profile_page(
     let profile_username: String = profile_row.get(1)?;
     let profile_bio: Option<String> = profile_row.get(2).ok();
     let profile_image: Option<String> = profile_row.get(3).ok();
+    let articles_count: i64 = profile_row.get(4)?;
+    let followers_count: i64 = profile_row.get(5)?;
+    let following_count: i64 = profile_row.get(6)?;
 
-    // Count published articles by this user
-    let mut articles_count_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM articles WHERE author_id = ? AND draft = 0",
-            libsql::params![profile_id.clone()],
-        )
-        .await?;
-    let articles_count: i64 = articles_count_rows
-        .next()
-        .await?
-        .map(|row| row.get(0).unwrap_or(0))
-        .unwrap_or(0);
-
-    // Count followers (people following this user)
-    let mut followers_count_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM user_follows WHERE following_id = ?",
-            libsql::params![profile_id.clone()],
-        )
-        .await?;
-    let followers_count: i64 = followers_count_rows
-        .next()
-        .await?
-        .map(|row| row.get(0).unwrap_or(0))
-        .unwrap_or(0);
-
-    // Count following (people this user follows)
-    let mut following_count_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM user_follows WHERE follower_id = ?",
-            libsql::params![profile_id.clone()],
-        )
-        .await?;
-    let following_count: i64 = following_count_rows
-        .next()
-        .await?
-        .map(|row| row.get(0).unwrap_or(0))
-        .unwrap_or(0);
-
-    // Check if current user is following this profile
+    // Check if current user is following this profile and get current user info
     let mut is_following = false;
     let mut current_user_info: Option<serde_json::Value> = None;
 
     if let Some(ref auth_user) = optional_user.user {
-        // Get current user info for navbar
+        // Get current user info and following status in a single query
         let mut current_user_rows = conn
             .query(
-                "SELECT username, email, bio, image FROM users WHERE id = ?",
-                libsql::params![auth_user.user_id.to_string()],
+                r#"
+                SELECT
+                    u.username,
+                    u.email,
+                    u.bio,
+                    u.image,
+                    EXISTS(SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?) as is_following
+                FROM users u
+                WHERE u.id = ?
+                "#,
+                libsql::params![
+                    auth_user.user_id.to_string(),
+                    profile_id.clone(),
+                    auth_user.user_id.to_string()
+                ],
             )
             .await?;
 
@@ -127,6 +129,8 @@ pub async fn get_profile_page(
             let cu_email: String = row.get(1)?;
             let cu_bio: Option<String> = row.get(2).ok();
             let cu_image: Option<String> = row.get(3).ok();
+            let following_status: i64 = row.get(4).unwrap_or(0);
+            is_following = following_status == 1;
 
             current_user_info = Some(json!({
                 "username": cu_username,
@@ -135,18 +139,9 @@ pub async fn get_profile_page(
                 "image": cu_image
             }));
         }
-
-        // Check if following
-        let mut follow_rows = conn
-            .query(
-                "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
-                libsql::params![auth_user.user_id.to_string(), profile_id.clone()],
-            )
-            .await?;
-        is_following = follow_rows.next().await?.is_some();
     }
 
-    // Fetch published articles by this user
+    // Fetch published articles with tags, favorites count, and comments count in a SINGLE optimized query
     let mut article_rows = conn
         .query(
             r#"
@@ -155,13 +150,20 @@ pub async fn get_profile_page(
                 a.slug,
                 a.description,
                 a.created_at,
-                a.id
+                GROUP_CONCAT(DISTINCT t.name) as tag_list,
+                COUNT(DISTINCT uf.user_id) as favorites_count,
+                COUNT(DISTINCT c.id) as comments_count
             FROM articles a
+            LEFT JOIN article_tags at ON a.id = at.article_id
+            LEFT JOIN tags t ON at.tag_id = t.id
+            LEFT JOIN user_favorites uf ON a.id = uf.article_id
+            LEFT JOIN comments c ON a.id = c.article_id
             WHERE a.author_id = ? AND a.draft = 0
+            GROUP BY a.id, a.title, a.slug, a.description, a.created_at
             ORDER BY a.created_at DESC
-            LIMIT 20
+            LIMIT ? OFFSET ?
             "#,
-            libsql::params![profile_id.clone()],
+            libsql::params![profile_id.clone(), ARTICLES_PER_PAGE, offset],
         )
         .await?;
 
@@ -171,54 +173,18 @@ pub async fn get_profile_page(
         let slug: String = row.get(1)?;
         let description: String = row.get(2).unwrap_or_default();
         let created_at: String = row.get(3)?;
-        let article_id: String = row.get(4)?;
-        // reading_time column doesn't exist in DB, use default estimate
+
+        // Get tags from GROUP_CONCAT result (comma-separated string)
+        let tag_list_str: Option<String> = row.get(4).ok();
+        let tags: Vec<String> = tag_list_str
+            .map(|s| s.split(',').map(|t| t.to_string()).collect())
+            .unwrap_or_default();
+
+        let favorites_count: i64 = row.get(5)?;
+        let comments_count: i64 = row.get(6)?;
+
+        // reading_time estimate based on typical reading speed
         let reading_time: i64 = 5;
-
-        // Get tags for this article
-        let mut tag_rows = conn
-            .query(
-                r#"
-                SELECT t.name
-                FROM tags t
-                JOIN article_tags at ON t.id = at.tag_id
-                WHERE at.article_id = ?
-                "#,
-                libsql::params![article_id.clone()],
-            )
-            .await?;
-
-        let mut tags: Vec<String> = Vec::new();
-        while let Some(tag_row) = tag_rows.next().await? {
-            let tag_name: String = tag_row.get(0)?;
-            tags.push(tag_name);
-        }
-
-        // Count favorites for this article
-        let mut fav_rows = conn
-            .query(
-                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
-                libsql::params![article_id.clone()],
-            )
-            .await?;
-        let favorites_count: i64 = fav_rows
-            .next()
-            .await?
-            .map(|r| r.get(0).unwrap_or(0))
-            .unwrap_or(0);
-
-        // Count comments for this article
-        let mut comment_rows = conn
-            .query(
-                "SELECT COUNT(*) FROM comments WHERE article_id = ?",
-                libsql::params![article_id.clone()],
-            )
-            .await?;
-        let comments_count: i64 = comment_rows
-            .next()
-            .await?
-            .map(|r| r.get(0).unwrap_or(0))
-            .unwrap_or(0);
 
         articles.push(ArticleSummary {
             title,
@@ -231,6 +197,13 @@ pub async fn get_profile_page(
             reading_time,
         });
     }
+
+    // Calculate pagination
+    let total_pages = ((articles_count as f64) / (ARTICLES_PER_PAGE as f64)).ceil() as i64;
+    let total_pages = total_pages.max(1); // At least 1 page
+
+    // Generate page numbers for pagination display
+    let pages: Vec<i64> = (1..=total_pages).collect();
 
     // Build profile data
     let profile = ProfileData {
@@ -252,8 +225,9 @@ pub async fn get_profile_page(
         "drafts": Vec::<ArticleSummary>::new(),
         "current_user": current_user_info,
         "user": current_user_info,
-        "current_page": 1,
-        "total_pages": 1,
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "pages": pages,
         "current_year": chrono::Utc::now().year(),
     });
 
