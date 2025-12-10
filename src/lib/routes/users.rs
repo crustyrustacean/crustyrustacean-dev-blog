@@ -489,10 +489,11 @@ pub async fn list_profiles(
     let offset = query.offset.unwrap_or(0);
 
     // Build the query with optional search
+    // Only show users with Author or Admin role (not Subscribers)
     let (sql, params) = if let Some(search) = &query.search {
         let search_pattern = format!("%{}%", search);
         (
-            "SELECT id, username, bio, image FROM users WHERE username LIKE ? OR bio LIKE ? ORDER BY username LIMIT ? OFFSET ?".to_string(),
+            "SELECT id, username, bio, image FROM users WHERE (role = 'author' OR role = 'admin') AND (username LIKE ? OR bio LIKE ?) ORDER BY username LIMIT ? OFFSET ?".to_string(),
             vec![
                 libsql::Value::from(search_pattern.clone()),
                 libsql::Value::from(search_pattern),
@@ -502,7 +503,7 @@ pub async fn list_profiles(
         )
     } else {
         (
-            "SELECT id, username, bio, image FROM users ORDER BY username LIMIT ? OFFSET ?"
+            "SELECT id, username, bio, image FROM users WHERE role = 'author' OR role = 'admin' ORDER BY username LIMIT ? OFFSET ?"
                 .to_string(),
             vec![libsql::Value::from(limit), libsql::Value::from(offset)],
         )

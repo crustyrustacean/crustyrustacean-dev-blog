@@ -35,25 +35,10 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
     }
 });
 
-// function to create R2 storage operator with dev bucket configuration
-fn create_r2_storage() -> Result<Operator, Box<dyn std::error::Error>> {
-    // Load environment variables from Secrets.dev.toml
-    let _ = dotenvy::from_filename("Secrets.dev.toml");
-
-    let builder = opendal::services::S3::default()
-        .region(&var("DEFAULT_REGION").unwrap_or_else(|_| "auto".to_string()))
-        .bucket(&var("BUCKET").unwrap_or_else(|_| "photo-bucket-dev".to_string()))
-        .endpoint(&var("ENDPOINT").unwrap_or_else(|_| {
-            "https://9f8f9b268ba5c7d97ad1adfabf962f30.r2.cloudflarestorage.com".to_string()
-        }))
-        .access_key_id(
-            &var("ACCESS_KEY_ID")
-                .unwrap_or_else(|_| "9063762cd3059516a2af26a159c7a5ca".to_string()),
-        )
-        .secret_access_key(&var("SECRET_ACCESS_KEY").unwrap_or_else(|_| {
-            "2c91ace42b2df0dd4d8c3d7dc36e8d59576e90dc55b8153d64da8086f87e4f16".to_string()
-        }));
-
+// function to create in-memory storage operator for testing
+fn create_test_storage() -> Result<Operator, Box<dyn std::error::Error>> {
+    // Use in-memory storage for tests - no cloud credentials needed
+    let builder = opendal::services::Memory::default();
     let op = Operator::new(builder)?.finish();
     Ok(op)
 }
@@ -134,7 +119,7 @@ pub async fn spawn_app() -> TestApp {
         .expect("Failed to run migrations");
 
     // Create R2 storage operator for testing with dev bucket
-    let operator = create_r2_storage().expect("Failed to create R2 storage operator for testing");
+    let operator = create_test_storage().expect("Failed to create test storage operator");
     let storage: Arc<dyn StorageBackend> = Arc::new(OpenDalStorage::new(operator));
 
     // set up the app state

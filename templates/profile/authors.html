@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-12">
+    <div class="col-lg-8">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h2">
                 <i class="fas fa-users text-primary me-2"></i>
@@ -22,98 +22,103 @@
             </div>
         </div>
 
-        <!-- Search Bar -->
-        <div class="row mb-4">
-            <div class="col-md-8 mx-auto">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="fas fa-search"></i>
-                            </span>
-                            <input 
-                                type="text" 
-                                class="form-control" 
-                                id="searchInput"
-                                placeholder="Search authors by username or bio..."
-                                value="{{ search_query or '' }}"
-                            >
-                            <button class="btn btn-primary" type="button" id="searchBtn">
-                                Search
-                            </button>
-                            {% if search_query %}
-                                <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn">
-                                    Clear
-                                </button>
-                            {% endif %}
-                        </div>
-                    </div>
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <div class="input-group">
+                    <span class="input-group-text bg-primary text-white">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input
+                        type="text"
+                        class="form-control form-control-lg"
+                        id="searchInput"
+                        placeholder="Search authors by username or bio..."
+                        value="{{ search_query | default(value='') }}"
+                    >
+                    <button class="btn btn-primary" type="button" id="searchBtn">
+                        Search
+                    </button>
+                    {% if search_query %}
+                        <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
         {% if search_query %}
-            <div class="alert alert-info">
+            <div class="alert alert-info d-flex align-items-center">
                 <i class="fas fa-search me-2"></i>
-                Showing results for "<strong>{{ search_query }}</strong>"
+                <span>Showing results for "<strong>{{ search_query }}</strong>"</span>
+                <a href="/profiles" class="ms-auto btn btn-sm btn-outline-info">Show All</a>
             </div>
         {% endif %}
 
-        {% if profiles and profiles|length > 0 %}
-            <div class="row">
-                {% for profile in profiles %}
-                    <div class="col-md-6 col-lg-4 mb-4">
-                        <div class="card h-100 author-card">
-                            <div class="card-body text-center">
-                                <div class="mb-3">
-                                    {% if profile.image %}
-                                        <img src="{{ profile.image }}" alt="{{ profile.username }}" class="rounded-circle" width="80" height="80">
-                                    {% else %}
-                                        <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px; font-size: 24px;">
-                                            {{ profile.username | slice(end=1) | upper }}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                
-                                <h5 class="card-title mb-2">
-                                    <a href="/profiles/{{ profile.username }}" class="text-decoration-none">
-                                        {{ profile.username }}
-                                    </a>
-                                </h5>
-                                
-                                {% if profile.bio %}
-                                    <p class="card-text text-muted small">{{ profile.bio | truncate(length=100) }}</p>
-                                {% else %}
-                                    <p class="card-text text-muted small fst-italic">No bio available</p>
-                                {% endif %}
+        {% if profiles and profiles | length > 0 %}
+            <p class="text-muted mb-3">
+                <i class="fas fa-user-friends me-1"></i>
+                Found {{ profiles | length }} author{% if profiles | length != 1 %}s{% endif %}
+            </p>
 
-                                <div class="d-flex justify-content-center gap-2 mt-3">
-                                    <a href="/profiles/{{ profile.username }}" class="btn btn-outline-primary btn-sm">
-                                        <i class="fas fa-user me-1"></i>
-                                        View Profile
-                                    </a>
-                                    
-                                    {% if profile.following %}
-                                        <button 
-                                            class="btn btn-success btn-sm follow-btn" 
-                                            data-username="{{ profile.username }}"
-                                            data-following="true"
-                                            data-toggle-follow
-                                        >
-                                            <i class="fas fa-user-check me-1"></i>
-                                            Following
-                                        </button>
-                                    {% else %}
-                                        <button 
-                                            class="btn btn-outline-primary btn-sm follow-btn" 
-                                            data-username="{{ profile.username }}"
-                                            data-following="false"
-                                            data-toggle-follow
-                                        >
-                                            <i class="fas fa-user-plus me-1"></i>
-                                            Follow
-                                        </button>
-                                    {% endif %}
+            <div class="row" id="authorsContainer">
+                {% for profile in profiles %}
+                    <div class="col-md-6 mb-4 author-item">
+                        <div class="card h-100 author-card shadow-sm border-0">
+                            <div class="card-body">
+                                <div class="d-flex align-items-start">
+                                    <div class="me-3 flex-shrink-0">
+                                        {% if profile.image %}
+                                            <img src="{{ profile.image }}" alt="{{ profile.username | default(value='User') }}" class="rounded-circle shadow-sm" width="64" height="64" style="object-fit: cover;">
+                                        {% else %}
+                                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 64px; height: 64px; font-size: 24px; font-weight: bold;">
+                                                {% if profile.username and profile.username | length > 0 %}{{ profile.username | truncate(length=1, end="") | upper }}{% else %}?{% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="flex-grow-1">
+                                        <h5 class="card-title mb-1">
+                                            <a href="/profiles/{{ profile.username }}" class="text-decoration-none text-dark">
+                                                {{ profile.username | default(value='Unknown') }}
+                                            </a>
+                                        </h5>
+
+                                        {% if profile.bio %}
+                                            <p class="card-text text-muted small mb-2">{{ profile.bio | truncate(length=80) }}</p>
+                                        {% else %}
+                                            <p class="card-text text-muted small fst-italic mb-2">No bio yet</p>
+                                        {% endif %}
+
+                                        <div class="d-flex gap-2 mt-2">
+                                            <a href="/profiles/{{ profile.username }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-user me-1"></i>
+                                                Profile
+                                            </a>
+
+                                            {% if profile.following %}
+                                                <button
+                                                    class="btn btn-success btn-sm follow-btn"
+                                                    data-username="{{ profile.username }}"
+                                                    data-following="true"
+                                                    data-toggle-follow
+                                                >
+                                                    <i class="fas fa-user-check me-1"></i>
+                                                    Following
+                                                </button>
+                                            {% else %}
+                                                <button
+                                                    class="btn btn-primary btn-sm follow-btn"
+                                                    data-username="{{ profile.username }}"
+                                                    data-following="false"
+                                                    data-toggle-follow
+                                                >
+                                                    <i class="fas fa-user-plus me-1"></i>
+                                                    Follow
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -121,9 +126,9 @@
                 {% endfor %}
             </div>
 
-            {% if profiles|length >= 20 %}
+            {% if profiles | length >= 20 %}
                 <div class="text-center mt-4">
-                    <button class="btn btn-outline-primary" id="loadMoreBtn">
+                    <button class="btn btn-outline-primary btn-lg" id="loadMoreBtn">
                         <i class="fas fa-plus-circle me-2"></i>
                         Load More Authors
                     </button>
@@ -132,27 +137,105 @@
 
         {% else %}
             <div class="text-center py-5">
-                {% if search_query %}
-                    <i class="fas fa-search fa-4x text-muted mb-3"></i>
-                    <h4 class="text-muted">No Authors Found</h4>
-                    <p class="text-muted mb-4">No authors match your search criteria "{{ search_query }}"</p>
-                    <button class="btn btn-primary" id="clearSearchBtn">
-                        <i class="fas fa-times me-2"></i>
-                        Clear Search
-                    </button>
-                {% else %}
-                    <i class="fas fa-users fa-4x text-muted mb-3"></i>
-                    <h4 class="text-muted">No Authors Available</h4>
-                    <p class="text-muted mb-4">Be the first to join the community!</p>
-                    <a href="/register" class="btn btn-primary">
-                        <i class="fas fa-user-plus me-2"></i>
-                        Join the Community
-                    </a>
-                {% endif %}
+                <div class="mb-4">
+                    {% if search_query %}
+                        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
+                            <i class="fas fa-search fa-3x text-muted"></i>
+                        </div>
+                        <h4 class="text-muted">No Authors Found</h4>
+                        <p class="text-muted mb-4">No authors match your search for "<strong>{{ search_query }}</strong>"</p>
+                        <a href="/profiles" class="btn btn-primary">
+                            <i class="fas fa-times me-2"></i>
+                            Clear Search
+                        </a>
+                    {% else %}
+                        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
+                            <i class="fas fa-user-friends fa-3x text-muted"></i>
+                        </div>
+                        <h4 class="text-muted">No Other Authors Yet</h4>
+                        <p class="text-muted mb-4">You're one of our first members! Invite friends to join the community.</p>
+                        <a href="/articles" class="btn btn-primary">
+                            <i class="fas fa-globe me-2"></i>
+                            Browse Articles
+                        </a>
+                    {% endif %}
+                </div>
             </div>
         {% endif %}
     </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    About Following
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Follow authors to see their articles in your personal feed.
+                    Stay updated with content from your favorite writers.
+                </p>
+                <ul class="list-unstyled small text-muted mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Get personalized article recommendations
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Curate your own reading experience
+                    </li>
+                    <li>
+                        <i class="fas fa-check text-success me-2"></i>
+                        Support your favorite authors
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-link me-2"></i>
+                    Quick Links
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/feed" class="btn btn-outline-warning">
+                        <i class="fas fa-rss me-2"></i>
+                        My Personal Feed
+                    </a>
+                    <a href="/favorites" class="btn btn-outline-danger">
+                        <i class="fas fa-heart me-2"></i>
+                        My Favorites
+                    </a>
+                    <a href="/articles" class="btn btn-outline-secondary">
+                        <i class="fas fa-globe me-2"></i>
+                        All Articles
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+.author-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.author-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+.follow-btn {
+    transition: all 0.2s ease;
+}
+.follow-btn:hover {
+    transform: scale(1.05);
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
