@@ -22,7 +22,6 @@
             </div>
         </div>
 
-        <!-- Search Bar -->
         <div class="card mb-4 shadow-sm">
             <div class="card-body">
                 <div class="input-group">
@@ -57,7 +56,6 @@
         {% endif %}
 
         {% if profiles and profiles | length > 0 %}
-            <!-- Results summary -->
             <p class="text-muted mb-3">
                 <i class="fas fa-user-friends me-1"></i>
                 Found {{ profiles | length }} author{% if profiles | length != 1 %}s{% endif %}
@@ -69,7 +67,6 @@
                         <div class="card h-100 author-card shadow-sm border-0">
                             <div class="card-body">
                                 <div class="d-flex align-items-start">
-                                    <!-- Avatar -->
                                     <div class="me-3 flex-shrink-0">
                                         {% if profile.image %}
                                             <img src="{{ profile.image }}" alt="{{ profile.username | default(value='User') }}" class="rounded-circle shadow-sm" width="64" height="64" style="object-fit: cover;">
@@ -80,7 +77,6 @@
                                         {% endif %}
                                     </div>
 
-                                    <!-- User Info -->
                                     <div class="flex-grow-1">
                                         <h5 class="card-title mb-1">
                                             <a href="/profiles/{{ profile.username }}" class="text-decoration-none text-dark">
@@ -168,7 +164,6 @@
         {% endif %}
     </div>
 
-    <!-- Sidebar -->
     <div class="col-lg-4">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
@@ -239,31 +234,6 @@
 }
 .follow-btn:hover {
     transform: scale(1.05);
-}
-.author-item {
-    animation: fadeInUp 0.4s ease forwards;
-    opacity: 0;
-}
-.author-item:nth-child(1) { animation-delay: 0s; }
-.author-item:nth-child(2) { animation-delay: 0.05s; }
-.author-item:nth-child(3) { animation-delay: 0.1s; }
-.author-item:nth-child(4) { animation-delay: 0.15s; }
-.author-item:nth-child(5) { animation-delay: 0.2s; }
-.author-item:nth-child(6) { animation-delay: 0.25s; }
-.author-item:nth-child(7) { animation-delay: 0.3s; }
-.author-item:nth-child(8) { animation-delay: 0.35s; }
-.author-item:nth-child(9) { animation-delay: 0.4s; }
-.author-item:nth-child(10) { animation-delay: 0.45s; }
-.author-item:nth-child(n+11) { animation-delay: 0.5s; }
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 </style>
 {% endblock %}
