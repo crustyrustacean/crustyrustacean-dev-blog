@@ -72,7 +72,7 @@
                                             <img src="{{ profile.image }}" alt="{{ profile.username | default(value='User') }}" class="rounded-circle shadow-sm" width="64" height="64" style="object-fit: cover;">
                                         {% else %}
                                             <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 64px; height: 64px; font-size: 24px; font-weight: bold;">
-                                                {{ profile.username | default(value='?') | slice(end=1) | upper }}
+                                                {% if profile.username and profile.username | length > 0 %}{{ profile.username | truncate(length=1, end="") | upper }}{% else %}?{% endif %}
                                             </div>
                                         {% endif %}
                                     </div>
