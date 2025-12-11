@@ -795,25 +795,18 @@ impl EmailService {
     /// Send a newsletter issue to a subscriber
     pub async fn send_newsletter_issue(
         &self,
-        to_email: &str,
-        subscriber_name: Option<&str>,
-        subject: &str,
-        newsletter_title: &str,
-        newsletter_body: &str,
-        unsubscribe_token: &str,
-        base_url: &str,
-        author_articles: Option<&[AuthorArticleSummary]>,
+        params: NewsletterIssueParams<'_>,
     ) -> Result<SendResponse, SendError> {
         let unsubscribe_link = format!(
             "{}/api/newsletters/unsubscribe/{}",
-            base_url, unsubscribe_token
+            params.base_url, params.unsubscribe_token
         );
-        let greeting = subscriber_name
+        let greeting = params.subscriber_name
             .map(|n| format!("Hi {},", n))
             .unwrap_or_else(|| "Hi,".to_string());
 
         // Build author articles section if provided
-        let author_section_text = author_articles
+        let author_section_text = params.author_articles
             .filter(|articles| !articles.is_empty())
             .map(|articles| {
                 let mut section = String::from("\n\n--- FROM YOUR FAVORITE AUTHORS ---\n\n");
@@ -827,7 +820,7 @@ impl EmailService {
             })
             .unwrap_or_default();
 
-        let author_section_html = author_articles
+        let author_section_html = params.author_articles
             .filter(|articles| !articles.is_empty())
             .map(|articles| {
                 let mut section = String::from(
@@ -859,7 +852,7 @@ impl EmailService {
             Unsubscribe: {}\n\n\
             Best regards,\n\
             CrustyRustacean Dev Blog Team",
-            greeting, newsletter_title, newsletter_body, author_section_text, unsubscribe_link
+            greeting, params.newsletter_title, params.newsletter_body, author_section_text, unsubscribe_link
         );
 
         let html_body = format!(
@@ -891,18 +884,18 @@ impl EmailService {
     </div>
 </body>
 </html>"#,
-            newsletter_title,
+            params.newsletter_title,
             greeting,
-            newsletter_title,
-            newsletter_body.replace('\n', "<br>"),
+            params.newsletter_title,
+            params.newsletter_body.replace('\n', "<br>"),
             author_section_html,
             unsubscribe_link
         );
 
         let email = Email::builder()
             .from(self.sender_address())
-            .to(EmailAddress::new(to_email))
-            .subject(subject)
+            .to(EmailAddress::new(params.to_email))
+            .subject(params.subject)
             .body(text_body, html_body)
             .build()?;
 
@@ -917,6 +910,19 @@ pub struct AuthorArticleSummary {
     pub description: String,
     pub author_name: String,
     pub url: String,
+}
+
+/// Parameters for sending a newsletter issue email
+#[derive(Debug, Clone)]
+pub struct NewsletterIssueParams<'a> {
+    pub to_email: &'a str,
+    pub subscriber_name: Option<&'a str>,
+    pub subject: &'a str,
+    pub newsletter_title: &'a str,
+    pub newsletter_body: &'a str,
+    pub unsubscribe_token: &'a str,
+    pub base_url: &'a str,
+    pub author_articles: Option<&'a [AuthorArticleSummary]>,
 }
 
 // ============================================================================

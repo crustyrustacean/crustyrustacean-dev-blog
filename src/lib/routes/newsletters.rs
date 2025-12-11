@@ -1,7 +1,7 @@
 // src/lib/routes/newsletters.rs
 
 use crate::auth::AuthorUser;
-use crate::email::AuthorArticleSummary;
+use crate::email::{AuthorArticleSummary, NewsletterIssueParams};
 use crate::errors::ApiError;
 use crate::models::{
     CreateNewsletterIssue, NewsletterIssueResponse, NewsletterStats, SubscribeRequest,
@@ -613,16 +613,16 @@ pub async fn send_newsletter(
         // Send the email
         match state
             .email
-            .send_newsletter_issue(
-                &subscriber.email,
-                subscriber.name.as_deref(),
-                &newsletter_subject,
-                &newsletter_title,
-                &newsletter_body,
-                &subscriber.unsubscribe_token,
-                &base_url,
-                author_articles_ref,
-            )
+            .send_newsletter_issue(NewsletterIssueParams {
+                to_email: &subscriber.email,
+                subscriber_name: subscriber.name.as_deref(),
+                subject: &newsletter_subject,
+                newsletter_title: &newsletter_title,
+                newsletter_body: &newsletter_body,
+                unsubscribe_token: &subscriber.unsubscribe_token,
+                base_url: &base_url,
+                author_articles: author_articles_ref,
+            })
             .await
         {
             Ok(_) => {
@@ -662,7 +662,7 @@ pub async fn send_newsletter(
 
     conn.execute(
         "UPDATE newsletter_issues SET status = ?, sent_at = ?, recipient_count = ?, updated_at = ? WHERE id = ?",
-        params![final_status, Utc::now().to_rfc3339(), sent_count as i32, Utc::now().to_rfc3339(), id.clone()],
+        params![final_status, Utc::now().to_rfc3339(), sent_count, Utc::now().to_rfc3339(), id.clone()],
     )
     .await?;
 
