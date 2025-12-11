@@ -625,3 +625,431 @@ async fn test_admin_newsletters_page_requires_authentication() {
     // Assert
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn test_send_newsletter_is_idempotent() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("author").await;
+
+    // Create and confirm a subscriber
+    let subscribe_data = json!({
+        "email": "idempotent@example.com",
+        "name": "Idempotent Test"
+    });
+
+    let _ = app
+        .client
+        .post(format!("{}/api/newsletters/subscribe", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&subscribe_data)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Confirm the subscription
+    let confirm_token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'idempotent@example.com'",
+                libsql::params![],
+            )
+            .await
+            .expect("Failed to query database");
+
+        let row = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No subscriber found");
+        row.get::<String>(0).expect("Failed to get token")
+    };
+
+    let _ = app
+        .client
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, confirm_token
+        ))
+        .send()
+        .await
+        .expect("Failed to confirm subscription");
+
+    // Create a newsletter
+    let newsletter_data = json!({
+        "title": "Idempotent Test Newsletter",
+        "subject": "Testing Idempotency",
+        "body": "This newsletter tests idempotent delivery"
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/admin/newsletters", &app.address))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&newsletter_data)
+        .send()
+        .await
+        .expect("Failed to create newsletter");
+
+    let create_body: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response");
+    let newsletter_id = create_body["data"]["id"].as_str().unwrap();
+
+    // Act - Send newsletter first time
+    let first_send = app
+        .client
+        .post(format!(
+            "{}/api/admin/newsletters/{}/send",
+            &app.address, newsletter_id
+        ))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to send newsletter first time");
+
+    assert_eq!(first_send.status(), StatusCode::OK);
+    let first_body: Value = first_send.json().await.expect("Failed to parse response");
+    assert_eq!(first_body["data"]["recipient_count"], 1);
+
+    // Act - Try to send again (should fail because already sent)
+    let second_send = app
+        .client
+        .post(format!(
+            "{}/api/admin/newsletters/{}/send",
+            &app.address, newsletter_id
+        ))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to send newsletter second time");
+
+    // Assert - Second send should return an error because newsletter is already sent
+    assert_eq!(second_send.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_delivery_logs_are_created() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("author").await;
+
+    // Create and confirm a subscriber
+    let subscribe_data = json!({
+        "email": "delivery-log@example.com",
+        "name": "Delivery Log Test"
+    });
+
+    let _ = app
+        .client
+        .post(format!("{}/api/newsletters/subscribe", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&subscribe_data)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Get and confirm the subscription token
+    let confirm_token = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT confirmation_token FROM newsletter_subscribers WHERE email = 'delivery-log@example.com'",
+                libsql::params![],
+            )
+            .await
+            .expect("Failed to query database");
+        let row = rows.next().await.expect("Failed to get row").expect("No subscriber");
+        row.get::<String>(0).expect("Failed to get token")
+    };
+
+    let _ = app
+        .client
+        .post(format!("{}/api/newsletters/confirm/{}", &app.address, confirm_token))
+        .send()
+        .await
+        .expect("Failed to confirm subscription");
+
+    // Create a newsletter
+    let newsletter_data = json!({
+        "title": "Delivery Log Test",
+        "subject": "Testing Delivery Logs",
+        "body": "This newsletter tests delivery log creation"
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/admin/newsletters", &app.address))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&newsletter_data)
+        .send()
+        .await
+        .expect("Failed to create newsletter");
+
+    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let newsletter_id = create_body["data"]["id"].as_str().unwrap();
+
+    // Act - Send newsletter
+    let _ = app
+        .client
+        .post(format!("{}/api/admin/newsletters/{}/send", &app.address, newsletter_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to send newsletter");
+
+    // Assert - Check delivery log was created
+    let conn = app.db.connect().expect("Failed to connect to database");
+    let mut rows = conn
+        .query(
+            "SELECT status FROM newsletter_delivery_logs WHERE issue_id = ?",
+            libsql::params![newsletter_id],
+        )
+        .await
+        .expect("Failed to query delivery logs");
+
+    let row = rows.next().await.expect("Failed to get row").expect("No delivery log found");
+    let status: String = row.get(0).expect("Failed to get status");
+    assert_eq!(status, "sent");
+}
+
+#[tokio::test]
+async fn test_resubscribe_after_unsubscribe() {
+    // Arrange
+    let app = spawn_app().await;
+
+    let subscribe_data = json!({
+        "email": "resubscribe@example.com",
+        "name": "Resubscribe Test"
+    });
+
+    // First subscription
+    let _ = app
+        .client
+        .post(format!("{}/api/newsletters/subscribe", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&subscribe_data)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Get tokens
+    let (confirm_token, unsubscribe_token) = {
+        let conn = app.db.connect().expect("Failed to connect to database");
+        let mut rows = conn
+            .query(
+                "SELECT confirmation_token, unsubscribe_token FROM newsletter_subscribers WHERE email = 'resubscribe@example.com'",
+                libsql::params![],
+            )
+            .await
+            .expect("Failed to query database");
+        let row = rows.next().await.expect("Failed to get row").expect("No subscriber");
+        (
+            row.get::<String>(0).expect("Failed to get confirm token"),
+            row.get::<String>(1).expect("Failed to get unsubscribe token"),
+        )
+    };
+
+    // Confirm subscription
+    let _ = app
+        .client
+        .post(format!("{}/api/newsletters/confirm/{}", &app.address, confirm_token))
+        .send()
+        .await
+        .expect("Failed to confirm subscription");
+
+    // Unsubscribe
+    let _ = app
+        .client
+        .post(format!("{}/api/newsletters/unsubscribe/{}", &app.address, unsubscribe_token))
+        .send()
+        .await
+        .expect("Failed to unsubscribe");
+
+    // Act - Resubscribe
+    let resubscribe_response = app
+        .client
+        .post(format!("{}/api/newsletters/subscribe", &app.address))
+        .header("Content-Type", "application/json")
+        .json(&subscribe_data)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    // Assert
+    assert_eq!(resubscribe_response.status(), StatusCode::OK);
+    let response_body: Value = resubscribe_response.json().await.expect("Failed to parse response");
+    assert!(response_body["data"]["message"].as_str().unwrap().contains("check your email"));
+
+    // Verify subscriber is no longer marked as unsubscribed
+    let conn = app.db.connect().expect("Failed to connect to database");
+    let mut rows = conn
+        .query(
+            "SELECT unsubscribed_at, confirmed FROM newsletter_subscribers WHERE email = 'resubscribe@example.com'",
+            libsql::params![],
+        )
+        .await
+        .expect("Failed to query database");
+    let row = rows.next().await.expect("Failed to get row").expect("No subscriber");
+    let unsubscribed_at: Option<String> = row.get(0).ok();
+    let confirmed: i64 = row.get(1).expect("Failed to get confirmed");
+
+    assert!(unsubscribed_at.is_none(), "Should not be unsubscribed");
+    assert_eq!(confirmed, 0, "Should need to reconfirm");
+}
+
+#[tokio::test]
+async fn test_newsletter_send_with_no_subscribers() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("author").await;
+
+    // Create a newsletter without any subscribers
+    let newsletter_data = json!({
+        "title": "No Subscribers Test",
+        "subject": "Testing with No Subscribers",
+        "body": "This newsletter has no subscribers"
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/admin/newsletters", &app.address))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&newsletter_data)
+        .send()
+        .await
+        .expect("Failed to create newsletter");
+
+    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let newsletter_id = create_body["data"]["id"].as_str().unwrap();
+
+    // Act - Send newsletter with no subscribers
+    let send_response = app
+        .client
+        .post(format!("{}/api/admin/newsletters/{}/send", &app.address, newsletter_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to send newsletter");
+
+    // Assert - Should succeed with 0 recipients
+    assert_eq!(send_response.status(), StatusCode::OK);
+    let response_body: Value = send_response.json().await.expect("Failed to parse response");
+    assert_eq!(response_body["data"]["recipient_count"], 0);
+}
+
+#[tokio::test]
+async fn test_update_newsletter() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("author").await;
+
+    // Create a newsletter
+    let newsletter_data = json!({
+        "title": "Original Title",
+        "subject": "Original Subject",
+        "body": "Original body content"
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/admin/newsletters", &app.address))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&newsletter_data)
+        .send()
+        .await
+        .expect("Failed to create newsletter");
+
+    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let newsletter_id = create_body["data"]["id"].as_str().unwrap();
+
+    // Act - Update the newsletter
+    let update_data = json!({
+        "title": "Updated Title",
+        "body": "Updated body content"
+    });
+
+    let update_response = app
+        .client
+        .put(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&update_data)
+        .send()
+        .await
+        .expect("Failed to update newsletter");
+
+    // Assert
+    assert_eq!(update_response.status(), StatusCode::OK);
+
+    // Verify the update
+    let get_response = app
+        .client
+        .get(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to get newsletter");
+
+    let get_body: Value = get_response.json().await.expect("Failed to parse response");
+    assert_eq!(get_body["data"]["newsletter"]["title"], "Updated Title");
+    assert_eq!(get_body["data"]["newsletter"]["body"], "Updated body content");
+    // Subject should remain unchanged
+    assert_eq!(get_body["data"]["newsletter"]["subject"], "Original Subject");
+}
+
+#[tokio::test]
+async fn test_delete_newsletter() {
+    // Arrange
+    let app = spawn_app().await;
+    let token = app.register_user_default("author").await;
+
+    // Create a newsletter
+    let newsletter_data = json!({
+        "title": "To Be Deleted",
+        "subject": "Delete Test",
+        "body": "This newsletter will be deleted"
+    });
+
+    let create_response = app
+        .client
+        .post(format!("{}/api/admin/newsletters", &app.address))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&newsletter_data)
+        .send()
+        .await
+        .expect("Failed to create newsletter");
+
+    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let newsletter_id = create_body["data"]["id"].as_str().unwrap();
+
+    // Act - Delete the newsletter
+    let delete_response = app
+        .client
+        .delete(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to delete newsletter");
+
+    // Assert
+    assert_eq!(delete_response.status(), StatusCode::OK);
+
+    // Verify it's deleted
+    let get_response = app
+        .client
+        .get(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .expect("Failed to get newsletter");
+
+    assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
+}
