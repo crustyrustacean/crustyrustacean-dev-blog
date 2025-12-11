@@ -717,6 +717,206 @@ impl EmailService {
     pub async fn send(&self, email: &Email) -> Result<SendResponse, SendError> {
         self.sender.send(email).await
     }
+
+    /// Send a newsletter subscription confirmation email
+    pub async fn send_newsletter_confirmation(
+        &self,
+        to_email: &str,
+        name: Option<&str>,
+        confirmation_token: &str,
+        base_url: &str,
+    ) -> Result<SendResponse, SendError> {
+        let confirmation_link = format!("{}/newsletter/confirmed/{}", base_url, confirmation_token);
+        let greeting = name
+            .map(|n| format!("Hi {},", n))
+            .unwrap_or_else(|| "Hi,".to_string());
+
+        let text_body = format!(
+            "{}\n\n\
+            Thank you for subscribing to the CrustyRustacean Dev Blog newsletter!\n\n\
+            Please confirm your subscription by clicking the link below:\n\
+            {}\n\n\
+            If you didn't subscribe to our newsletter, you can safely ignore this email.\n\n\
+            Best regards,\n\
+            CrustyRustacean Dev Blog Team",
+            greeting, confirmation_link
+        );
+
+        let html_body = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Your Newsletter Subscription</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">CrustyRustacean Dev Blog</h1>
+        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Newsletter Subscription</p>
+    </div>
+    <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+        <p style="font-size: 16px;">{}</p>
+        <p>Thank you for subscribing to the CrustyRustacean Dev Blog newsletter!</p>
+        <p>You'll receive:</p>
+        <ul style="padding-left: 20px;">
+            <li>Latest articles and tutorials</li>
+            <li>Rust tips and best practices</li>
+            <li>Updates from your favorite authors</li>
+        </ul>
+        <p>Please confirm your subscription by clicking the button below:</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{}" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                Confirm Subscription
+            </a>
+        </div>
+        <p style="color: #666; font-size: 14px;">Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #667eea; font-size: 14px;">{}</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">
+            If you didn't subscribe to our newsletter, you can safely ignore this email.
+        </p>
+    </div>
+</body>
+</html>"#,
+            greeting, confirmation_link, confirmation_link
+        );
+
+        let email = Email::builder()
+            .from(self.sender_address())
+            .to(EmailAddress::new(to_email))
+            .subject("Confirm Your Newsletter Subscription - CrustyRustacean Dev Blog")
+            .body(text_body, html_body)
+            .build()?;
+
+        self.sender.send(&email).await
+    }
+
+    /// Send a newsletter issue to a subscriber
+    pub async fn send_newsletter_issue(
+        &self,
+        to_email: &str,
+        subscriber_name: Option<&str>,
+        subject: &str,
+        newsletter_title: &str,
+        newsletter_body: &str,
+        unsubscribe_token: &str,
+        base_url: &str,
+        author_articles: Option<&[AuthorArticleSummary]>,
+    ) -> Result<SendResponse, SendError> {
+        let unsubscribe_link = format!(
+            "{}/api/newsletters/unsubscribe/{}",
+            base_url, unsubscribe_token
+        );
+        let greeting = subscriber_name
+            .map(|n| format!("Hi {},", n))
+            .unwrap_or_else(|| "Hi,".to_string());
+
+        // Build author articles section if provided
+        let author_section_text = author_articles
+            .filter(|articles| !articles.is_empty())
+            .map(|articles| {
+                let mut section = String::from("\n\n--- FROM YOUR FAVORITE AUTHORS ---\n\n");
+                for article in articles {
+                    section.push_str(&format!(
+                        "* {} by {}\n  {}\n  Read more: {}\n\n",
+                        article.title, article.author_name, article.description, article.url
+                    ));
+                }
+                section
+            })
+            .unwrap_or_default();
+
+        let author_section_html = author_articles
+            .filter(|articles| !articles.is_empty())
+            .map(|articles| {
+                let mut section = String::from(
+                    r#"<div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #667eea;">
+                    <h2 style="color: #667eea; font-size: 18px; margin-bottom: 20px;">From Your Favorite Authors</h2>"#,
+                );
+                for article in articles {
+                    section.push_str(&format!(
+                        r#"<div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h3 style="margin: 0 0 5px 0; font-size: 16px;"><a href="{}" style="color: #333; text-decoration: none;">{}</a></h3>
+                            <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">by {}</p>
+                            <p style="margin: 0; color: #555; font-size: 14px;">{}</p>
+                        </div>"#,
+                        article.url, article.title, article.author_name, article.description
+                    ));
+                }
+                section.push_str("</div>");
+                section
+            })
+            .unwrap_or_default();
+
+        let text_body = format!(
+            "{}\n\n\
+            {}\n\n\
+            {}\
+            {}\n\n\
+            ---\n\
+            You're receiving this because you subscribed to our newsletter.\n\
+            Unsubscribe: {}\n\n\
+            Best regards,\n\
+            CrustyRustacean Dev Blog Team",
+            greeting, newsletter_title, newsletter_body, author_section_text, unsubscribe_link
+        );
+
+        let html_body = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">CrustyRustacean Dev Blog</h1>
+        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Newsletter</p>
+    </div>
+    <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+        <p style="font-size: 16px;">{}</p>
+        <h2 style="color: #333; font-size: 22px; margin-top: 0;">{}</h2>
+        <div style="font-size: 15px; line-height: 1.8;">
+            {}
+        </div>
+        {}
+    </div>
+    <div style="background: #f8f9fa; padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; text-align: center;">
+        <p style="color: #666; font-size: 12px; margin: 0 0 10px 0;">
+            You're receiving this email because you subscribed to our newsletter.
+        </p>
+        <a href="{}" style="color: #999; font-size: 12px;">Unsubscribe</a>
+    </div>
+</body>
+</html>"#,
+            newsletter_title,
+            greeting,
+            newsletter_title,
+            newsletter_body.replace('\n', "<br>"),
+            author_section_html,
+            unsubscribe_link
+        );
+
+        let email = Email::builder()
+            .from(self.sender_address())
+            .to(EmailAddress::new(to_email))
+            .subject(subject)
+            .body(text_body, html_body)
+            .build()?;
+
+        self.sender.send(&email).await
+    }
+}
+
+/// Summary of an article from a followed author for newsletter personalization
+#[derive(Debug, Clone)]
+pub struct AuthorArticleSummary {
+    pub title: String,
+    pub description: String,
+    pub author_name: String,
+    pub url: String,
 }
 
 // ============================================================================

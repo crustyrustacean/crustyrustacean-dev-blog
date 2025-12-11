@@ -1,6 +1,7 @@
 // src/lib/routes/newsletters.rs
 
 use crate::auth::AuthorUser;
+use crate::email::AuthorArticleSummary;
 use crate::errors::ApiError;
 use crate::models::{
     CreateNewsletterIssue, NewsletterIssueResponse, NewsletterStats, SubscribeRequest,
@@ -11,19 +12,36 @@ use crate::state::AppState;
 use axum::{
     Json,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse},
 };
 use chrono::{Datelike, Utc};
 use libsql::params;
 use serde_json::json;
+use tracing::{error, info, warn};
 use uuid::Uuid;
 use validator::Validate;
+
+/// Helper to construct base URL from headers
+fn get_base_url(headers: &HeaderMap) -> String {
+    let host = headers
+        .get("host")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("localhost:8000");
+
+    // In production, use HTTPS; for localhost, use HTTP
+    if host.contains("localhost") || host.contains("127.0.0.1") {
+        format!("http://{}", host)
+    } else {
+        format!("https://{}", host)
+    }
+}
 
 /// Subscribe to newsletter
 /// POST /api/newsletters/subscribe
 pub async fn subscribe(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<SubscribeRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     // Validate request
@@ -32,11 +50,12 @@ pub async fn subscribe(
     let conn = state.db.connect()?;
     let email = payload.email.to_lowercase();
     let name = payload.name;
+    let base_url = get_base_url(&headers);
 
     // Check if email already subscribed
     let mut existing = conn
         .query(
-            "SELECT id, confirmed, unsubscribed_at FROM newsletter_subscribers WHERE email = ?",
+            "SELECT id, confirmed, unsubscribed_at, confirmation_token FROM newsletter_subscribers WHERE email = ?",
             params![email.clone()],
         )
         .await?;
@@ -44,6 +63,7 @@ pub async fn subscribe(
     if let Some(row) = existing.next().await? {
         let confirmed: i64 = row.get(1)?;
         let unsubscribed_at: Option<String> = row.get(2)?;
+        let existing_token: Option<String> = row.get(3)?;
 
         // If already confirmed and not unsubscribed
         if confirmed == 1 && unsubscribed_at.is_none() {
@@ -58,18 +78,45 @@ pub async fn subscribe(
             let confirmation_token = Uuid::new_v4().to_string();
             conn.execute(
                 "UPDATE newsletter_subscribers SET confirmation_token = ?, unsubscribed_at = NULL, confirmed = 0, updated_at = ? WHERE email = ?",
-                params![confirmation_token, Utc::now().to_rfc3339(), email.clone()],
+                params![confirmation_token.clone(), Utc::now().to_rfc3339(), email.clone()],
             )
             .await?;
 
-            // TODO: Send confirmation email
+            // Send confirmation email
+            if let Err(e) = state
+                .email
+                .send_newsletter_confirmation(
+                    &email,
+                    name.as_deref(),
+                    &confirmation_token,
+                    &base_url,
+                )
+                .await
+            {
+                warn!("Failed to send newsletter confirmation email to {}: {}", email, e);
+            } else {
+                info!("Sent newsletter re-subscription confirmation to {}", email);
+            }
+
             return Ok(ApiResponse::success(json!({
                 "message": "Please check your email to confirm your subscription.",
                 "email": email
             })));
         }
 
-        // If not confirmed yet, resend confirmation
+        // If not confirmed yet, resend confirmation email
+        if let Some(token) = existing_token {
+            if let Err(e) = state
+                .email
+                .send_newsletter_confirmation(&email, name.as_deref(), &token, &base_url)
+                .await
+            {
+                warn!("Failed to resend newsletter confirmation email to {}: {}", email, e);
+            } else {
+                info!("Resent newsletter confirmation to {}", email);
+            }
+        }
+
         return Ok(ApiResponse::success(json!({
             "message": "A confirmation email has been sent. Please check your inbox.",
             "email": email
@@ -89,7 +136,7 @@ pub async fn subscribe(
             id.to_string(),
             email.clone(),
             name.clone(),
-            confirmation_token,
+            confirmation_token.clone(),
             unsubscribe_token,
             now.clone(),
             now.clone(),
@@ -98,7 +145,16 @@ pub async fn subscribe(
     )
     .await?;
 
-    // TODO: Send confirmation email with token
+    // Send confirmation email
+    if let Err(e) = state
+        .email
+        .send_newsletter_confirmation(&email, name.as_deref(), &confirmation_token, &base_url)
+        .await
+    {
+        warn!("Failed to send newsletter confirmation email to {}: {}", email, e);
+    } else {
+        info!("Sent newsletter confirmation email to {}", email);
+    }
 
     Ok(ApiResponse::success(json!({
         "message": "Please check your email to confirm your subscription.",
@@ -443,14 +499,24 @@ pub async fn delete_newsletter(
     })))
 }
 
+/// Subscriber info for sending newsletters
+struct SubscriberInfo {
+    id: String,
+    email: String,
+    name: Option<String>,
+    unsubscribe_token: String,
+}
+
 /// Send newsletter to all confirmed subscribers (author or admin)
 /// POST /api/admin/newsletters/:id/send
 pub async fn send_newsletter(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     let conn = state.db.connect()?;
+    let base_url = get_base_url(&headers);
 
     // Get newsletter
     let mut rows = conn
@@ -465,6 +531,9 @@ pub async fn send_newsletter(
         .await?
         .ok_or_else(|| ApiError::NotFound("Newsletter not found".to_string()))?;
 
+    let newsletter_title: String = row.get(1)?;
+    let newsletter_subject: String = row.get(2)?;
+    let newsletter_body: String = row.get(3)?;
     let status: String = row.get(4)?;
 
     // Check if already sent
@@ -474,49 +543,188 @@ pub async fn send_newsletter(
         ));
     }
 
-    // Get all confirmed subscribers
-    let mut subscribers_rows = conn
-        .query(
-            "SELECT id, email, name FROM newsletter_subscribers WHERE confirmed = 1 AND unsubscribed_at IS NULL",
-            params![],
-        )
-        .await?;
-
-    // Collect subscriber IDs
-    let mut subscriber_ids = Vec::new();
-    while let Some(row) = subscribers_rows.next().await? {
-        let subscriber_id: String = row.get(0)?;
-        subscriber_ids.push(subscriber_id);
-    }
-
-    let subscriber_count = subscriber_ids.len();
-
-    // TODO: Implement actual email sending logic
-    // For now, we'll just create delivery logs with "sent" status
-
-    // Update newsletter status to "sent"
+    // Update newsletter status to "sending"
     let now = Utc::now().to_rfc3339();
     conn.execute(
-        "UPDATE newsletter_issues SET status = 'sent', sent_at = ?, recipient_count = ?, updated_at = ? WHERE id = ?",
-        params![now.clone(), subscriber_count as i32, now.clone(), id.clone()],
+        "UPDATE newsletter_issues SET status = 'sending', updated_at = ? WHERE id = ?",
+        params![now.clone(), id.clone()],
     )
     .await?;
 
-    // Create delivery logs for all subscribers
-    for subscriber_id in subscriber_ids {
-        let log_id = Uuid::new_v4();
-
-        conn.execute(
-            "INSERT INTO newsletter_delivery_logs (id, issue_id, subscriber_id, status, sent_at, created_at) VALUES (?, ?, ?, 'sent', ?, ?)",
-            params![log_id.to_string(), id.clone(), subscriber_id, now.clone(), now.clone()],
+    // Get all confirmed subscribers who haven't received this newsletter yet (idempotency)
+    let mut subscribers_rows = conn
+        .query(
+            r"SELECT ns.id, ns.email, ns.name, ns.unsubscribe_token
+              FROM newsletter_subscribers ns
+              WHERE ns.confirmed = 1
+              AND ns.unsubscribed_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM newsletter_delivery_logs dl
+                  WHERE dl.subscriber_id = ns.id
+                  AND dl.issue_id = ?
+              )",
+            params![id.clone()],
         )
         .await?;
+
+    // Collect subscriber info
+    let mut subscribers: Vec<SubscriberInfo> = Vec::new();
+    while let Some(row) = subscribers_rows.next().await? {
+        subscribers.push(SubscriberInfo {
+            id: row.get(0)?,
+            email: row.get(1)?,
+            name: row.get(2).ok(),
+            unsubscribe_token: row.get(3)?,
+        });
     }
 
+    let total_subscribers = subscribers.len();
+    let mut sent_count = 0;
+    let mut failed_count = 0;
+
+    // Send emails to each subscriber
+    for subscriber in subscribers {
+        // Get personalized content: recent articles from authors this subscriber's user follows
+        // Note: Newsletter subscribers may not have a user account, so this is optional
+        let author_articles = get_followed_author_articles(
+            &conn,
+            &subscriber.email,
+            &base_url,
+        )
+        .await
+        .unwrap_or_default();
+
+        let author_articles_ref: Option<&[AuthorArticleSummary]> = if author_articles.is_empty() {
+            None
+        } else {
+            Some(&author_articles)
+        };
+
+        // Create delivery log entry with "pending" status
+        let log_id = Uuid::new_v4();
+        let send_time = Utc::now().to_rfc3339();
+
+        conn.execute(
+            "INSERT INTO newsletter_delivery_logs (id, issue_id, subscriber_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
+            params![log_id.to_string(), id.clone(), subscriber.id.clone(), send_time.clone()],
+        )
+        .await?;
+
+        // Send the email
+        match state
+            .email
+            .send_newsletter_issue(
+                &subscriber.email,
+                subscriber.name.as_deref(),
+                &newsletter_subject,
+                &newsletter_title,
+                &newsletter_body,
+                &subscriber.unsubscribe_token,
+                &base_url,
+                author_articles_ref,
+            )
+            .await
+        {
+            Ok(_) => {
+                // Update delivery log to "sent"
+                conn.execute(
+                    "UPDATE newsletter_delivery_logs SET status = 'sent', sent_at = ? WHERE id = ?",
+                    params![Utc::now().to_rfc3339(), log_id.to_string()],
+                )
+                .await?;
+                sent_count += 1;
+                info!("Newsletter {} sent to {}", id, subscriber.email);
+            }
+            Err(e) => {
+                // Update delivery log to "failed" with error message
+                conn.execute(
+                    "UPDATE newsletter_delivery_logs SET status = 'failed', error_message = ? WHERE id = ?",
+                    params![e.to_string(), log_id.to_string()],
+                )
+                .await?;
+                failed_count += 1;
+                error!(
+                    "Failed to send newsletter {} to {}: {}",
+                    id, subscriber.email, e
+                );
+            }
+        }
+    }
+
+    // Update newsletter status based on results
+    let final_status = if failed_count == 0 {
+        "sent"
+    } else if sent_count == 0 {
+        "failed"
+    } else {
+        "sent" // Partial success still counts as sent
+    };
+
+    conn.execute(
+        "UPDATE newsletter_issues SET status = ?, sent_at = ?, recipient_count = ?, updated_at = ? WHERE id = ?",
+        params![final_status, Utc::now().to_rfc3339(), sent_count as i32, Utc::now().to_rfc3339(), id.clone()],
+    )
+    .await?;
+
+    let message = if failed_count > 0 {
+        format!(
+            "Newsletter sent to {} of {} subscribers ({} failed)",
+            sent_count, total_subscribers, failed_count
+        )
+    } else {
+        format!("Newsletter sent to {} subscribers", sent_count)
+    };
+
+    info!("{}", message);
+
     Ok(ApiResponse::success(json!({
-        "message": format!("Newsletter sent to {} subscribers", subscriber_count),
-        "recipient_count": subscriber_count
+        "message": message,
+        "recipient_count": sent_count,
+        "failed_count": failed_count
     })))
+}
+
+/// Get recent articles from authors that a subscriber follows (via their user account)
+/// Returns empty vec if subscriber has no linked user account or doesn't follow anyone
+async fn get_followed_author_articles(
+    conn: &libsql::Connection,
+    subscriber_email: &str,
+    base_url: &str,
+) -> Result<Vec<AuthorArticleSummary>, libsql::Error> {
+    // Try to find a user account with this email that follows some authors
+    // Then get recent articles from those followed authors (last 30 days)
+    let mut rows = conn
+        .query(
+            r"SELECT a.title, a.description, a.slug, u.username
+              FROM articles a
+              JOIN users u ON a.author_id = u.id
+              JOIN user_follows uf ON uf.following_id = u.id
+              JOIN users subscriber_user ON uf.follower_id = subscriber_user.id
+              WHERE subscriber_user.email = ?
+              AND a.draft = 0
+              AND datetime(a.created_at) >= datetime('now', '-30 days')
+              ORDER BY a.created_at DESC
+              LIMIT 5",
+            params![subscriber_email],
+        )
+        .await?;
+
+    let mut articles = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let title: String = row.get(0)?;
+        let description: String = row.get(1)?;
+        let slug: String = row.get(2)?;
+        let author_name: String = row.get(3)?;
+
+        articles.push(AuthorArticleSummary {
+            title,
+            description,
+            author_name,
+            url: format!("{}/articles/{}", base_url, slug),
+        });
+    }
+
+    Ok(articles)
 }
 
 /// Get newsletter statistics (author or admin)
