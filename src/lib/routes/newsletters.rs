@@ -792,26 +792,41 @@ pub async fn newsletter_page(State(state): State<AppState>) -> Result<Html<Strin
 }
 
 /// Newsletter confirmation success page
-/// GET /newsletter/confirmed (used via redirect from API)
+/// GET /newsletter/confirmed/{token}
+/// This page both confirms the subscription AND displays the success page
 pub async fn newsletter_confirmed_page(
     State(state): State<AppState>,
     Path(token): Path<String>,
 ) -> Result<Html<String>, ApiError> {
     let conn = state.db.connect()?;
 
-    // Get subscriber email from token
+    // Get subscriber info from token
     let mut rows = conn
         .query(
-            "SELECT email FROM newsletter_subscribers WHERE confirmation_token = ?",
+            "SELECT id, email, confirmed FROM newsletter_subscribers WHERE confirmation_token = ?",
             params![token],
         )
         .await?;
 
-    let email = if let Some(row) = rows.next().await? {
-        row.get::<String>(0)?
-    } else {
-        return Err(ApiError::NotFound("Invalid confirmation link".to_string()));
-    };
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Invalid confirmation link".to_string()))?;
+
+    let id: String = row.get(0)?;
+    let email: String = row.get(1)?;
+    let confirmed: i64 = row.get(2)?;
+
+    // If not already confirmed, confirm now
+    if confirmed != 1 {
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "UPDATE newsletter_subscribers SET confirmed = 1, confirmed_at = ?, updated_at = ? WHERE id = ?",
+            params![now.clone(), now, id],
+        )
+        .await?;
+        info!("Newsletter subscription confirmed for {}", email);
+    }
 
     let mut context = tera::Context::new();
     context.insert("title", "Subscription Confirmed");
