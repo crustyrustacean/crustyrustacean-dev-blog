@@ -798,7 +798,7 @@ impl EmailService {
         params: NewsletterIssueParams<'_>,
     ) -> Result<SendResponse, SendError> {
         let unsubscribe_link = format!(
-            "{}/api/newsletters/unsubscribe/{}",
+            "{}/newsletter/unsubscribed/{}",
             params.base_url, params.unsubscribe_token
         );
         let greeting = params.subscriber_name
