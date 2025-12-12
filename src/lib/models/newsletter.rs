@@ -218,3 +218,15 @@ pub struct NewsletterStats {
     pub total_issues: i32,
     pub sent_issues: i32,
 }
+
+// Newsletter subscriber response (for admin API)
+#[derive(Debug, Serialize)]
+pub struct SubscriberResponse {
+    pub id: Uuid,
+    pub email: String,
+    pub name: Option<String>,
+    pub confirmed: bool,
+    pub subscribed_at: DateTime<Utc>,
+    pub confirmed_at: Option<DateTime<Utc>>,
+    pub unsubscribed_at: Option<DateTime<Utc>>,
+}
