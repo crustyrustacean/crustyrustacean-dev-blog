@@ -68,7 +68,7 @@
         </div>
 
         <!-- Newsletters List -->
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="fas fa-list me-2"></i>
@@ -77,6 +77,26 @@
             </div>
             <div class="card-body">
                 <div id="newsletters-container">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscribers Management -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-users me-2"></i>
+                    Manage Subscribers
+                </h5>
+                <span class="badge bg-primary" id="subscriber-count-badge">-</span>
+            </div>
+            <div class="card-body">
+                <div id="subscribers-container">
                     <div class="text-center py-5">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
@@ -311,8 +331,107 @@ async function deleteNewsletter(id) {
     }
 }
 
+async function loadSubscribers() {
+    const container = document.getElementById('subscribers-container');
+    const badge = document.getElementById('subscriber-count-badge');
+
+    try {
+        const response = await fetch('/api/admin/newsletters/subscribers', {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            const subscribers = result.data.subscribers;
+
+            badge.textContent = subscribers.length;
+
+            if (subscribers.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center py-4">No subscribers yet.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th class="d-none d-md-table-cell">Name</th>
+                                <th>Status</th>
+                                <th class="d-none d-md-table-cell">Subscribed</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${subscribers.map(s => `
+                                <tr>
+                                    <td>
+                                        <span class="text-break">${s.email}</span>
+                                        <div class="d-md-none small text-muted">${s.name || ''}</div>
+                                    </td>
+                                    <td class="d-none d-md-table-cell">${s.name || '-'}</td>
+                                    <td>${getSubscriberStatusBadge(s)}</td>
+                                    <td class="d-none d-md-table-cell">${new Date(s.subscribed_at).toLocaleDateString()}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSubscriber('${s.id}', '${s.email}')" title="Remove subscriber">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading subscribers:', error);
+        container.innerHTML = '<p class="text-danger text-center py-4">Error loading subscribers</p>';
+    }
+}
+
+function getSubscriberStatusBadge(subscriber) {
+    if (subscriber.unsubscribed_at) {
+        return '<span class="badge bg-secondary">Unsubscribed</span>';
+    }
+    if (subscriber.confirmed) {
+        return '<span class="badge bg-success">Confirmed</span>';
+    }
+    return '<span class="badge bg-warning text-dark">Pending</span>';
+}
+
+async function deleteSubscriber(id, email) {
+    if (!confirm(`Are you sure you want to remove ${email} from the subscriber list? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/newsletters/subscribers/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            await loadSubscribers();
+            await loadStats();
+        } else {
+            const result = await response.json();
+            alert(result.error?.message || 'Error removing subscriber');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error removing subscriber');
+    }
+}
+
 // Load data on page load
 loadStats();
 loadNewsletters();
+loadSubscribers();
 </script>
 {% endblock %}

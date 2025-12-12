@@ -499,6 +499,84 @@ pub async fn delete_newsletter(
     })))
 }
 
+/// List all newsletter subscribers (admin only)
+/// GET /api/admin/newsletters/subscribers
+pub async fn list_subscribers(
+    _auth_user: AuthorUser,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let conn = state.db.connect()?;
+
+    let mut rows = conn
+        .query(
+            r"SELECT id, email, name, confirmed, subscribed_at, confirmed_at, unsubscribed_at
+              FROM newsletter_subscribers
+              ORDER BY subscribed_at DESC",
+            params![],
+        )
+        .await?;
+
+    let mut subscribers = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let id: String = row.get(0)?;
+        let email: String = row.get(1)?;
+        let name: Option<String> = row.get(2)?;
+        let confirmed: i64 = row.get(3)?;
+        let subscribed_at: String = row.get(4)?;
+        let confirmed_at: Option<String> = row.get(5)?;
+        let unsubscribed_at: Option<String> = row.get(6)?;
+
+        subscribers.push(crate::models::SubscriberResponse {
+            id: Uuid::parse_str(&id)?,
+            email,
+            name,
+            confirmed: confirmed == 1,
+            subscribed_at: subscribed_at.parse()?,
+            confirmed_at: confirmed_at.and_then(|s| s.parse().ok()),
+            unsubscribed_at: unsubscribed_at.and_then(|s| s.parse().ok()),
+        });
+    }
+
+    Ok(ApiResponse::success(json!({ "subscribers": subscribers })))
+}
+
+/// Delete a subscriber (admin only)
+/// DELETE /api/admin/newsletters/subscribers/:id
+pub async fn delete_subscriber(
+    _auth_user: AuthorUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, ApiError> {
+    info!("Attempting to delete subscriber with id: {}", id);
+
+    let conn = state.db.connect()?;
+
+    // Delete the subscriber directly (delivery logs will be deleted by CASCADE)
+    let result = match conn
+        .execute(
+            "DELETE FROM newsletter_subscribers WHERE id = ?",
+            params![id.clone()],
+        )
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Database error deleting subscriber {}: {:?}", id, e);
+            return Err(ApiError::from(e));
+        }
+    };
+
+    if result == 0 {
+        return Err(ApiError::NotFound("Subscriber not found".to_string()));
+    }
+
+    info!("Subscriber {} deleted by admin", id);
+
+    Ok(ApiResponse::success(json!({
+        "message": "Subscriber deleted successfully"
+    })))
+}
+
 /// Subscriber info for sending newsletters
 struct SubscriberInfo {
     id: String,

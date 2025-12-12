@@ -17,11 +17,11 @@ use crate::routes::{
     get_tags_admin_page, get_terms, get_user_admin, get_verify_email_page, handle_404_simple,
     health_check, list_api_keys, list_articles, list_media, list_newsletters, list_profiles,
     list_user_drafts, list_users_admin, login_user, mobile_upload_article,
-    newsletter_confirmed_page, newsletter_page, newsletter_unsubscribed_page, register_user,
-    request_password_reset, search_articles, send_newsletter, subscribe, unfavorite_article,
-    unfollow_user, unsubscribe, update_article, update_category, update_current_user,
-    update_media_metadata, update_newsletter, update_tag, update_user_admin, upload_markdown_file,
-    upload_media, verify_email,
+    delete_subscriber, list_subscribers, newsletter_confirmed_page, newsletter_page,
+    newsletter_unsubscribed_page, register_user, request_password_reset, search_articles,
+    send_newsletter, subscribe, unfavorite_article, unfollow_user, unsubscribe, update_article,
+    update_category, update_current_user, update_media_metadata, update_newsletter, update_tag,
+    update_user_admin, upload_markdown_file, upload_media, verify_email,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -181,6 +181,14 @@ impl AppService {
                 post(create_newsletter).get(list_newsletters),
             )
             .route("/api/admin/newsletters/stats", get(get_newsletter_stats))
+            .route(
+                "/api/admin/newsletters/subscribers",
+                get(list_subscribers),
+            )
+            .route(
+                "/api/admin/newsletters/subscribers/{id}",
+                axum::routing::delete(delete_subscriber),
+            )
             .route(
                 "/api/admin/newsletters/{id}",
                 get(get_newsletter)
