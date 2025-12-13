@@ -31,3 +31,4 @@ mod shortcodes;
 mod sitemap;
 mod tags;
 mod template_rendering;
+mod themes;

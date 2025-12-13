@@ -568,7 +568,7 @@ pub async fn list_profiles(
 pub async fn get_theme_preference(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-) -> Result<Json<ThemePreferenceResponse>, ApiError> {
+) -> Result<ApiResponse<ThemePreferenceResponse>, ApiError> {
     let conn = state
         .db
         .connect()
@@ -586,9 +586,9 @@ pub async fn get_theme_preference(
         .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let theme: String = row.get::<String>(0).unwrap_or_else(|_| "auto".to_string());
+    let theme: Option<String> = row.get::<String>(0).ok();
 
-    Ok(Json(ThemePreferenceResponse { theme }))
+    Ok(ApiResponse::success(ThemePreferenceResponse { theme }))
 }
 
 /// Update user's theme preference
@@ -597,7 +597,7 @@ pub async fn update_theme_preference(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(payload): Json<ThemePreferenceUpdate>,
-) -> Result<Json<ThemePreferenceResponse>, ApiError> {
+) -> Result<ApiResponse<ThemePreferenceResponse>, ApiError> {
     payload
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
@@ -631,8 +631,8 @@ pub async fn update_theme_preference(
     )
     .await?;
 
-    Ok(Json(ThemePreferenceResponse {
-        theme: payload.theme,
+    Ok(ApiResponse::success(ThemePreferenceResponse {
+        theme: Some(payload.theme),
     }))
 }
 
@@ -640,7 +640,7 @@ pub async fn update_theme_preference(
 /// GET /api/themes
 pub async fn list_themes(
     State(state): State<AppState>,
-) -> Result<Json<Vec<ThemeListItem>>, ApiError> {
+) -> Result<ApiResponse<Vec<ThemeListItem>>, ApiError> {
     let mut themes = state.available_themes();
 
     // Add 'auto' option
@@ -656,5 +656,5 @@ pub async fn list_themes(
         },
     );
 
-    Ok(Json(themes))
+    Ok(ApiResponse::success(themes))
 }
