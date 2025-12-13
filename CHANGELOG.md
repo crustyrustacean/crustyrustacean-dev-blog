@@ -2,6 +2,109 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [2.15.0] - 2025-12-13
+
+### Added - Newsletter Email Delivery & Subscriber Management
+- **Complete Newsletter Email Delivery**:
+  - Implemented `send_newsletter_confirmation` and `send_newsletter_issue` methods in EmailService
+  - Newsletter confirmation emails sent automatically on subscription
+  - Idempotent newsletter delivery (checks delivery_logs before sending)
+  - Personalized content based on followed authors' recent articles
+  - Responsive HTML email templates for both confirmation and newsletter emails
+
+- **Subscriber Management in Admin Panel**:
+  - `GET /api/admin/newsletters/subscribers` - List all subscribers
+  - `DELETE /api/admin/newsletters/subscribers/:id` - Remove subscribers
+  - Subscriber list shows email, name, and status (Confirmed/Pending/Unsubscribed)
+  - Delete functionality with responsive design for mobile
+
+- **Improved Unsubscribe Experience**:
+  - Unsubscribe link now redirects to styled `/newsletter/unsubscribed/{token}` page
+  - Users see a nicely formatted "You've Been Unsubscribed" page instead of raw JSON
+  - Page performs actual unsubscription (similar to confirmation page pattern)
+
+### Fixed - Newsletter Subscription Bug
+- **Critical Fix**: Confirmation page now actually confirms newsletter subscriptions
+  - Previously the page displayed success without updating database (`confirmed = 1`)
+  - Users who clicked confirmation link were never actually confirmed
+  - Now properly updates database so subscribers receive newsletters
+
+### Added - Real User Profile Pages
+- **Complete Profile System**:
+  - `GET /profiles/{username}` - Public user profile pages with real data
+  - `GET /profile` - Redirect to authenticated user's own profile
+  - Fetches actual articles, follower/following counts from database
+  - Returns 404 if user doesn't exist (instead of mock data)
+  - Optional authentication for follow button functionality
+
+- **Profile Page Optimizations**:
+  - Replaced N+1 queries with single optimized SQL query using JOINs and GROUP BY
+  - Consolidated profile stats (articles, followers, following) into single query
+  - Added pagination support with page query parameter (10 articles/page)
+
+### Fixed - User Experience Improvements
+- **Login Redirect**: Non-admin users now redirect to `/articles` instead of `/admin` after login
+- **404 Pages**: Now preserve login state and show logged-in user in navbar
+- **Edit Profile Link**: Fixed link from `/settings` to `/account` (the actual route)
+- **Footer Socials**: Fixed missing links in social media icons in footer
+
+### Added - Authors Discovery Enhancements
+- **Redesigned Authors Page**:
+  - New sidebar layout for better navigation
+  - Fully functional "Load More" pagination
+  - Toast notifications for follow/unfollow actions
+  - Enhanced visual design with hover effects and animations
+  - Informational sidebar explaining the follow feature
+  - Improved search UX with clear button and result count
+  - Quick links to related pages (Feed, Favorites, Articles)
+
+- **Authors List Fix**: Now filters to show only authors and admins (excludes subscribers)
+
+### Added - SEO Improvements
+- **Sitemap Fixes**:
+  - Corrected lastmod date format for W3C compliance (RFC 3339 with colon in timezone)
+  - Exclude draft articles from sitemap (fixes Google Search Console 404 errors)
+
+- **Search Engine Optimization**:
+  - Canonical URL tags on all public pages
+  - Meta description tags for better search snippets
+  - Robots noindex for paginated article list pages
+  - JSON-LD structured data for articles (BlogPosting schema)
+
+- **Code Quality**:
+  - Consolidated duplicate `escape_xml` functions into shared `xml.rs` module
+
+### Changed - Test Infrastructure
+- **Improved Test Helpers**:
+  - Added `TestCommentBuilder` trait with `add_comment` helper method
+  - Added `create_draft_article` and `create_draft_article_simple` to TestArticleBuilder
+  - Added `assert_navbar_authenticated` for navbar auth state assertions
+  - Added `assert_js_loaded` and `APP_VERSION` for JS cache-busting verification
+
+- **Test Code Reduction**:
+  - Refactored `template_rendering.rs` (39% code reduction)
+  - Refactored `sitemap.rs` (20% code reduction)
+  - Refactored `rss.rs` (15% code reduction)
+  - Refactored `feed_page.rs` to use helpers
+  - Net reduction: 247 lines removed while maintaining coverage
+
+### Test Coverage
+- Added 6 new comprehensive newsletter tests:
+  - Idempotent delivery
+  - Delivery logs verification
+  - Resubscribe flow
+  - Send with no subscribers
+  - Update newsletter
+  - Delete newsletter
+- Added tests for subscriber management endpoints (list and delete)
+- **Total test count**: 323 tests (all passing)
+
+### Technical Details
+- **Performance**: Optimized database queries reduce load times on profile pages
+- **Security**: Proper email confirmation prevents spam subscriptions
+- **User Experience**: Polished unsubscribe flow and improved navigation
+- **Code Quality**: Cleaner test infrastructure with reusable helpers
+
 ## [2.12.3] - 2025-11-23
 
 ### Changed - Error Handling Refactor
