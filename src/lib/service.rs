@@ -13,15 +13,16 @@ use crate::routes::{
     get_edit_article_page, get_editor_page, get_index, get_login_page, get_media_library_page,
     get_media_metadata, get_my_favorites_page, get_my_profile_page, get_newsletter,
     get_newsletter_stats, get_password_reset_page, get_password_reset_request_page, get_privacy,
-    get_profile, get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap, get_tags,
-    get_tags_admin_page, get_terms, get_user_admin, get_verify_email_page, handle_404_simple,
-    health_check, list_api_keys, list_articles, list_media, list_newsletters, list_profiles,
-    list_user_drafts, list_users_admin, login_user, mobile_upload_article,
-    delete_subscriber, list_subscribers, newsletter_confirmed_page, newsletter_page,
-    newsletter_unsubscribed_page, register_user, request_password_reset, search_articles,
-    send_newsletter, subscribe, unfavorite_article, unfollow_user, unsubscribe, update_article,
-    update_category, update_current_user, update_media_metadata, update_newsletter, update_tag,
-    update_user_admin, upload_markdown_file, upload_media, verify_email,
+    get_profile, get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap,
+    get_tags, get_tags_admin_page, get_terms, get_theme_preference, get_user_admin,
+    get_verify_email_page, handle_404_simple, health_check, list_api_keys, list_articles,
+    list_media, list_newsletters, list_profiles, list_themes, list_user_drafts, list_users_admin,
+    login_user, mobile_upload_article, delete_subscriber, list_subscribers, newsletter_confirmed_page,
+    newsletter_page, newsletter_unsubscribed_page, register_user, request_password_reset,
+    search_articles, send_newsletter, subscribe, unfavorite_article, unfollow_user, unsubscribe,
+    update_article, update_category, update_current_user, update_media_metadata, update_newsletter,
+    update_tag, update_theme_preference, update_user_admin, upload_markdown_file, upload_media,
+    verify_email,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -209,6 +210,12 @@ impl AppService {
             .route("/password-reset/{token}", get(get_password_reset_page))
             .route("/api/password-reset/{token}", post(complete_password_reset))
             .route("/api/account/password", post(change_password))
+            // Theme routes
+            .route("/api/themes", get(list_themes))
+            .route(
+                "/api/user/theme",
+                get(get_theme_preference).put(update_theme_preference),
+            )
             // Email verification route
             .route(
                 "/verify-email/{token}",
