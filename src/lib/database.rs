@@ -579,6 +579,16 @@ impl DatabaseConnection {
         )
         .await?;
 
+        // Add theme_preference column to users table
+        // Stores user's selected theme: 'auto', 'default', 'dark', 'high-contrast'
+        let _ = conn
+            .execute(
+                r"ALTER TABLE users ADD COLUMN theme_preference TEXT DEFAULT 'auto'",
+                (),
+            )
+            .await;
+        // Ignore error if column already exists
+
         Ok(())
     }
 }

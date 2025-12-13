@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ current_theme | default(value='default') }}">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="{{ theme_color_scheme(theme=current_theme | default(value='default')) }}">
         <title>{% block title %}Crusty Rustacean{% endblock %}</title>
         {% block meta_description %}{% endblock %}
         {% block canonical %}{% endblock %}
@@ -21,11 +22,22 @@
 
             gtag("config", "G-QCWV95QMKD");
         </script>
+        <!-- External CSS Framework (Bootstrap) -->
         <link
             rel="stylesheet"
             href="{{ theme_stylesheet(which='external') }}"
         />
         <link rel="icon" href="{{ versioned_asset(path='/static/favicon.png') }}" />
+        <!-- Base styles with CSS layers -->
+        <link
+            rel="stylesheet"
+            href="{{ versioned_asset(path='/static/css/base.css') }}"
+        />
+        <!-- Theme CSS variables from theme.toml -->
+        <style id="theme-variables">
+{{ theme_css(theme=current_theme | default(value='default')) | safe }}
+        </style>
+        <!-- Legacy override stylesheet (for backwards compatibility) -->
         <link
             rel="stylesheet"
             href="{{ versioned_asset(path=theme_stylesheet(which='override')) }}"
@@ -267,6 +279,7 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
         <script src="{{ versioned_asset(path='/static/js/base.js') }}"></script>
         <script src="{{ versioned_asset(path='/static/js/search.js') }}"></script>
+        <script src="{{ versioned_asset(path='/static/js/theme-switcher.js') }}"></script>
         {% block scripts %}{% endblock %}
     </body>
 </html>

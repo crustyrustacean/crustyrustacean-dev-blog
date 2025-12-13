@@ -62,6 +62,121 @@
                 </div>
             </div>
 
+            <!-- Theme Preferences Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-palette me-2"></i>Theme Preferences</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Choose your preferred color theme. "System" will follow your device's dark/light mode setting.
+                    </p>
+                    <div class="row" id="themePicker">
+                        <!-- System/Auto Theme -->
+                        <div class="col-md-3 col-6 mb-3">
+                            <div class="theme-option {% if theme_preference == 'auto' or not theme_preference %}active{% endif %}" data-theme="auto">
+                                <div class="theme-preview" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                                    <div class="theme-preview-split">
+                                        <div class="split-light"></div>
+                                        <div class="split-dark"></div>
+                                    </div>
+                                </div>
+                                <div class="theme-name">
+                                    <i class="fas fa-desktop me-1"></i>System
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Light Theme -->
+                        <div class="col-md-3 col-6 mb-3">
+                            <div class="theme-option {% if theme_preference == 'default' %}active{% endif %}" data-theme="default">
+                                <div class="theme-preview" style="background: #ffffff; border: 1px solid #dee2e6;">
+                                    <div class="preview-accent" style="background: #ff6b35;"></div>
+                                </div>
+                                <div class="theme-name">
+                                    <i class="fas fa-sun me-1"></i>Light
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Dark Theme -->
+                        <div class="col-md-3 col-6 mb-3">
+                            <div class="theme-option {% if theme_preference == 'dark' %}active{% endif %}" data-theme="dark">
+                                <div class="theme-preview" style="background: #0d1117;">
+                                    <div class="preview-accent" style="background: #ff8f5a;"></div>
+                                </div>
+                                <div class="theme-name">
+                                    <i class="fas fa-moon me-1"></i>Dark
+                                </div>
+                            </div>
+                        </div>
+                        <!-- High Contrast Theme -->
+                        <div class="col-md-3 col-6 mb-3">
+                            <div class="theme-option {% if theme_preference == 'high-contrast' %}active{% endif %}" data-theme="high-contrast">
+                                <div class="theme-preview" style="background: #ffffff; border: 2px solid #000000;">
+                                    <div class="preview-accent" style="background: #0066cc;"></div>
+                                </div>
+                                <div class="theme-name">
+                                    <i class="fas fa-adjust me-1"></i>High Contrast
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                .theme-option {
+                    cursor: pointer;
+                    border: 2px solid var(--color-border, #dee2e6);
+                    border-radius: var(--border-radius, 12px);
+                    padding: 0.5rem;
+                    transition: all 0.3s ease;
+                    text-align: center;
+                }
+                .theme-option:hover {
+                    border-color: var(--color-primary, #ff6b35);
+                    transform: translateY(-2px);
+                    box-shadow: var(--shadow-hover, 0 5px 25px rgba(0, 0, 0, 0.15));
+                }
+                .theme-option.active {
+                    border-color: var(--color-primary, #ff6b35);
+                    background-color: color-mix(in srgb, var(--color-primary, #ff6b35) 10%, transparent);
+                }
+                .theme-preview {
+                    height: 60px;
+                    border-radius: 8px;
+                    position: relative;
+                    overflow: hidden;
+                    margin-bottom: 0.5rem;
+                }
+                .preview-accent {
+                    position: absolute;
+                    bottom: 8px;
+                    left: 8px;
+                    width: 30px;
+                    height: 4px;
+                    border-radius: 2px;
+                }
+                .theme-preview-split {
+                    display: flex;
+                    height: 100%;
+                }
+                .split-light {
+                    flex: 1;
+                    background: #ffffff;
+                    border-right: 1px solid #dee2e6;
+                }
+                .split-dark {
+                    flex: 1;
+                    background: #0d1117;
+                }
+                .theme-name {
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    color: var(--color-text-primary, inherit);
+                }
+            </style>
+
             <!-- Change Password Card -->
             <div class="card mb-4">
                 <div class="card-header bg-warning text-dark">
@@ -136,4 +251,37 @@
 
 <script src="{{ versioned_asset(path='/static/js/utils.js') }}"></script>
 <script src="{{ versioned_asset(path='/static/js/account-settings.js') }}"></script>
+<script>
+// Theme picker functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const themePicker = document.getElementById('themePicker');
+    if (!themePicker) return;
+
+    const themeOptions = themePicker.querySelectorAll('.theme-option');
+
+    themeOptions.forEach(option => {
+        option.addEventListener('click', async function() {
+            const theme = this.dataset.theme;
+
+            // Update UI immediately
+            themeOptions.forEach(opt => opt.classList.remove('active'));
+            this.classList.add('active');
+
+            // Apply theme using the global themeSwitcher
+            if (window.themeSwitcher) {
+                await window.themeSwitcher.setTheme(theme);
+            }
+
+            // Show success feedback
+            const successEl = document.getElementById('successMessage');
+            const successText = document.getElementById('successText');
+            if (successEl && successText) {
+                successText.textContent = 'Theme updated successfully!';
+                successEl.classList.remove('d-none');
+                setTimeout(() => successEl.classList.add('d-none'), 3000);
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
