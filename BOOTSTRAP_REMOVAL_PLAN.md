@@ -19,19 +19,65 @@ This plan outlines the systematic removal of Bootstrap 5.1.3 from the CrustyRust
 
 ---
 
+## ⚠️ Deployment Safety Guide
+
+This migration is designed for **incremental deployment**. You can deploy changes in stages while keeping the site fully functional.
+
+### Key Principle
+**Keep Bootstrap loaded until ALL replacements are complete.** The custom CSS/JS will coexist with Bootstrap until the final cutover.
+
+### What's Safe to Deploy (Bootstrap Still Loaded)
+
+| Phase | Tasks | Safe to Deploy? | Notes |
+|-------|-------|-----------------|-------|
+| 1 | L2-L8 (utilities) | ✅ Yes | Adds CSS that coexists with Bootstrap |
+| 2 | M1-M8 (components) | ✅ Yes | Adds CSS that coexists with Bootstrap |
+| 3 | H1-H4 (interactive) | ✅ Yes | Adds JS/CSS, Bootstrap still handles interactions |
+| 4 | H5-H6 (migration) | ✅ Yes | Templates switch to custom classes |
+| 5 | **FINAL** (L1 + H7) | ⚠️ Only after ALL above | Removes Bootstrap entirely |
+
+### What Will Break If You Remove Bootstrap Early
+
+If you deploy L1 (remove Bootstrap CDN) before completing all other tasks:
+- ❌ Navbar loses all styling and mobile collapse
+- ❌ All 10+ modals stop working
+- ❌ Dropdowns break completely
+- ❌ Forms, buttons, cards become unstyled
+- ❌ Grid layout (container/row/col) collapses
+- ❌ Pagination, alerts, badges unstyled
+
+### Recommended Deployment Strategy
+
+```
+Deploy 1: L2-L8 + M1         → Foundation ready (utilities + grid)
+Deploy 2: M2-M8              → Component styles ready
+Deploy 3: H1-H4              → Interactive components ready
+Deploy 4: H5-H6              → Templates migrated to custom classes
+Deploy 5: L1 + H7            → Remove Bootstrap, final QA
+```
+
+Each deployment is safe and the site remains fully functional.
+
+---
+
 ## Task Breakdown
 
 ### LOW DIFFICULTY TASKS (Quick wins, minimal risk)
 
-#### L1. Remove Bootstrap CDN References
+#### L1. Remove Bootstrap CDN References ⚠️ FINAL STEP
 **Files**: `themes/*/theme.toml`, `templates/base.html`
 **Effort**: ~30 minutes
+**Prerequisites**: ALL other tasks (L2-L8, M1-M8, H1-H7) must be complete
+
+> **🚨 WARNING**: This task removes Bootstrap entirely. Only execute this after ALL other tasks are complete and tested. Deploying this prematurely will break the entire site.
 
 Remove the Bootstrap CDN links from all theme configuration files and update base.html to no longer include external Bootstrap stylesheets.
 
+- [ ] Verify ALL other tasks are complete (L2-L8, M1-M8, H1-H6)
 - [ ] Remove `stylesheets = ["https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"]` from all `theme.toml` files
 - [ ] Remove Bootstrap JS bundle script tag from `templates/base.html`
 - [ ] Update `theme_stylesheet()` Tera function to not return Bootstrap URL
+- [ ] Run H7 (comprehensive testing) immediately after
 
 ---
 
@@ -1328,31 +1374,101 @@ Thorough testing of all functionality after Bootstrap removal.
 
 ## Implementation Order
 
-### Recommended Sequence
+### Phased Implementation (Safe for Incremental Deployment)
 
-**Phase 1: Foundation (Days 1-2)**
-1. L2-L8: Create utilities.css with all utility classes
-2. M1: Implement grid system
+Each phase can be deployed independently. Bootstrap remains loaded and functional until Phase 5.
 
-**Phase 2: Components (Days 3-5)**
-3. M2: Button styles
-4. M3: Card styles
-5. M4: Form styles
-6. M5-M8: Badge, Alert, Pagination, Table styles
+---
 
-**Phase 3: Complex Components (Days 6-8)**
-7. H3: Dropdown component (needed for navbar)
-8. H4: Collapse component (needed for navbar)
-9. H1: Navbar component
-10. H2: Modal component
+#### 🟢 Phase 1: Foundation
+**Tasks**: L2-L8, M1
+**Deployable**: Yes (Bootstrap still handles everything)
+**What you're adding**: Custom utility classes + grid system
 
-**Phase 4: Integration (Days 9-11)**
-11. H5: Update all JavaScript files
-12. H6: Update all HTML templates
-13. L1: Remove Bootstrap CDN references (final step)
+| Task | Description | Can Deploy After? |
+|------|-------------|-------------------|
+| L2 | Spacing utilities (m-*, p-*) | ✅ Yes |
+| L3 | Text utilities | ✅ Yes |
+| L4 | Display utilities | ✅ Yes |
+| L5 | Sizing utilities | ✅ Yes |
+| L6 | Flex utilities | ✅ Yes |
+| L7 | Border/rounded utilities | ✅ Yes |
+| L8 | Shadow utilities | ✅ Yes |
+| M1 | Grid system | ✅ Yes |
 
-**Phase 5: QA (Days 12-13)**
-14. H7: Comprehensive testing
+---
+
+#### 🟢 Phase 2: Component Styles
+**Tasks**: M2-M8
+**Deployable**: Yes (Bootstrap still handles everything)
+**What you're adding**: Custom component CSS (coexists with Bootstrap)
+
+| Task | Description | Can Deploy After? |
+|------|-------------|-------------------|
+| M2 | Button styles | ✅ Yes |
+| M3 | Card styles | ✅ Yes |
+| M4 | Form styles | ✅ Yes |
+| M5 | Badge styles | ✅ Yes |
+| M6 | Alert styles | ✅ Yes |
+| M7 | Pagination styles | ✅ Yes |
+| M8 | Table styles | ✅ Yes |
+
+---
+
+#### 🟢 Phase 3: Interactive Components
+**Tasks**: H1-H4
+**Deployable**: Yes (Bootstrap JS still handles interactions)
+**What you're adding**: Custom JS components (ready but not active yet)
+
+| Task | Description | Can Deploy After? |
+|------|-------------|-------------------|
+| H3 | Dropdown component | ✅ Yes |
+| H4 | Collapse component | ✅ Yes |
+| H1 | Navbar component | ✅ Yes |
+| H2 | Modal component | ✅ Yes |
+
+---
+
+#### 🟡 Phase 4: Template Migration
+**Tasks**: H5, H6
+**Deployable**: Yes (switches templates to use custom components)
+**What you're doing**: Updating templates from `data-bs-*` to `data-*` attributes
+
+| Task | Description | Can Deploy After? |
+|------|-------------|-------------------|
+| H5 | Update all JavaScript files | ✅ Yes |
+| H6 | Update all 35 HTML templates | ✅ Yes |
+
+After this phase, your custom components are handling all interactions, but Bootstrap CSS is still loaded as a fallback.
+
+---
+
+#### 🔴 Phase 5: Final Cutover (LAST STEP)
+**Tasks**: L1, H7
+**Deployable**: Only after ALL phases above are complete
+**What you're doing**: Removing Bootstrap entirely
+
+| Task | Description | Can Deploy After? |
+|------|-------------|-------------------|
+| **L1** | **Remove Bootstrap CDN** | ⚠️ Only after H6 complete |
+| H7 | Comprehensive testing | Required immediately after L1 |
+
+> **🚨 Do not deploy L1 until Phases 1-4 are complete and tested.**
+
+---
+
+### Quick Reference: Task Execution Order
+
+```
+SAFE TO DEPLOY ANYTIME (Phases 1-4):
+L2 → L3 → L4 → L5 → L6 → L7 → L8 → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8
+                                    ↓
+                    H3 → H4 → H1 → H2 → H5 → H6
+
+FINAL STEP ONLY (Phase 5):
+                                              ↓
+                                    L1 → H7 (QA)
+```
 
 ---
 
