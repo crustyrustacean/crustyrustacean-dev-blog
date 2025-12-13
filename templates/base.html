@@ -33,9 +33,9 @@
             rel="stylesheet"
             href="{{ versioned_asset(path='/static/css/base.css') }}"
         />
-        <!-- Theme CSS variables from theme.toml -->
+        <!-- Theme CSS variables for all themes (enables client-side switching) -->
         <style id="theme-variables">
-{{ theme_css(theme=current_theme | default(value='default')) | safe }}
+{{ all_themes_css() | safe }}
         </style>
         <!-- Legacy override stylesheet (for backwards compatibility) -->
         <link

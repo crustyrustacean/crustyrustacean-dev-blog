@@ -107,9 +107,14 @@ impl ThemeConfig {
         Ok(config)
     }
 
-    /// Generate CSS custom properties from theme colors
+    /// Generate CSS custom properties from theme colors (for :root)
     pub fn to_css(&self) -> String {
-        let mut css = String::from(":root {\n");
+        self.to_css_with_selector(":root")
+    }
+
+    /// Generate CSS custom properties with a specific selector
+    pub fn to_css_with_selector(&self, selector: &str) -> String {
+        let mut css = format!("{} {{\n", selector);
 
         // Add color variables
         for (key, value) in &self.theme.colors {
@@ -285,6 +290,21 @@ impl ThemeRegistry {
             })
             .collect()
     }
+
+    /// Generate CSS for all themes with data-theme attribute selectors
+    /// This allows client-side theme switching without server requests
+    pub fn all_themes_css(&self) -> String {
+        let mut css = String::new();
+
+        // Generate CSS for each theme with [data-theme="X"] selector
+        for config in self.themes.values() {
+            let selector = format!("[data-theme=\"{}\"]", config.theme.id);
+            css.push_str(&config.to_css_with_selector(&selector));
+            css.push('\n');
+        }
+
+        css
+    }
 }
 
 impl Default for ThemeRegistry {
@@ -412,5 +432,65 @@ preview_colors = ["#ff6b35", "#2c3e50", "#ffffff"]
             config.external_stylesheet(),
             Some("https://example.com/bootstrap.css")
         );
+    }
+
+    #[test]
+    fn test_to_css_with_selector() {
+        let toml_content = create_test_theme_toml();
+        let config: ThemeConfig = toml::from_str(&toml_content).unwrap();
+        let css = config.to_css_with_selector("[data-theme=\"test\"]");
+
+        assert!(css.contains("[data-theme=\"test\"] {"));
+        assert!(css.contains("--theme-primary:"));
+        assert!(!css.contains(":root"));
+    }
+
+    #[test]
+    fn test_all_themes_css() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create two test themes
+        let theme1_dir = temp_dir.path().join("light");
+        fs::create_dir(&theme1_dir).unwrap();
+        fs::write(
+            theme1_dir.join("theme.toml"),
+            r##"
+[theme]
+id = "light"
+name = "Light"
+version = "1.0.0"
+[theme.supports]
+color_scheme = "light"
+[theme.colors]
+primary = "#ffffff"
+"##,
+        )
+        .unwrap();
+
+        let theme2_dir = temp_dir.path().join("dark");
+        fs::create_dir(&theme2_dir).unwrap();
+        fs::write(
+            theme2_dir.join("theme.toml"),
+            r##"
+[theme]
+id = "dark"
+name = "Dark"
+version = "1.0.0"
+[theme.supports]
+color_scheme = "dark"
+[theme.colors]
+primary = "#000000"
+"##,
+        )
+        .unwrap();
+
+        let registry = ThemeRegistry::load_from_directory(temp_dir.path()).unwrap();
+        let css = registry.all_themes_css();
+
+        // Should contain both themes with data-theme selectors
+        assert!(css.contains("[data-theme=\"light\"]"));
+        assert!(css.contains("[data-theme=\"dark\"]"));
+        assert!(css.contains("--theme-primary: #ffffff"));
+        assert!(css.contains("--theme-primary: #000000"));
     }
 }

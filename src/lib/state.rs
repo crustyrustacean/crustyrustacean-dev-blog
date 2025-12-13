@@ -173,6 +173,20 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
             },
         );
 
+        // Register all_themes_css function to generate CSS for all themes
+        // This enables client-side theme switching without additional server requests
+        tera.register_function(
+            "all_themes_css",
+            |_args: &HashMap<String, Value>| -> tera::Result<Value> {
+                let registry = THEME_REGISTRY.get();
+                let css = registry
+                    .map(|r| r.all_themes_css())
+                    .unwrap_or_default();
+
+                Ok(Value::String(css))
+            },
+        );
+
         Ok(tera)
     })
 }
