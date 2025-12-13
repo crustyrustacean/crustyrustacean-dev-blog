@@ -4,6 +4,7 @@
 use crate::auth::Keys;
 use crate::email::EmailService;
 use crate::storage::StorageBackend;
+use crate::theme::{ThemeListItem, ThemeRegistry};
 use crate::{ApiError, AppConfig, DatabaseConnection};
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
@@ -17,6 +18,9 @@ pub type TagCache = Arc<RwLock<Option<CachedTags>>>;
 
 // initialized a static variable to hold the compiled templates
 static COMPILED_TEMPLATES: OnceCell<Tera> = OnceCell::new();
+
+// static variable to hold the theme registry
+static THEME_REGISTRY: OnceCell<ThemeRegistry> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct CachedTags {
@@ -34,11 +38,28 @@ pub struct AppState {
     pub cached_tags: TagCache,
     pub email: EmailService,
     pub allowed_origins: Vec<String>,
+    pub themes: &'static ThemeRegistry,
 }
 
 // simplified setup function
 fn setup_templates(config: &AppConfig) -> Result<&'static Tera, tera::Error> {
     load_templates(&config.templates_dir, config)
+}
+
+// Load themes from the themes directory
+fn setup_themes() -> &'static ThemeRegistry {
+    THEME_REGISTRY.get_or_init(|| {
+        match ThemeRegistry::load_from_directory("themes") {
+            Ok(registry) => {
+                tracing::info!("Loaded {} themes", registry.len());
+                registry
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load themes: {}, using empty registry", e);
+                ThemeRegistry::new()
+            }
+        }
+    })
 }
 
 // utility function to load and compile the templates once, saving them in static memory
@@ -49,6 +70,7 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
         let external = config.external_stylesheet.clone();
         let override_css = config.override_stylesheet.clone();
 
+        // Legacy theme_stylesheet function (for backwards compatibility)
         tera.register_function(
             "theme_stylesheet",
             move |args: &HashMap<String, Value>| -> tera::Result<Value> {
@@ -88,6 +110,69 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
             },
         );
 
+        // Register theme_css function to generate CSS variables from theme.toml
+        tera.register_function(
+            "theme_css",
+            |args: &HashMap<String, Value>| -> tera::Result<Value> {
+                use tera::from_value;
+
+                let theme_id = args
+                    .get("theme")
+                    .and_then(|v| from_value::<String>(v.clone()).ok())
+                    .unwrap_or_else(|| "default".to_string());
+
+                let registry = THEME_REGISTRY.get();
+                let css = registry
+                    .and_then(|r| r.get(&theme_id))
+                    .map(|theme| theme.to_css())
+                    .unwrap_or_else(|| {
+                        // Fallback to default theme or empty CSS
+                        registry
+                            .and_then(|r| r.default_theme())
+                            .map(|t| t.to_css())
+                            .unwrap_or_default()
+                    });
+
+                Ok(Value::String(css))
+            },
+        );
+
+        // Register available_themes function to get list of themes
+        tera.register_function(
+            "available_themes",
+            |_args: &HashMap<String, Value>| -> tera::Result<Value> {
+                let registry = THEME_REGISTRY.get();
+                let themes: Vec<ThemeListItem> = registry
+                    .map(|r| r.to_theme_list())
+                    .unwrap_or_default();
+
+                serde_json::to_value(themes)
+                    .map(|v| tera::to_value(v).unwrap_or(Value::Array(vec![])))
+                    .map_err(|e| tera::Error::msg(format!("Failed to serialize themes: {}", e)))
+            },
+        );
+
+        // Register theme_color_scheme function to get a theme's color scheme
+        tera.register_function(
+            "theme_color_scheme",
+            |args: &HashMap<String, Value>| -> tera::Result<Value> {
+                use tera::from_value;
+
+                let theme_id = args
+                    .get("theme")
+                    .and_then(|v| from_value::<String>(v.clone()).ok())
+                    .unwrap_or_else(|| "default".to_string());
+
+                let registry = THEME_REGISTRY.get();
+                let scheme = registry
+                    .and_then(|r| r.get(&theme_id))
+                    .map(|theme| theme.color_scheme().to_string())
+                    .unwrap_or_else(|| "light".to_string());
+
+                Ok(Value::String(scheme))
+            },
+        );
+
         Ok(tera)
     })
 }
@@ -100,6 +185,8 @@ impl AppState {
         storage: Arc<dyn StorageBackend>,
         config: AppConfig,
     ) -> Result<Self, ApiError> {
+        // Load themes first (so they're available during template setup)
+        let themes = setup_themes();
         let templates = setup_templates(&config)?;
         let jwt_keys = Keys::from_config(&config);
         let email = EmailService::from_config(&config.email);
@@ -113,7 +200,18 @@ impl AppState {
             cached_tags: Arc::new(RwLock::new(None)),
             email,
             allowed_origins,
+            themes,
         })
+    }
+
+    /// Get the theme registry
+    pub fn theme_registry(&self) -> &ThemeRegistry {
+        self.themes
+    }
+
+    /// Get available themes as a list
+    pub fn available_themes(&self) -> Vec<ThemeListItem> {
+        self.themes.to_theme_list()
     }
 }
 

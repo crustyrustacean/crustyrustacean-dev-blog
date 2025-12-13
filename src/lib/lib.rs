@@ -18,6 +18,7 @@ pub mod shortcodes;
 pub mod state;
 pub mod storage;
 pub mod telemetry;
+pub mod theme;
 pub mod xml;
 
 // re-exports for easier access
@@ -34,4 +35,5 @@ pub use shortcodes::*;
 pub use state::*;
 pub use storage::*;
 pub use telemetry::*;
+pub use theme::*;
 pub use xml::*;

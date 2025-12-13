@@ -5,9 +5,11 @@ use crate::{
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
     models::{
         ProfileResponse, ProfilesQuery, ProfilesResponse, RegistrationSuccessResponse, Role,
-        UserData, UserLogin, UserProfile, UserRegistration, UserResponse, UserUpdate,
+        ThemePreferenceResponse, ThemePreferenceUpdate, UserData, UserLogin, UserProfile,
+        UserRegistration, UserResponse, UserUpdate,
     },
     response::ApiResponse,
+    theme::ThemeListItem,
 };
 use axum::{
     extract::{Path, Query, State},
@@ -555,4 +557,104 @@ pub async fn list_profiles(
     };
 
     Ok(Json(response))
+}
+
+// ==========================================
+// Theme Preference Routes
+// ==========================================
+
+/// Get user's theme preference
+/// GET /api/user/theme
+pub async fn get_theme_preference(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<ThemePreferenceResponse>, ApiError> {
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
+
+    let mut rows = conn
+        .query(
+            "SELECT theme_preference FROM users WHERE id = ?",
+            libsql::params![user.user_id.to_string()],
+        )
+        .await?;
+
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
+
+    let theme: String = row.get::<String>(0).unwrap_or_else(|_| "auto".to_string());
+
+    Ok(Json(ThemePreferenceResponse { theme }))
+}
+
+/// Update user's theme preference
+/// PUT /api/user/theme
+pub async fn update_theme_preference(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Json(payload): Json<ThemePreferenceUpdate>,
+) -> Result<Json<ThemePreferenceResponse>, ApiError> {
+    payload
+        .validate()
+        .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
+
+    // Validate that the theme exists
+    let valid_themes = ["auto", "default", "dark", "high-contrast"];
+    if !valid_themes.contains(&payload.theme.as_str())
+        && !state.themes.contains(&payload.theme)
+    {
+        return Err(ApiError::BadRequest(format!(
+            "Invalid theme: {}. Valid themes are: {:?}",
+            payload.theme,
+            valid_themes
+        )));
+    }
+
+    let conn = state
+        .db
+        .connect()
+        .map_err(ApiError::from_connection_error)?;
+
+    let now = Utc::now();
+
+    conn.execute(
+        "UPDATE users SET theme_preference = ?, updated_at = ? WHERE id = ?",
+        libsql::params![
+            payload.theme.clone(),
+            now.to_rfc3339(),
+            user.user_id.to_string(),
+        ],
+    )
+    .await?;
+
+    Ok(Json(ThemePreferenceResponse {
+        theme: payload.theme,
+    }))
+}
+
+/// Get list of available themes
+/// GET /api/themes
+pub async fn list_themes(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ThemeListItem>>, ApiError> {
+    let mut themes = state.available_themes();
+
+    // Add 'auto' option
+    themes.insert(
+        0,
+        ThemeListItem {
+            id: "auto".to_string(),
+            name: "System".to_string(),
+            description: Some("Follow system preference".to_string()),
+            color_scheme: "auto".to_string(),
+            high_contrast: false,
+            preview_colors: vec!["#667eea".to_string(), "#764ba2".to_string()],
+        },
+    );
+
+    Ok(Json(themes))
 }

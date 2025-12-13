@@ -18,6 +18,7 @@ pub struct User {
     pub disabled: bool,
     pub role: Role,
     pub email_verified: bool,
+    pub theme_preference: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -167,4 +168,16 @@ pub struct AdminUsersQuery {
     pub status: Option<String>, // "active", "disabled", or "all"
     pub limit: Option<i32>,
     pub offset: Option<i32>,
+}
+
+// Theme preference models
+#[derive(Debug, Serialize)]
+pub struct ThemePreferenceResponse {
+    pub theme: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ThemePreferenceUpdate {
+    #[validate(length(min = 1, max = 50))]
+    pub theme: String,
 }
