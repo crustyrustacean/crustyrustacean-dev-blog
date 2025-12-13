@@ -12,7 +12,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
 - **Role-Based Access Control (RBAC)** with Admin, Author, and Subscriber roles
 - **User profiles and social features** (follow/unfollow system)
 - **Turso/libSQL database integration** with automated migrations
-- **Comprehensive test suite** with 264 integration tests and 19 unit tests (283 total)
+- **Comprehensive test suite** with 323 tests (integration + unit)
 - **Production-ready security** (Argon2 password hashing, JWT validation)
 - **Shuttle deployment ready** with environment configuration
 - **Health check endpoint** for monitoring
@@ -25,7 +25,8 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Admin dashboard for content management with copy-to-clipboard slug functionality
 - **Professional frontend** with Tera templating:
   - Bootstrap-based responsive design
-  - SEO-friendly URLs and metadata
+  - SEO-friendly URLs with canonical tags and meta descriptions
+  - JSON-LD structured data for articles (BlogPosting schema)
   - User-friendly navigation and error handling
   - Real-time statistics and content updates
 - **Content management system**:
@@ -146,15 +147,20 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Fast preview without server-side processing
 - **Newsletter Subscription and Delivery Service** (TDD implementation):
   - Newsletter subscription with email validation
-  - Double opt-in confirmation pattern
+  - Double opt-in confirmation pattern with email confirmation
   - Subscriber management (subscribe, confirm, unsubscribe)
+  - Admin subscriber management (list, delete subscribers)
   - Newsletter creation and management (Author+ role required)
-  - Send newsletters to confirmed subscribers
+  - Send newsletters to confirmed subscribers with email delivery
+  - Idempotent delivery with delivery logs tracking
+  - Personalized content based on followed authors
+  - Responsive HTML email templates
   - Newsletter statistics dashboard
   - Subscription page with responsive UI
-  - Admin newsletter management page
+  - Admin newsletter management page with subscriber list
+  - Styled unsubscribe confirmation pages
   - Re-subscription support for unsubscribed users
-  - 16 comprehensive integration tests
+  - 22+ comprehensive integration tests
 - **Role-Based Access Control (RBAC) System** (TDD implementation):
   - Three user roles: Admin, Author, Subscriber
   - Hierarchical permission system (Admin > Author > Subscriber)
@@ -303,7 +309,7 @@ shuttle run
 ### Running Tests
 
 ```sh
-cargo test              # Run all tests (283 total: 264 integration + 19 unit)
+cargo test              # Run all tests (323 total)
 cargo test auth         # Run authentication tests only
 cargo test favorites    # Run favorites API tests only
 cargo test feed         # Run feed API tests only
@@ -342,6 +348,9 @@ The test suite includes comprehensive testing:
 - ✅ Media library with file upload and storage operations
 - ✅ Newsletter subscription with double opt-in confirmation
 - ✅ Newsletter management and delivery to confirmed subscribers
+- ✅ Newsletter subscriber management (list, delete)
+- ✅ User profile pages with real data and pagination
+- ✅ SEO features (canonical URLs, structured data, sitemap)
 - ✅ Template rendering with authentication state validation
 - ✅ RBAC system with role-based permissions and access control
 - ✅ Unified error handling with sanitized error messages
@@ -373,7 +382,8 @@ GET  /admin/newsletters            # Newsletter management page (protected)
 GET  /newsletter                   # Newsletter subscription page
 GET  /newsletter/confirmed/{token} # Subscription confirmation page
 GET  /newsletter/unsubscribed/{token} # Unsubscribe confirmation page
-GET  /profiles/{username}          # User profile page
+GET  /profile                      # Redirect to own profile (protected)
+GET  /profiles/{username}          # User profile page with real data
 GET  /profiles                     # Authors discovery page (protected)
 GET  /feed                         # Personal feed page (protected)
 GET  /favorites                    # User's favorite articles (protected)
@@ -479,6 +489,8 @@ PUT    /api/admin/newsletters/{id}          # Update newsletter issue
 DELETE /api/admin/newsletters/{id}          # Delete newsletter issue
 POST   /api/admin/newsletters/{id}/send     # Send newsletter to confirmed subscribers
 GET    /api/admin/newsletters/stats         # Get newsletter statistics
+GET    /api/admin/newsletters/subscribers   # List all subscribers (Admin)
+DELETE /api/admin/newsletters/subscribers/:id # Remove subscriber (Admin)
 ```
 
 ### System
@@ -509,8 +521,10 @@ The application now includes a complete blog system:
 17. **RSS Feed**: Standards-compliant syndication for RSS readers and aggregators
 18. **Comments System**: Add, view, and delete comments on articles with proper authorization
 19. **Media Library**: Upload and manage media files with cloud storage integration
-20. **Newsletter System**: Email subscription with double opt-in, newsletter creation and delivery management
-21. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+20. **Newsletter System**: Email subscription with double opt-in, newsletter creation and delivery management, subscriber management
+21. **User Profile Pages**: Real profile pages with articles, followers, following counts, and pagination
+22. **SEO Features**: Canonical URLs, meta descriptions, JSON-LD structured data, W3C-compliant sitemap
+23. **Responsive Design**: Bootstrap-based UI that works on all device sizes
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -544,7 +558,7 @@ The application now includes a complete blog system:
 - **Unified Error Handling**: Consolidated `ApiError` type eliminates duplication across codebase
 - **Standardized Responses**: All API responses use `ApiResponse<T>` type for consistency
 - **Domain-Driven Design**: Clear separation between domain logic and HTTP concerns
-- **Comprehensive Testing**: 283 total tests (264 integration + 19 unit) covering happy path and failure scenarios
+- **Comprehensive Testing**: 323 tests covering happy path and failure scenarios
 - **Test-Driven Development**: Tags, RSS, Comments, Search, Categories, Drafts, Media Library, Newsletter, and RBAC features built with TDD approach
 - **Production-Ready**: Industry best practices for security, error handling, and testing
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
