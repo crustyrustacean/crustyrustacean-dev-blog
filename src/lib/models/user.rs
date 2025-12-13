@@ -173,7 +173,7 @@ pub struct AdminUsersQuery {
 // Theme preference models
 #[derive(Debug, Serialize)]
 pub struct ThemePreferenceResponse {
-    pub theme: Option<String>,
+    pub theme: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]

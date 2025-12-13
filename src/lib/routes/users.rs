@@ -586,7 +586,7 @@ pub async fn get_theme_preference(
         .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let theme: Option<String> = row.get::<String>(0).ok();
+    let theme: String = row.get::<String>(0).unwrap_or_else(|_| "auto".to_string());
 
     Ok(ApiResponse::success(ThemePreferenceResponse { theme }))
 }
@@ -632,7 +632,7 @@ pub async fn update_theme_preference(
     .await?;
 
     Ok(ApiResponse::success(ThemePreferenceResponse {
-        theme: Some(payload.theme),
+        theme: payload.theme,
     }))
 }
 
