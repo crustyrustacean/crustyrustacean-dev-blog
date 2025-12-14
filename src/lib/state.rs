@@ -67,27 +67,13 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
     COMPILED_TEMPLATES.get_or_try_init(|| {
         let mut tera = Tera::new(templates_dir)?;
 
-        let external = config.external_stylesheet.clone();
-        let override_css = config.override_stylesheet.clone();
-
-        // Legacy theme_stylesheet function (for backwards compatibility)
+        // Deprecated: Bootstrap has been removed. This function now returns empty strings.
+        // Kept for backwards compatibility in case any templates still reference it.
         tera.register_function(
             "theme_stylesheet",
-            move |args: &HashMap<String, Value>| -> tera::Result<Value> {
-                use tera::from_value;
-
-                let which = args
-                    .get("which")
-                    .and_then(|v| from_value::<String>(v.clone()).ok())
-                    .unwrap_or_else(|| "external".to_string());
-
-                let url = match which.as_str() {
-                    "external" => &external,
-                    "override" => &override_css,
-                    _ => "",
-                };
-
-                Ok(Value::String(url.to_string()))
+            |_args: &HashMap<String, Value>| -> tera::Result<Value> {
+                // Bootstrap has been removed - return empty string
+                Ok(Value::String(String::new()))
             },
         );
 
