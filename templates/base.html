@@ -28,6 +28,11 @@
             href="{{ theme_stylesheet(which='external') }}"
         />
         <link rel="icon" href="{{ versioned_asset(path='/static/favicon.png') }}" />
+        <!-- CSS custom properties (variables) - must load first -->
+        <link
+            rel="stylesheet"
+            href="{{ versioned_asset(path='/static/css/variables.css') }}"
+        />
         <!-- Base styles with CSS layers -->
         <link
             rel="stylesheet"
