@@ -113,6 +113,13 @@ const REQUIRED_COLOR_KEYS: &[&str] = &[
 /// Valid color scheme values
 const VALID_COLOR_SCHEMES: &[&str] = &["light", "dark", "auto"];
 
+/// Keys in the colors map that are NOT actual colors (CSS values like border-radius, shadows)
+const NON_COLOR_KEYS: &[&str] = &[
+    "border-radius",
+    "shadow",
+    "shadow-hover",
+];
+
 impl ThemeConfig {
     /// Load a theme from a TOML file
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, ThemeError> {
@@ -161,7 +168,11 @@ impl ThemeConfig {
         }
 
         // Validate color format (hex colors should start with #)
+        // Skip non-color keys like border-radius, shadow, etc.
         for (key, value) in &self.theme.colors {
+            if NON_COLOR_KEYS.contains(&key.as_str()) {
+                continue; // Skip validation for non-color CSS values
+            }
             if !Self::is_valid_color_value(value) {
                 errors.push(format!(
                     "Invalid color value for '{}': '{}' (expected hex color like #ffffff or CSS function)",
