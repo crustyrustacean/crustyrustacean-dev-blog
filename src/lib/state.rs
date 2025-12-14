@@ -48,16 +48,14 @@ fn setup_templates(config: &AppConfig) -> Result<&'static Tera, tera::Error> {
 
 // Load themes from the themes directory
 fn setup_themes() -> &'static ThemeRegistry {
-    THEME_REGISTRY.get_or_init(|| {
-        match ThemeRegistry::load_from_directory("themes") {
-            Ok(registry) => {
-                tracing::info!("Loaded {} themes", registry.len());
-                registry
-            }
-            Err(e) => {
-                tracing::warn!("Failed to load themes: {}, using empty registry", e);
-                ThemeRegistry::new()
-            }
+    THEME_REGISTRY.get_or_init(|| match ThemeRegistry::load_from_directory("themes") {
+        Ok(registry) => {
+            tracing::info!("Loaded {} themes", registry.len());
+            registry
+        }
+        Err(e) => {
+            tracing::warn!("Failed to load themes: {}, using empty registry", e);
+            ThemeRegistry::new()
         }
     })
 }
@@ -128,9 +126,8 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
             "available_themes",
             |_args: &HashMap<String, Value>| -> tera::Result<Value> {
                 let registry = THEME_REGISTRY.get();
-                let themes: Vec<ThemeListItem> = registry
-                    .map(|r| r.to_theme_list())
-                    .unwrap_or_default();
+                let themes: Vec<ThemeListItem> =
+                    registry.map(|r| r.to_theme_list()).unwrap_or_default();
 
                 serde_json::to_value(themes)
                     .map(|v| tera::to_value(v).unwrap_or(Value::Array(vec![])))
@@ -165,9 +162,7 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
             "all_themes_css",
             |_args: &HashMap<String, Value>| -> tera::Result<Value> {
                 let registry = THEME_REGISTRY.get();
-                let css = registry
-                    .map(|r| r.all_themes_css())
-                    .unwrap_or_default();
+                let css = registry.map(|r| r.all_themes_css()).unwrap_or_default();
 
                 Ok(Value::String(css))
             },

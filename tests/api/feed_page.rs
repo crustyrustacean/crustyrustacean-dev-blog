@@ -1,6 +1,6 @@
 // tests/api/feed_page.rs
 
-use crate::helpers::{assert_body_contains, HtmlResponseValidator, TestUserBuilder, spawn_app};
+use crate::helpers::{HtmlResponseValidator, TestUserBuilder, assert_body_contains, spawn_app};
 use reqwest::StatusCode;
 
 #[tokio::test]

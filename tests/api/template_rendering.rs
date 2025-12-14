@@ -1,8 +1,8 @@
 // tests/api/template_rendering.rs
 
 use crate::helpers::{
-    assert_body_contains, assert_js_loaded, assert_navbar_authenticated, HtmlResponseValidator,
-    TestArticleBuilder, TestCommentBuilder, TestUserBuilder, APP_VERSION, spawn_app,
+    APP_VERSION, HtmlResponseValidator, TestArticleBuilder, TestCommentBuilder, TestUserBuilder,
+    assert_body_contains, assert_js_loaded, assert_navbar_authenticated, spawn_app,
 };
 use reqwest::StatusCode;
 
@@ -80,7 +80,10 @@ async fn test_article_template_handles_nonexistent_article_failure_path() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     let body = response.text().await.expect("Failed to get response body");
-    assert!(!body.is_empty(), "Response body should not be empty for 404");
+    assert!(
+        !body.is_empty(),
+        "Response body should not be empty for 404"
+    );
 }
 
 #[tokio::test]
@@ -238,10 +241,7 @@ async fn test_editor_page_shows_authenticated_user_in_navbar() {
     assert_navbar_authenticated(&body, "navbaruser");
 
     // Verify the editor form is present with article data
-    assert_body_contains(
-        &body,
-        &["articleForm", "Navbar Authentication Test"],
-    );
+    assert_body_contains(&body, &["articleForm", "Navbar Authentication Test"]);
 }
 
 #[tokio::test]

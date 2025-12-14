@@ -267,7 +267,10 @@ pub async fn get_my_profile_page(
     let username: String = row.get(0)?;
 
     // Redirect to the user's profile page
-    Ok(axum::response::Redirect::to(&format!("/profiles/{}", username)))
+    Ok(axum::response::Redirect::to(&format!(
+        "/profiles/{}",
+        username
+    )))
 }
 
 pub async fn get_my_favorites_page(

@@ -604,13 +604,10 @@ pub async fn update_theme_preference(
 
     // Validate that the theme exists
     let valid_themes = ["auto", "default", "dark", "high-contrast"];
-    if !valid_themes.contains(&payload.theme.as_str())
-        && !state.themes.contains(&payload.theme)
-    {
+    if !valid_themes.contains(&payload.theme.as_str()) && !state.themes.contains(&payload.theme) {
         return Err(ApiError::BadRequest(format!(
             "Invalid theme: {}. Valid themes are: {:?}",
-            payload.theme,
-            valid_themes
+            payload.theme, valid_themes
         )));
     }
 

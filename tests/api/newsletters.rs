@@ -762,13 +762,20 @@ async fn test_delivery_logs_are_created() {
             )
             .await
             .expect("Failed to query database");
-        let row = rows.next().await.expect("Failed to get row").expect("No subscriber");
+        let row = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No subscriber");
         row.get::<String>(0).expect("Failed to get token")
     };
 
     let _ = app
         .client
-        .post(format!("{}/api/newsletters/confirm/{}", &app.address, confirm_token))
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, confirm_token
+        ))
         .send()
         .await
         .expect("Failed to confirm subscription");
@@ -790,13 +797,19 @@ async fn test_delivery_logs_are_created() {
         .await
         .expect("Failed to create newsletter");
 
-    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let create_body: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let newsletter_id = create_body["data"]["id"].as_str().unwrap();
 
     // Act - Send newsletter
     let _ = app
         .client
-        .post(format!("{}/api/admin/newsletters/{}/send", &app.address, newsletter_id))
+        .post(format!(
+            "{}/api/admin/newsletters/{}/send",
+            &app.address, newsletter_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -812,7 +825,11 @@ async fn test_delivery_logs_are_created() {
         .await
         .expect("Failed to query delivery logs");
 
-    let row = rows.next().await.expect("Failed to get row").expect("No delivery log found");
+    let row = rows
+        .next()
+        .await
+        .expect("Failed to get row")
+        .expect("No delivery log found");
     let status: String = row.get(0).expect("Failed to get status");
     assert_eq!(status, "sent");
 }
@@ -847,17 +864,25 @@ async fn test_resubscribe_after_unsubscribe() {
             )
             .await
             .expect("Failed to query database");
-        let row = rows.next().await.expect("Failed to get row").expect("No subscriber");
+        let row = rows
+            .next()
+            .await
+            .expect("Failed to get row")
+            .expect("No subscriber");
         (
             row.get::<String>(0).expect("Failed to get confirm token"),
-            row.get::<String>(1).expect("Failed to get unsubscribe token"),
+            row.get::<String>(1)
+                .expect("Failed to get unsubscribe token"),
         )
     };
 
     // Confirm subscription
     let _ = app
         .client
-        .post(format!("{}/api/newsletters/confirm/{}", &app.address, confirm_token))
+        .post(format!(
+            "{}/api/newsletters/confirm/{}",
+            &app.address, confirm_token
+        ))
         .send()
         .await
         .expect("Failed to confirm subscription");
@@ -865,7 +890,10 @@ async fn test_resubscribe_after_unsubscribe() {
     // Unsubscribe
     let _ = app
         .client
-        .post(format!("{}/api/newsletters/unsubscribe/{}", &app.address, unsubscribe_token))
+        .post(format!(
+            "{}/api/newsletters/unsubscribe/{}",
+            &app.address, unsubscribe_token
+        ))
         .send()
         .await
         .expect("Failed to unsubscribe");
@@ -882,8 +910,16 @@ async fn test_resubscribe_after_unsubscribe() {
 
     // Assert
     assert_eq!(resubscribe_response.status(), StatusCode::OK);
-    let response_body: Value = resubscribe_response.json().await.expect("Failed to parse response");
-    assert!(response_body["data"]["message"].as_str().unwrap().contains("check your email"));
+    let response_body: Value = resubscribe_response
+        .json()
+        .await
+        .expect("Failed to parse response");
+    assert!(
+        response_body["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("check your email")
+    );
 
     // Verify subscriber is no longer marked as unsubscribed
     let conn = app.db.connect().expect("Failed to connect to database");
@@ -894,7 +930,11 @@ async fn test_resubscribe_after_unsubscribe() {
         )
         .await
         .expect("Failed to query database");
-    let row = rows.next().await.expect("Failed to get row").expect("No subscriber");
+    let row = rows
+        .next()
+        .await
+        .expect("Failed to get row")
+        .expect("No subscriber");
     let unsubscribed_at: Option<String> = row.get(0).ok();
     let confirmed: i64 = row.get(1).expect("Failed to get confirmed");
 
@@ -925,13 +965,19 @@ async fn test_newsletter_send_with_no_subscribers() {
         .await
         .expect("Failed to create newsletter");
 
-    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let create_body: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let newsletter_id = create_body["data"]["id"].as_str().unwrap();
 
     // Act - Send newsletter with no subscribers
     let send_response = app
         .client
-        .post(format!("{}/api/admin/newsletters/{}/send", &app.address, newsletter_id))
+        .post(format!(
+            "{}/api/admin/newsletters/{}/send",
+            &app.address, newsletter_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -939,7 +985,10 @@ async fn test_newsletter_send_with_no_subscribers() {
 
     // Assert - Should succeed with 0 recipients
     assert_eq!(send_response.status(), StatusCode::OK);
-    let response_body: Value = send_response.json().await.expect("Failed to parse response");
+    let response_body: Value = send_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     assert_eq!(response_body["data"]["recipient_count"], 0);
 }
 
@@ -966,7 +1015,10 @@ async fn test_update_newsletter() {
         .await
         .expect("Failed to create newsletter");
 
-    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let create_body: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let newsletter_id = create_body["data"]["id"].as_str().unwrap();
 
     // Act - Update the newsletter
@@ -977,7 +1029,10 @@ async fn test_update_newsletter() {
 
     let update_response = app
         .client
-        .put(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .put(format!(
+            "{}/api/admin/newsletters/{}",
+            &app.address, newsletter_id
+        ))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", token))
         .json(&update_data)
@@ -991,7 +1046,10 @@ async fn test_update_newsletter() {
     // Verify the update
     let get_response = app
         .client
-        .get(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .get(format!(
+            "{}/api/admin/newsletters/{}",
+            &app.address, newsletter_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -999,9 +1057,15 @@ async fn test_update_newsletter() {
 
     let get_body: Value = get_response.json().await.expect("Failed to parse response");
     assert_eq!(get_body["data"]["newsletter"]["title"], "Updated Title");
-    assert_eq!(get_body["data"]["newsletter"]["body"], "Updated body content");
+    assert_eq!(
+        get_body["data"]["newsletter"]["body"],
+        "Updated body content"
+    );
     // Subject should remain unchanged
-    assert_eq!(get_body["data"]["newsletter"]["subject"], "Original Subject");
+    assert_eq!(
+        get_body["data"]["newsletter"]["subject"],
+        "Original Subject"
+    );
 }
 
 #[tokio::test]
@@ -1027,13 +1091,19 @@ async fn test_delete_newsletter() {
         .await
         .expect("Failed to create newsletter");
 
-    let create_body: Value = create_response.json().await.expect("Failed to parse response");
+    let create_body: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let newsletter_id = create_body["data"]["id"].as_str().unwrap();
 
     // Act - Delete the newsletter
     let delete_response = app
         .client
-        .delete(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .delete(format!(
+            "{}/api/admin/newsletters/{}",
+            &app.address, newsletter_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -1045,7 +1115,10 @@ async fn test_delete_newsletter() {
     // Verify it's deleted
     let get_response = app
         .client
-        .get(format!("{}/api/admin/newsletters/{}", &app.address, newsletter_id))
+        .get(format!(
+            "{}/api/admin/newsletters/{}",
+            &app.address, newsletter_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -1062,7 +1135,10 @@ async fn test_list_subscribers_requires_auth() {
     // Act - Try to list subscribers without auth
     let response = app
         .client
-        .get(format!("{}/api/admin/newsletters/subscribers", &app.address))
+        .get(format!(
+            "{}/api/admin/newsletters/subscribers",
+            &app.address
+        ))
         .send()
         .await
         .expect("Failed to execute request");
@@ -1094,7 +1170,10 @@ async fn test_list_subscribers_success() {
     // Act - List subscribers
     let response = app
         .client
-        .get(format!("{}/api/admin/newsletters/subscribers", &app.address))
+        .get(format!(
+            "{}/api/admin/newsletters/subscribers",
+            &app.address
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -1103,11 +1182,15 @@ async fn test_list_subscribers_success() {
     // Assert
     assert_eq!(response.status(), StatusCode::OK);
     let body: Value = response.json().await.expect("Failed to parse response");
-    let subscribers = body["data"]["subscribers"].as_array().expect("Expected array");
+    let subscribers = body["data"]["subscribers"]
+        .as_array()
+        .expect("Expected array");
     assert!(!subscribers.is_empty());
 
     // Find our subscriber
-    let found = subscribers.iter().any(|s| s["email"] == "list-test@example.com");
+    let found = subscribers
+        .iter()
+        .any(|s| s["email"] == "list-test@example.com");
     assert!(found, "Subscriber should be in the list");
 }
 
@@ -1132,7 +1215,11 @@ async fn test_delete_subscriber_success() {
         .send()
         .await
         .expect("Failed to subscribe");
-    assert_eq!(subscribe_response.status(), StatusCode::OK, "Subscribe should succeed");
+    assert_eq!(
+        subscribe_response.status(),
+        StatusCode::OK,
+        "Subscribe should succeed"
+    );
 
     // Get the subscriber ID using a fresh connection
     let conn = app.db.connect().expect("Failed to connect");
@@ -1143,12 +1230,19 @@ async fn test_delete_subscriber_success() {
         )
         .await
         .expect("Failed to query");
-    let row = rows.next().await.expect("Query failed").expect("No subscriber found - subscribe may have failed");
+    let row = rows
+        .next()
+        .await
+        .expect("Query failed")
+        .expect("No subscriber found - subscribe may have failed");
     let subscriber_id: String = row.get(0).expect("Failed to get id");
-    drop(rows);  // Close the cursor
+    drop(rows); // Close the cursor
 
     // Act - Delete the subscriber
-    let delete_url = format!("{}/api/admin/newsletters/subscribers/{}", &app.address, subscriber_id);
+    let delete_url = format!(
+        "{}/api/admin/newsletters/subscribers/{}",
+        &app.address, subscriber_id
+    );
     let response = app
         .client
         .delete(&delete_url)
@@ -1160,8 +1254,14 @@ async fn test_delete_subscriber_success() {
     // Assert
     let status = response.status();
     if status != StatusCode::OK {
-        let body: Value = response.json().await.expect("Failed to parse error response");
-        panic!("Expected 200 OK from {}, got {} with body: {:?}", delete_url, status, body);
+        let body: Value = response
+            .json()
+            .await
+            .expect("Failed to parse error response");
+        panic!(
+            "Expected 200 OK from {}, got {} with body: {:?}",
+            delete_url, status, body
+        );
     }
 
     // Verify subscriber is deleted using a fresh connection
@@ -1173,7 +1273,10 @@ async fn test_delete_subscriber_success() {
         )
         .await
         .expect("Failed to query");
-    assert!(rows2.next().await.expect("Query failed").is_none(), "Subscriber should be deleted");
+    assert!(
+        rows2.next().await.expect("Query failed").is_none(),
+        "Subscriber should be deleted"
+    );
 }
 
 #[tokio::test]
@@ -1186,7 +1289,10 @@ async fn test_delete_subscriber_not_found() {
     // Act - Try to delete non-existent subscriber
     let response = app
         .client
-        .delete(format!("{}/api/admin/newsletters/subscribers/{}", &app.address, fake_id))
+        .delete(format!(
+            "{}/api/admin/newsletters/subscribers/{}",
+            &app.address, fake_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await

@@ -33,13 +33,9 @@ impl TryFrom<&SecretStore> for AppConfig {
             .ok_or_else(|| anyhow!("Missing required templates directory: TEMPLATES_DIR"))?;
 
         // Deprecated: Bootstrap has been removed. These now default to empty strings.
-        let external_stylesheet = secrets
-            .get("EXTERNAL_STYLESHEET")
-            .unwrap_or_default();
+        let external_stylesheet = secrets.get("EXTERNAL_STYLESHEET").unwrap_or_default();
 
-        let override_stylesheet = secrets
-            .get("OVERRIDE_STYLESHEET")
-            .unwrap_or_default();
+        let override_stylesheet = secrets.get("OVERRIDE_STYLESHEET").unwrap_or_default();
 
         // Get version from Cargo.toml at compile time
         let app_version = env!("CARGO_PKG_VERSION").to_string();

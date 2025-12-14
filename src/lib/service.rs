@@ -5,19 +5,19 @@ use crate::routes::{
     add_comment, admin_newsletters_page, change_password, complete_password_reset,
     confirm_subscription, create_api_key, create_article, create_category, create_newsletter,
     delete_api_key, delete_article, delete_category, delete_comment, delete_media,
-    delete_newsletter, delete_tag, delete_user_admin, download_media, favorite_article,
-    follow_user, get_about, get_account_page, get_admin_dashboard, get_admin_users_page,
-    get_api_keys_admin_page, get_article, get_article_page, get_articles_feed,
-    get_articles_feed_page, get_articles_list_page, get_authors_page, get_categories,
-    get_categories_admin_page, get_category, get_comments, get_current_user, get_drafts_admin_page,
-    get_edit_article_page, get_editor_page, get_index, get_login_page, get_media_library_page,
-    get_media_metadata, get_my_favorites_page, get_my_profile_page, get_newsletter,
-    get_newsletter_stats, get_password_reset_page, get_password_reset_request_page, get_privacy,
-    get_profile, get_profile_page, get_register_page, get_robots_txt, get_rss_feed, get_sitemap,
-    get_tags, get_tags_admin_page, get_terms, get_theme_preference, get_user_admin,
+    delete_newsletter, delete_subscriber, delete_tag, delete_user_admin, download_media,
+    favorite_article, follow_user, get_about, get_account_page, get_admin_dashboard,
+    get_admin_users_page, get_api_keys_admin_page, get_article, get_article_page,
+    get_articles_feed, get_articles_feed_page, get_articles_list_page, get_authors_page,
+    get_categories, get_categories_admin_page, get_category, get_comments, get_current_user,
+    get_drafts_admin_page, get_edit_article_page, get_editor_page, get_index, get_login_page,
+    get_media_library_page, get_media_metadata, get_my_favorites_page, get_my_profile_page,
+    get_newsletter, get_newsletter_stats, get_password_reset_page, get_password_reset_request_page,
+    get_privacy, get_profile, get_profile_page, get_register_page, get_robots_txt, get_rss_feed,
+    get_sitemap, get_tags, get_tags_admin_page, get_terms, get_theme_preference, get_user_admin,
     get_verify_email_page, handle_404_simple, health_check, list_api_keys, list_articles,
-    list_media, list_newsletters, list_profiles, list_themes, list_user_drafts, list_users_admin,
-    login_user, mobile_upload_article, delete_subscriber, list_subscribers, newsletter_confirmed_page,
+    list_media, list_newsletters, list_profiles, list_subscribers, list_themes, list_user_drafts,
+    list_users_admin, login_user, mobile_upload_article, newsletter_confirmed_page,
     newsletter_page, newsletter_unsubscribed_page, register_user, request_password_reset,
     search_articles, send_newsletter, subscribe, unfavorite_article, unfollow_user, unsubscribe,
     update_article, update_category, update_current_user, update_media_metadata, update_newsletter,
@@ -182,10 +182,7 @@ impl AppService {
                 post(create_newsletter).get(list_newsletters),
             )
             .route("/api/admin/newsletters/stats", get(get_newsletter_stats))
-            .route(
-                "/api/admin/newsletters/subscribers",
-                get(list_subscribers),
-            )
+            .route("/api/admin/newsletters/subscribers", get(list_subscribers))
             .route(
                 "/api/admin/newsletters/subscribers/{id}",
                 axum::routing::delete(delete_subscriber),

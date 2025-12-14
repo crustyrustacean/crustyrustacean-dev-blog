@@ -1,9 +1,9 @@
 // tests/api/profile.rs
 
-use crate::helpers::{
-    spawn_app, HtmlResponseValidator, TestArticleBuilder, TestCommentBuilder, TestFixture,
-};
 use crate::assert_status;
+use crate::helpers::{
+    HtmlResponseValidator, TestArticleBuilder, TestCommentBuilder, TestFixture, spawn_app,
+};
 use reqwest::StatusCode;
 
 #[tokio::test]
@@ -73,10 +73,7 @@ async fn test_profile_page_shows_articles() {
     let response = fixture
         .app
         .client
-        .get(format!(
-            "{}/profiles/articleauthor",
-            &fixture.app.address
-        ))
+        .get(format!("{}/profiles/articleauthor", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -155,10 +152,7 @@ async fn test_profile_page_pagination_with_many_articles() {
     let response = fixture
         .app
         .client
-        .get(format!(
-            "{}/profiles/paginatedauthor",
-            &fixture.app.address
-        ))
+        .get(format!("{}/profiles/paginatedauthor", &fixture.app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -264,7 +258,10 @@ async fn test_profile_page_shows_comments_count() {
         .await;
 
     // Add a comment
-    fixture.app.add_comment(&commenter_token, &slug, "Great article!").await;
+    fixture
+        .app
+        .add_comment(&commenter_token, &slug, "Great article!")
+        .await;
 
     // Act - Access profile page
     let response = fixture
@@ -305,10 +302,7 @@ async fn test_profile_page_without_authentication() {
     let response = fixture
         .app
         .client
-        .get(format!(
-            "{}/profiles/publicauthor",
-            &fixture.app.address
-        ))
+        .get(format!("{}/profiles/publicauthor", &fixture.app.address))
         .send()
         .await
         .expect("Failed to execute request");

@@ -104,21 +104,13 @@ impl From<toml::de::Error> for ThemeError {
 }
 
 /// Required color keys that must be present in every theme
-const REQUIRED_COLOR_KEYS: &[&str] = &[
-    "primary",
-    "bg-body",
-    "text-primary",
-];
+const REQUIRED_COLOR_KEYS: &[&str] = &["primary", "bg-body", "text-primary"];
 
 /// Valid color scheme values
 const VALID_COLOR_SCHEMES: &[&str] = &["light", "dark", "auto"];
 
 /// Keys in the colors map that are NOT actual colors (CSS values like border-radius, shadows)
-const NON_COLOR_KEYS: &[&str] = &[
-    "border-radius",
-    "shadow",
-    "shadow-hover",
-];
+const NON_COLOR_KEYS: &[&str] = &["border-radius", "shadow", "shadow-hover"];
 
 impl ThemeConfig {
     /// Load a theme from a TOML file
@@ -140,7 +132,12 @@ impl ThemeConfig {
         let mut errors = Vec::new();
 
         // Validate theme ID (alphanumeric and hyphens only)
-        if !self.theme.id.chars().all(|c| c.is_alphanumeric() || c == '-') {
+        if !self
+            .theme
+            .id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-')
+        {
             errors.push(format!(
                 "Invalid theme ID '{}': must contain only alphanumeric characters and hyphens",
                 self.theme.id
@@ -194,9 +191,7 @@ impl ThemeConfig {
         let value = value.trim();
 
         // Accept hex colors
-        if value.starts_with('#') {
-            let hex_part = &value[1..];
-            // Valid lengths: 3 (RGB), 4 (RGBA), 6 (RRGGBB), 8 (RRGGBBAA)
+        if let Some(hex_part) = value.strip_prefix('#') {
             let valid_length = matches!(hex_part.len(), 3 | 4 | 6 | 8);
             let valid_chars = hex_part.chars().all(|c| c.is_ascii_hexdigit());
             return valid_length && valid_chars;
@@ -214,9 +209,21 @@ impl ThemeConfig {
 
         // Accept CSS keywords (basic color names)
         let css_keywords = [
-            "inherit", "initial", "unset", "currentColor",
-            "black", "white", "red", "green", "blue", "yellow",
-            "orange", "purple", "pink", "gray", "grey",
+            "inherit",
+            "initial",
+            "unset",
+            "currentColor",
+            "black",
+            "white",
+            "red",
+            "green",
+            "blue",
+            "yellow",
+            "orange",
+            "purple",
+            "pink",
+            "gray",
+            "grey",
         ];
         if css_keywords.contains(&value) {
             return true;
@@ -285,7 +292,11 @@ impl ThemeConfig {
             .unwrap_or_else(|| {
                 // Fallback to primary, secondary, and first background color
                 vec![
-                    self.theme.colors.get("primary").cloned().unwrap_or_default(),
+                    self.theme
+                        .colors
+                        .get("primary")
+                        .cloned()
+                        .unwrap_or_default(),
                     self.theme
                         .colors
                         .get("secondary")
@@ -351,10 +362,7 @@ impl ThemeRegistry {
                     match load_result {
                         Ok(config) => {
                             // Verify that the theme ID matches the directory name
-                            let dir_name = path
-                                .file_name()
-                                .and_then(|n| n.to_str())
-                                .unwrap_or("");
+                            let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
                             if config.theme.id != dir_name {
                                 tracing::warn!(
@@ -752,9 +760,13 @@ text-primary = "#000000"
         assert!(ThemeConfig::is_valid_color_value("#ffffff"));
         assert!(ThemeConfig::is_valid_color_value("#ffffffff"));
         assert!(ThemeConfig::is_valid_color_value("rgb(255, 255, 255)"));
-        assert!(ThemeConfig::is_valid_color_value("rgba(255, 255, 255, 0.5)"));
+        assert!(ThemeConfig::is_valid_color_value(
+            "rgba(255, 255, 255, 0.5)"
+        ));
         assert!(ThemeConfig::is_valid_color_value("hsl(0, 100%, 50%)"));
-        assert!(ThemeConfig::is_valid_color_value("color-mix(in oklch, #ff0000, #0000ff)"));
+        assert!(ThemeConfig::is_valid_color_value(
+            "color-mix(in oklch, #ff0000, #0000ff)"
+        ));
         assert!(ThemeConfig::is_valid_color_value("transparent"));
         assert!(ThemeConfig::is_valid_color_value("none"));
         assert!(ThemeConfig::is_valid_color_value("currentColor"));

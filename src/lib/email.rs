@@ -801,12 +801,14 @@ impl EmailService {
             "{}/newsletter/unsubscribed/{}",
             params.base_url, params.unsubscribe_token
         );
-        let greeting = params.subscriber_name
+        let greeting = params
+            .subscriber_name
             .map(|n| format!("Hi {},", n))
             .unwrap_or_else(|| "Hi,".to_string());
 
         // Build author articles section if provided
-        let author_section_text = params.author_articles
+        let author_section_text = params
+            .author_articles
             .filter(|articles| !articles.is_empty())
             .map(|articles| {
                 let mut section = String::from("\n\n--- FROM YOUR FAVORITE AUTHORS ---\n\n");
@@ -852,7 +854,11 @@ impl EmailService {
             Unsubscribe: {}\n\n\
             Best regards,\n\
             CrustyRustacean Dev Blog Team",
-            greeting, params.newsletter_title, params.newsletter_body, author_section_text, unsubscribe_link
+            greeting,
+            params.newsletter_title,
+            params.newsletter_body,
+            author_section_text,
+            unsubscribe_link
         );
 
         let html_body = format!(
