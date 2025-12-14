@@ -2,6 +2,74 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [2.16.0] - 2025-12-14
+
+### Removed - Bootstrap Dependency
+- **Complete Bootstrap Removal**:
+  - Removed Bootstrap 5.1.3 CSS CDN dependency (~25KB)
+  - Removed Bootstrap JS bundle dependency (~80KB)
+  - Eliminated external framework dependency for improved performance and control
+
+### Added - Modern CSS Architecture
+- **Standards-Compliant CSS System**:
+  - Custom CSS grid system with responsive breakpoints (576px, 768px, 992px, 1200px, 1400px)
+  - CSS Layers (`@layer`) for organized specificity control: reset, base, components, utilities, theme
+  - CSS Custom Properties (variables) for consistent theming throughout the application
+  - Modern CSS features: `color-mix()`, `color-scheme`, CSS Grid, Flexbox
+  - Fallback support for browsers that don't support `color-mix()`
+
+- **New CSS Files**:
+  - `variables.css` - CSS custom properties and theme variable mappings
+  - `base.css` - Theme-agnostic base styles using CSS layers
+  - `bootstrap-replacement.css` - Complete Bootstrap-compatible utility classes and grid system
+
+- **Vanilla JavaScript Components**:
+  - `components.js` - Native JS replacements for Bootstrap components
+  - Modal, Dropdown, Collapse, Tab, and Alert components
+  - Maintains `window.bootstrap` namespace for API compatibility with existing code
+  - Lightweight implementation without jQuery dependency
+
+### Added - Modular Theme System
+- **TOML-Based Theme Configuration**:
+  - Themes defined in `themes/{theme-id}/theme.toml` files
+  - Theme validation with comprehensive error checking
+  - Support for color schemes: light, dark, auto (system preference)
+  - High contrast theme support for accessibility
+  - External stylesheet support for CDN integrations
+
+- **Built-in Themes**:
+  - `default` (Crusty Light) - Warm orange accents with clean light design
+  - `dark` (Crusty Dark) - GitHub-inspired dark theme for low-light environments
+  - `high-contrast` - Maximum readability with strong color contrast for accessibility
+
+- **Theme Features**:
+  - Dynamic CSS variable generation from TOML configuration
+  - Client-side theme switching via `data-theme` attribute
+  - System preference detection with `prefers-color-scheme` media query
+  - Theme preview colors for picker UI
+  - Font customization (body, heading, monospace)
+  - Configurable border-radius, shadows, and color palette
+
+- **Theme System Implementation** (`src/lib/theme.rs`):
+  - `ThemeConfig` - Parse and validate theme TOML files
+  - `ThemeRegistry` - Manage collection of available themes
+  - Theme validation (required colors, valid color schemes, hex color format)
+  - CSS generation with custom selectors for client-side switching
+  - Comprehensive unit tests for theme parsing and validation
+
+### Technical Details
+- **Performance**: Reduced CSS/JS bundle size by ~105KB (Bootstrap removal)
+- **Standards Compliance**: Uses modern CSS features with graceful fallbacks
+- **Accessibility**: High contrast theme with WCAG-compliant color ratios
+- **Maintainability**: Single source of truth for theme colors in TOML files
+- **Testing**: Theme validation tests ensure consistent theme quality
+- **Browser Support**: Fallbacks for older browsers without `color-mix()` support
+
+### Migration Notes
+- No breaking changes to existing functionality
+- Existing templates continue to work with Bootstrap-compatible class names
+- JavaScript components maintain API compatibility via `window.bootstrap` namespace
+
 ## [2.15.0] - 2025-12-13
 
 ### Added - Newsletter Email Delivery & Subscriber Management
