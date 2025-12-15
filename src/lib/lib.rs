@@ -11,6 +11,7 @@ pub mod email;
 pub mod errors;
 pub mod markdown;
 pub mod models;
+pub mod repositories;
 pub mod response;
 pub mod routes;
 pub mod service;
