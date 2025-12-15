@@ -337,16 +337,28 @@ impl UserRepository for LibSqlUserRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let limit = query.limit.unwrap_or(20);
+        let limit = query.limit.unwrap_or(20).min(100);
         let offset = query.offset.unwrap_or(0);
 
-        let mut where_clauses = vec!["disabled = 0".to_string()];
+        // Only show users with Author or Admin role (not Subscribers)
+        let mut where_clauses = vec![
+            "disabled = 0".to_string(),
+            "(role = 'author' OR role = 'admin')".to_string(),
+        ];
         let mut params: Vec<libsql::Value> = Vec::new();
+
+        // Exclude current user from results
+        if let Some(current_id) = current_user_id {
+            where_clauses.push("id != ?".to_string());
+            params.push(libsql::Value::Text(current_id.to_string()));
+        }
 
         if let Some(search) = &query.search {
             if !search.trim().is_empty() {
-                where_clauses.push("username LIKE ?".to_string());
-                params.push(libsql::Value::Text(format!("%{}%", search.trim())));
+                where_clauses.push("(username LIKE ? OR bio LIKE ?)".to_string());
+                let search_pattern = format!("%{}%", search.trim());
+                params.push(libsql::Value::Text(search_pattern.clone()));
+                params.push(libsql::Value::Text(search_pattern));
             }
         }
 
@@ -399,13 +411,19 @@ impl UserRepository for LibSqlUserRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut where_clauses = vec!["disabled = 0".to_string()];
+        // Only count users with Author or Admin role (not Subscribers)
+        let mut where_clauses = vec![
+            "disabled = 0".to_string(),
+            "(role = 'author' OR role = 'admin')".to_string(),
+        ];
         let mut params: Vec<libsql::Value> = Vec::new();
 
         if let Some(search) = &query.search {
             if !search.trim().is_empty() {
-                where_clauses.push("username LIKE ?".to_string());
-                params.push(libsql::Value::Text(format!("%{}%", search.trim())));
+                where_clauses.push("(username LIKE ? OR bio LIKE ?)".to_string());
+                let search_pattern = format!("%{}%", search.trim());
+                params.push(libsql::Value::Text(search_pattern.clone()));
+                params.push(libsql::Value::Text(search_pattern));
             }
         }
 
