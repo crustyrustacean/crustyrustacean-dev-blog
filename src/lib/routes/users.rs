@@ -4,10 +4,11 @@ use crate::{
     ApiError, AppState,
     auth::{AuthenticatedUser, generate_token, hash_password, verify_password},
     models::{
-        ProfileResponse, ProfilesQuery, ProfilesResponse, RegistrationSuccessResponse, Role,
-        ThemePreferenceResponse, ThemePreferenceUpdate, UserData, UserLogin, UserProfile,
-        UserRegistration, UserResponse, UserUpdate,
+        AdminUsersQuery, ProfileResponse, ProfilesQuery, ProfilesResponse,
+        RegistrationSuccessResponse, Role, ThemePreferenceResponse, ThemePreferenceUpdate,
+        UserData, UserLogin, UserRegistration, UserResponse, UserUpdate,
     },
+    repositories::{NewUser, UpdateUser},
     response::ApiResponse,
     theme::ThemeListItem,
 };
@@ -17,7 +18,6 @@ use axum::{
     response::Json,
 };
 use chrono::{Duration, Utc};
-use uuid::Uuid;
 use validator::Validate;
 
 pub async fn register_user(
@@ -37,34 +37,34 @@ pub async fn register_user(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    // Check if user already exists
-    let mut existing_user = conn
-        .query(
-            "SELECT id FROM users WHERE email = ? OR username = ?",
-            libsql::params![user_data.email.clone(), user_data.username.clone()],
-        )
-        .await?;
-
-    if existing_user.next().await?.is_some() {
+    // Check if user already exists (by email or username)
+    if state.users.find_by_email(&user_data.email).await?.is_some() {
         return Err(ApiError::Conflict(
-            "User with this email or username already exists".to_string(),
+            "User with this email already exists".to_string(),
+        ));
+    }
+
+    if state
+        .users
+        .find_by_username(&user_data.username)
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::Conflict(
+            "User with this username already exists".to_string(),
         ));
     }
 
     // Check if this is the first user (for admin assignment)
-    let mut count_row = conn.query("SELECT COUNT(*) FROM users", ()).await?;
-
-    let row = count_row
-        .next()
-        .await?
-        .ok_or_else(|| ApiError::InternalServerError("Failed to count users".to_string()))?;
-
-    let user_count: i64 = row.get(0)?;
+    let user_count = state
+        .users
+        .count(&AdminUsersQuery {
+            search: None,
+            status: None,
+            limit: None,
+            offset: None,
+        })
+        .await?;
 
     // First user gets admin role, all others get subscriber role
     let role = if user_count == 0 {
@@ -73,42 +73,25 @@ pub async fn register_user(
         Role::Subscriber
     };
 
-    let user_id = Uuid::new_v4();
     let password_hash = hash_password(&user_data.password)?;
-    let now = Utc::now();
 
-    // New users start with email_verified = 0
-    conn.execute(
-        "INSERT INTO users (id, username, email, password_hash, role, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        libsql::params![
-            user_id.to_string(),
-            user_data.username.clone(),
-            user_data.email.clone(),
-            password_hash,
-            role.to_string(),
-            0_i64,  // email_verified = false
-            now.to_rfc3339(),
-            now.to_rfc3339(),
-        ],
-    )
-    .await?;
+    let new_user = NewUser {
+        username: user_data.username.clone(),
+        email: user_data.email.clone(),
+        password_hash,
+        role,
+    };
+
+    let user = state.users.create(&new_user).await?;
 
     // Generate email verification token
-    let token_id = Uuid::new_v4();
-    let verification_token = Uuid::new_v4().to_string();
-    let expires_at = now + Duration::hours(24);
+    let verification_token = uuid::Uuid::new_v4().to_string();
+    let expires_at = Utc::now() + Duration::hours(24);
 
-    conn.execute(
-        "INSERT INTO email_verification_tokens (id, user_id, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
-        libsql::params![
-            token_id.to_string(),
-            user_id.to_string(),
-            verification_token.clone(),
-            expires_at.to_rfc3339(),
-            now.to_rfc3339(),
-        ],
-    )
-    .await?;
+    state
+        .tokens
+        .create_email_verification_token(user.id, &verification_token, expires_at)
+        .await?;
 
     // Send verification email
     // Get host from headers
@@ -161,60 +144,33 @@ pub async fn login_user(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut rows = conn
-        .query(
-            "SELECT id, username, email, password_hash, bio, image, role, email_verified FROM users WHERE email = ?",
-            libsql::params![login_data.email],
-        )
-        .await?;
-
-    let row = rows
-        .next()
+    let user = state
+        .users
+        .find_by_email(&login_data.email)
         .await?
         .ok_or_else(|| ApiError::Unauthorized("Invalid credentials".to_string()))?;
 
-    let user_id: String = row.get(0)?;
-    let username: String = row.get(1)?;
-    let email: String = row.get(2)?;
-    let password_hash: String = row.get(3)?;
-    let bio: Option<String> = row.get(4).ok();
-    let image: Option<String> = row.get(5).ok();
-    let role_str: String = row.get(6)?;
-    let email_verified: i64 = row.get(7)?;
-
-    let role = role_str
-        .parse::<Role>()
-        .map_err(|_| ApiError::InternalServerError("Invalid role in database".to_string()))?;
-
-    let user_uuid = Uuid::parse_str(&user_id)
-        .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
-
-    if !verify_password(&login_data.password, &password_hash)? {
+    if !verify_password(&login_data.password, &user.password_hash)? {
         return Err(ApiError::Unauthorized("Invalid credentials".to_string()));
     }
 
     // Check if email is verified
-    if email_verified == 0 {
+    if !user.email_verified {
         return Err(ApiError::Forbidden(
             "Please verify your email address before logging in. Check your inbox for the verification link.".to_string(),
         ));
     }
 
-    let token = generate_token(user_uuid, &state.jwt_keys)?;
+    let token = generate_token(user.id, &state.jwt_keys)?;
 
     let response = UserResponse {
         user: UserData {
-            email,
+            email: user.email,
             token,
-            username,
-            bio,
-            image,
-            role,
+            username: user.username,
+            bio: user.bio,
+            image: user.image,
+            role: user.role,
         },
     };
 
@@ -225,43 +181,22 @@ pub async fn get_current_user(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<UserResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut rows = conn
-        .query(
-            "SELECT username, email, bio, image, role FROM users WHERE id = ?",
-            libsql::params![user.user_id.to_string()],
-        )
-        .await?;
-
-    let row = rows
-        .next()
+    let db_user = state
+        .users
+        .find_by_id(user.user_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
-
-    let username: String = row.get(0)?;
-    let email: String = row.get(1)?;
-    let bio: Option<String> = row.get(2).ok();
-    let image: Option<String> = row.get(3).ok();
-    let role_str: String = row.get(4)?;
-
-    let role = role_str
-        .parse::<Role>()
-        .map_err(|_| ApiError::InternalServerError("Invalid role in database".to_string()))?;
 
     let token = generate_token(user.user_id, &state.jwt_keys)?;
 
     let response = UserResponse {
         user: UserData {
-            email,
+            email: db_user.email,
             token,
-            username,
-            bio,
-            image,
-            role,
+            username: db_user.username,
+            bio: db_user.bio,
+            image: db_user.image,
+            role: db_user.role,
         },
     };
 
@@ -285,49 +220,25 @@ pub async fn update_current_user(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let now = Utc::now();
-    let mut updates = Vec::new();
-    let mut values: Vec<libsql::Value> = Vec::new();
-
-    if let Some(username) = &update_data.username {
-        updates.push("username = ?");
-        values.push(username.clone().into());
-    }
-
-    if let Some(email) = &update_data.email {
-        updates.push("email = ?");
-        values.push(email.clone().into());
-    }
-
+    // Handle password update separately if provided
     if let Some(password) = &update_data.password {
         let password_hash = hash_password(password)?;
-        updates.push("password_hash = ?");
-        values.push(password_hash.into());
+        state
+            .users
+            .update_password(user.user_id, &password_hash)
+            .await?;
     }
 
-    if let Some(bio) = &update_data.bio {
-        updates.push("bio = ?");
-        values.push(bio.clone().into());
-    }
+    // Update other fields
+    let repo_update = UpdateUser {
+        username: update_data.username,
+        email: update_data.email,
+        bio: update_data.bio,
+        image: update_data.image,
+        ..Default::default()
+    };
 
-    if let Some(image) = &update_data.image {
-        updates.push("image = ?");
-        values.push(image.clone().into());
-    }
-
-    updates.push("updated_at = ?");
-    values.push(now.to_rfc3339().into());
-    values.push(user.user_id.to_string().into());
-
-    let query = format!("UPDATE users SET {} WHERE id = ?", updates.join(", "));
-
-    conn.execute(&query, libsql::params_from_iter(values))
-        .await?;
+    state.users.update(user.user_id, &repo_update).await?;
 
     // Fetch updated user
     get_current_user(State(state), user).await
@@ -353,52 +264,15 @@ async fn get_profile_internal(
     username: String,
     user: Option<AuthenticatedUser>,
 ) -> Result<Json<ProfileResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
+    let current_user_id = user.map(|u| u.user_id);
 
-    let mut rows = conn
-        .query(
-            "SELECT id, username, bio, image FROM users WHERE username = ?",
-            libsql::params![username],
-        )
-        .await?;
-
-    let row = rows
-        .next()
+    let profile = state
+        .users
+        .get_profile(&username, current_user_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("Profile not found".to_string()))?;
 
-    let profile_id: String = row.get(0)?;
-    let profile_username: String = row.get(1)?;
-    let bio: Option<String> = row.get(2).ok();
-    let image: Option<String> = row.get(3).ok();
-
-    let profile_uuid = Uuid::parse_str(&profile_id)
-        .map_err(|_| ApiError::InternalServerError("Invalid profile ID".to_string()))?;
-
-    let following = if let Some(current_user) = user {
-        let mut follow_rows = conn
-            .query(
-                "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
-                libsql::params![current_user.user_id.to_string(), profile_uuid.to_string(),],
-            )
-            .await?;
-
-        follow_rows.next().await?.is_some()
-    } else {
-        false
-    };
-
-    let response = ProfileResponse {
-        profile: UserProfile {
-            username: profile_username,
-            bio,
-            image,
-            following,
-        },
-    };
+    let response = ProfileResponse { profile };
 
     Ok(Json(response))
 }
@@ -408,34 +282,15 @@ pub async fn follow_user(
     Path(username): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<ProfileResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Get the user to follow
-    let mut rows = conn
-        .query(
-            "SELECT id FROM users WHERE username = ?",
-            libsql::params![username.clone()],
-        )
-        .await?;
-
-    let row = rows
-        .next()
+    let target_user = state
+        .users
+        .find_by_username(&username)
         .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let following_id: String = row.get(0)?;
-    let following_uuid = Uuid::parse_str(&following_id)
-        .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
-
-    // Insert follow relationship (ignore if already exists)
-    conn.execute(
-        "INSERT OR IGNORE INTO user_follows (follower_id, following_id) VALUES (?, ?)",
-        libsql::params![user.user_id.to_string(), following_uuid.to_string(),],
-    )
-    .await?;
+    // Follow the user
+    state.users.follow(user.user_id, target_user.id).await?;
 
     get_profile_internal(state, username, Some(user)).await
 }
@@ -445,34 +300,15 @@ pub async fn unfollow_user(
     Path(username): Path<String>,
     user: AuthenticatedUser,
 ) -> Result<Json<ProfileResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Get the user to unfollow
-    let mut rows = conn
-        .query(
-            "SELECT id FROM users WHERE username = ?",
-            libsql::params![username.clone()],
-        )
-        .await?;
-
-    let row = rows
-        .next()
+    let target_user = state
+        .users
+        .find_by_username(&username)
         .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let following_id: String = row.get(0)?;
-    let following_uuid = Uuid::parse_str(&following_id)
-        .map_err(|_| ApiError::InternalServerError("Invalid user ID".to_string()))?;
-
-    // Remove follow relationship
-    conn.execute(
-        "DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?",
-        libsql::params![user.user_id.to_string(), following_uuid.to_string(),],
-    )
-    .await?;
+    // Unfollow the user
+    state.users.unfollow(user.user_id, target_user.id).await?;
 
     get_profile_internal(state, username, Some(user)).await
 }
@@ -482,72 +318,10 @@ pub async fn list_profiles(
     user: AuthenticatedUser,
     Query(query): Query<ProfilesQuery>,
 ) -> Result<Json<ProfilesResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
-
-    // Build the query with optional search
-    // Only show users with Author or Admin role (not Subscribers)
-    let (sql, params) = if let Some(search) = &query.search {
-        let search_pattern = format!("%{}%", search);
-        (
-            "SELECT id, username, bio, image FROM users WHERE (role = 'author' OR role = 'admin') AND (username LIKE ? OR bio LIKE ?) ORDER BY username LIMIT ? OFFSET ?".to_string(),
-            vec![
-                libsql::Value::from(search_pattern.clone()),
-                libsql::Value::from(search_pattern),
-                libsql::Value::from(limit),
-                libsql::Value::from(offset),
-            ]
-        )
-    } else {
-        (
-            "SELECT id, username, bio, image FROM users WHERE role = 'author' OR role = 'admin' ORDER BY username LIMIT ? OFFSET ?"
-                .to_string(),
-            vec![libsql::Value::from(limit), libsql::Value::from(offset)],
-        )
-    };
-
-    let mut rows = conn.query(&sql, params).await?;
-
-    let mut profiles = Vec::new();
-
-    while let Some(row) = rows.next().await? {
-        let profile_id: String = row.get(0)?;
-        let username: String = row.get(1)?;
-        let bio: Option<String> = row.get(2).ok();
-        let image: Option<String> = row.get(3).ok();
-
-        // Skip the current user from the results
-        let profile_uuid = Uuid::parse_str(&profile_id)
-            .map_err(|_| ApiError::InternalServerError("Invalid profile ID".to_string()))?;
-
-        if profile_uuid == user.user_id {
-            continue;
-        }
-
-        // Check if current user is following this profile
-        let mut follow_rows = conn
-            .query(
-                "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
-                libsql::params![user.user_id.to_string(), profile_id],
-            )
-            .await?;
-
-        let following = follow_rows.next().await?.is_some();
-
-        let profile = UserProfile {
-            username,
-            bio,
-            image,
-            following,
-        };
-
-        profiles.push(profile);
-    }
+    let profiles = state
+        .users
+        .list_profiles(&query, Some(user.user_id))
+        .await?;
 
     let profiles_count = profiles.len() as i32;
 
@@ -569,24 +343,13 @@ pub async fn get_theme_preference(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<ApiResponse<ThemePreferenceResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut rows = conn
-        .query(
-            "SELECT theme_preference FROM users WHERE id = ?",
-            libsql::params![user.user_id.to_string()],
-        )
-        .await?;
-
-    let row = rows
-        .next()
+    let db_user = state
+        .users
+        .find_by_id(user.user_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let theme: String = row.get::<String>(0).unwrap_or_else(|_| "auto".to_string());
+    let theme = db_user.theme_preference.unwrap_or_else(|| "auto".to_string());
 
     Ok(ApiResponse::success(ThemePreferenceResponse { theme }))
 }
@@ -611,22 +374,10 @@ pub async fn update_theme_preference(
         )));
     }
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let now = Utc::now();
-
-    conn.execute(
-        "UPDATE users SET theme_preference = ?, updated_at = ? WHERE id = ?",
-        libsql::params![
-            payload.theme.clone(),
-            now.to_rfc3339(),
-            user.user_id.to_string(),
-        ],
-    )
-    .await?;
+    state
+        .users
+        .update_theme_preference(user.user_id, &payload.theme)
+        .await?;
 
     Ok(ApiResponse::success(ThemePreferenceResponse {
         theme: payload.theme,

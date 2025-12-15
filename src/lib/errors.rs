@@ -1,6 +1,7 @@
 // src/lib/errors.rs
 
 // dependencies
+use crate::repositories::RepositoryError;
 use crate::response::ApiResponse;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -95,6 +96,30 @@ impl From<chrono::ParseError> for ApiError {
     fn from(err: chrono::ParseError) -> Self {
         tracing::warn!("Invalid date format: {}", err);
         ApiError::BadRequest("Invalid date format".to_string())
+    }
+}
+
+// Implement From for RepositoryError
+impl From<RepositoryError> for ApiError {
+    fn from(err: RepositoryError) -> Self {
+        match err {
+            RepositoryError::NotFound(msg) => ApiError::NotFound(msg),
+            RepositoryError::AlreadyExists(msg) => ApiError::Conflict(msg),
+            RepositoryError::InvalidReference(msg) => ApiError::BadRequest(msg),
+            RepositoryError::ValidationError(msg) => ApiError::BadRequest(msg),
+            RepositoryError::ConnectionError(msg) => {
+                tracing::error!("Repository connection error: {}", msg);
+                ApiError::InternalServerError("Unable to connect to the database".to_string())
+            }
+            RepositoryError::DatabaseError(msg) => {
+                tracing::error!("Repository database error: {}", msg);
+                ApiError::InternalServerError("A database error occurred".to_string())
+            }
+            RepositoryError::InternalError(msg) => {
+                tracing::error!("Repository internal error: {}", msg);
+                ApiError::InternalServerError("An internal error occurred".to_string())
+            }
+        }
     }
 }
 

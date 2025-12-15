@@ -3,6 +3,13 @@
 // dependencies
 use crate::auth::Keys;
 use crate::email::EmailService;
+use crate::repositories::{
+    ApiKeyRepository, ArticleRepository, CategoryRepository, CommentRepository,
+    LibSqlApiKeyRepository, LibSqlArticleRepository, LibSqlCategoryRepository,
+    LibSqlCommentRepository, LibSqlMediaRepository, LibSqlNewsletterRepository,
+    LibSqlTagRepository, LibSqlTokenRepository, LibSqlUserRepository, MediaRepository,
+    NewsletterRepository, TagRepository, TokenRepository, UserRepository,
+};
 use crate::storage::StorageBackend;
 use crate::theme::{ThemeListItem, ThemeRegistry};
 use crate::{ApiError, AppConfig, DatabaseConnection};
@@ -39,6 +46,16 @@ pub struct AppState {
     pub email: EmailService,
     pub allowed_origins: Vec<String>,
     pub themes: &'static ThemeRegistry,
+    // Repositories
+    pub users: Arc<dyn UserRepository>,
+    pub articles: Arc<dyn ArticleRepository>,
+    pub tags: Arc<dyn TagRepository>,
+    pub categories: Arc<dyn CategoryRepository>,
+    pub comments: Arc<dyn CommentRepository>,
+    pub newsletters: Arc<dyn NewsletterRepository>,
+    pub api_keys: Arc<dyn ApiKeyRepository>,
+    pub media: Arc<dyn MediaRepository>,
+    pub tokens: Arc<dyn TokenRepository>,
 }
 
 // simplified setup function
@@ -187,6 +204,26 @@ impl AppState {
         let email = EmailService::from_config(&config.email);
         let allowed_origins = config.allowed_origins;
 
+        // Initialize repositories
+        let users: Arc<dyn UserRepository> =
+            Arc::new(LibSqlUserRepository::new(db.clone()));
+        let articles: Arc<dyn ArticleRepository> =
+            Arc::new(LibSqlArticleRepository::new(db.clone()));
+        let tags: Arc<dyn TagRepository> =
+            Arc::new(LibSqlTagRepository::new(db.clone()));
+        let categories: Arc<dyn CategoryRepository> =
+            Arc::new(LibSqlCategoryRepository::new(db.clone()));
+        let comments: Arc<dyn CommentRepository> =
+            Arc::new(LibSqlCommentRepository::new(db.clone()));
+        let newsletters: Arc<dyn NewsletterRepository> =
+            Arc::new(LibSqlNewsletterRepository::new(db.clone()));
+        let api_keys: Arc<dyn ApiKeyRepository> =
+            Arc::new(LibSqlApiKeyRepository::new(db.clone()));
+        let media: Arc<dyn MediaRepository> =
+            Arc::new(LibSqlMediaRepository::new(db.clone()));
+        let tokens: Arc<dyn TokenRepository> =
+            Arc::new(LibSqlTokenRepository::new(db.clone()));
+
         Ok(Self {
             templates,
             db,
@@ -196,6 +233,15 @@ impl AppState {
             email,
             allowed_origins,
             themes,
+            users,
+            articles,
+            tags,
+            categories,
+            comments,
+            newsletters,
+            api_keys,
+            media,
+            tokens,
         })
     }
 
