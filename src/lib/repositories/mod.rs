@@ -102,7 +102,9 @@ pub use tag::{TagRecord, TagRepository};
 pub use tag_libsql::LibSqlTagRepository;
 
 // Category repository
-pub use category::{CategoryRecord, CategoryRepository, CategoryWithCount, NewCategory, UpdateCategoryData};
+pub use category::{
+    CategoryRecord, CategoryRepository, CategoryWithCount, NewCategory, UpdateCategoryData,
+};
 pub use category_libsql::LibSqlCategoryRepository;
 
 // Comment repository
@@ -111,7 +113,7 @@ pub use comment_libsql::LibSqlCommentRepository;
 
 // Newsletter repository
 pub use newsletter::{
-    NewsletterRepository, NewsletterStatsData, NewNewsletterIssue, NewSubscriber,
+    NewNewsletterIssue, NewSubscriber, NewsletterRepository, NewsletterStatsData,
     UpdateNewsletterIssueData,
 };
 pub use newsletter_libsql::LibSqlNewsletterRepository;

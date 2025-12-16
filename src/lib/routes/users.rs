@@ -349,7 +349,9 @@ pub async fn get_theme_preference(
         .await?
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
 
-    let theme = db_user.theme_preference.unwrap_or_else(|| "auto".to_string());
+    let theme = db_user
+        .theme_preference
+        .unwrap_or_else(|| "auto".to_string());
 
     Ok(ApiResponse::success(ThemePreferenceResponse { theme }))
 }

@@ -63,7 +63,10 @@ pub trait NewsletterRepository: Send + Sync {
     async fn unsubscribe(&self, token: &str) -> RepoResult<()>;
 
     /// Find a subscriber by email.
-    async fn find_subscriber_by_email(&self, email: &str) -> RepoResult<Option<NewsletterSubscriber>>;
+    async fn find_subscriber_by_email(
+        &self,
+        email: &str,
+    ) -> RepoResult<Option<NewsletterSubscriber>>;
 
     /// Find a subscriber by ID.
     async fn find_subscriber_by_id(&self, id: Uuid) -> RepoResult<Option<NewsletterSubscriber>>;
@@ -91,7 +94,11 @@ pub trait NewsletterRepository: Send + Sync {
     async fn list_issues(&self) -> RepoResult<Vec<NewsletterIssue>>;
 
     /// Update an issue.
-    async fn update_issue(&self, id: Uuid, data: &UpdateNewsletterIssueData) -> RepoResult<NewsletterIssue>;
+    async fn update_issue(
+        &self,
+        id: Uuid,
+        data: &UpdateNewsletterIssueData,
+    ) -> RepoResult<NewsletterIssue>;
 
     /// Delete an issue.
     async fn delete_issue(&self, id: Uuid) -> RepoResult<()>;
@@ -104,7 +111,13 @@ pub trait NewsletterRepository: Send + Sync {
     // ========================================================================
 
     /// Log a delivery attempt.
-    async fn log_delivery(&self, issue_id: Uuid, subscriber_id: Uuid, status: &str, error: Option<&str>) -> RepoResult<()>;
+    async fn log_delivery(
+        &self,
+        issue_id: Uuid,
+        subscriber_id: Uuid,
+        status: &str,
+        error: Option<&str>,
+    ) -> RepoResult<()>;
 
     // ========================================================================
     // Statistics

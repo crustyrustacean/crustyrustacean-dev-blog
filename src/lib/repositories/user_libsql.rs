@@ -116,9 +116,9 @@ impl UserRepository for LibSqlUserRepository {
         .await?;
 
         // Return the created user
-        self.find_by_id(id)
-            .await?
-            .ok_or_else(|| RepositoryError::InternalError("Failed to retrieve created user".to_string()))
+        self.find_by_id(id).await?.ok_or_else(|| {
+            RepositoryError::InternalError("Failed to retrieve created user".to_string())
+        })
     }
 
     // ========================================================================
@@ -205,11 +205,11 @@ impl UserRepository for LibSqlUserRepository {
         let mut params_vec: Vec<String> = Vec::new();
 
         // Search filter
-        if let Some(search) = &query.search {
-            if !search.trim().is_empty() {
-                where_clauses.push("(u.username LIKE ?1 OR u.email LIKE ?1)");
-                params_vec.push(format!("%{}%", search.trim()));
-            }
+        if let Some(search) = &query.search
+            && !search.trim().is_empty()
+        {
+            where_clauses.push("(u.username LIKE ?1 OR u.email LIKE ?1)");
+            params_vec.push(format!("%{}%", search.trim()));
         }
 
         // Status filter
@@ -245,7 +245,9 @@ impl UserRepository for LibSqlUserRepository {
             .map(|s| libsql::Value::Text(s.clone()))
             .collect();
 
-        let mut rows = conn.query(&query_str, libsql::params_from_iter(params)).await?;
+        let mut rows = conn
+            .query(&query_str, libsql::params_from_iter(params))
+            .await?;
 
         let mut users = Vec::new();
         while let Some(row) = rows.next().await? {
@@ -292,11 +294,11 @@ impl UserRepository for LibSqlUserRepository {
         let mut where_clauses = Vec::new();
         let mut params_vec: Vec<String> = Vec::new();
 
-        if let Some(search) = &query.search {
-            if !search.trim().is_empty() {
-                where_clauses.push("(username LIKE ?1 OR email LIKE ?1)");
-                params_vec.push(format!("%{}%", search.trim()));
-            }
+        if let Some(search) = &query.search
+            && !search.trim().is_empty()
+        {
+            where_clauses.push("(username LIKE ?1 OR email LIKE ?1)");
+            params_vec.push(format!("%{}%", search.trim()));
         }
 
         match query.status.as_deref() {
@@ -318,7 +320,9 @@ impl UserRepository for LibSqlUserRepository {
             .map(|s| libsql::Value::Text(s.clone()))
             .collect();
 
-        let mut rows = conn.query(&query_str, libsql::params_from_iter(params)).await?;
+        let mut rows = conn
+            .query(&query_str, libsql::params_from_iter(params))
+            .await?;
 
         if let Some(row) = rows.next().await? {
             Ok(row.get(0).unwrap_or(0))
@@ -353,13 +357,13 @@ impl UserRepository for LibSqlUserRepository {
             params.push(libsql::Value::Text(current_id.to_string()));
         }
 
-        if let Some(search) = &query.search {
-            if !search.trim().is_empty() {
-                where_clauses.push("(username LIKE ? OR bio LIKE ?)".to_string());
-                let search_pattern = format!("%{}%", search.trim());
-                params.push(libsql::Value::Text(search_pattern.clone()));
-                params.push(libsql::Value::Text(search_pattern));
-            }
+        if let Some(search) = &query.search
+            && !search.trim().is_empty()
+        {
+            where_clauses.push("(username LIKE ? OR bio LIKE ?)".to_string());
+            let search_pattern = format!("%{}%", search.trim());
+            params.push(libsql::Value::Text(search_pattern.clone()));
+            params.push(libsql::Value::Text(search_pattern));
         }
 
         let where_clause = where_clauses.join(" AND ");
@@ -375,7 +379,9 @@ impl UserRepository for LibSqlUserRepository {
         params.push(libsql::Value::Integer(limit as i64));
         params.push(libsql::Value::Integer(offset as i64));
 
-        let mut rows = conn.query(&query_str, libsql::params_from_iter(params)).await?;
+        let mut rows = conn
+            .query(&query_str, libsql::params_from_iter(params))
+            .await?;
 
         let mut profiles = Vec::new();
         while let Some(row) = rows.next().await? {
@@ -418,19 +424,21 @@ impl UserRepository for LibSqlUserRepository {
         ];
         let mut params: Vec<libsql::Value> = Vec::new();
 
-        if let Some(search) = &query.search {
-            if !search.trim().is_empty() {
-                where_clauses.push("(username LIKE ? OR bio LIKE ?)".to_string());
-                let search_pattern = format!("%{}%", search.trim());
-                params.push(libsql::Value::Text(search_pattern.clone()));
-                params.push(libsql::Value::Text(search_pattern));
-            }
+        if let Some(search) = &query.search
+            && !search.trim().is_empty()
+        {
+            where_clauses.push("(username LIKE ? OR bio LIKE ?)".to_string());
+            let search_pattern = format!("%{}%", search.trim());
+            params.push(libsql::Value::Text(search_pattern.clone()));
+            params.push(libsql::Value::Text(search_pattern));
         }
 
         let where_clause = where_clauses.join(" AND ");
         let query_str = format!("SELECT COUNT(*) FROM users WHERE {}", where_clause);
 
-        let mut rows = conn.query(&query_str, libsql::params_from_iter(params)).await?;
+        let mut rows = conn
+            .query(&query_str, libsql::params_from_iter(params))
+            .await?;
 
         if let Some(row) = rows.next().await? {
             Ok(row.get(0).unwrap_or(0))

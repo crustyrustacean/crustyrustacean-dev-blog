@@ -37,10 +37,18 @@ pub trait TokenRepository: Send + Sync {
     // ========================================================================
 
     /// Create a new password reset token.
-    async fn create_password_reset_token(&self, user_id: Uuid, token: &str, expires_at: DateTime<Utc>) -> RepoResult<PasswordResetToken>;
+    async fn create_password_reset_token(
+        &self,
+        user_id: Uuid,
+        token: &str,
+        expires_at: DateTime<Utc>,
+    ) -> RepoResult<PasswordResetToken>;
 
     /// Find a password reset token by token string.
-    async fn find_password_reset_token(&self, token: &str) -> RepoResult<Option<PasswordResetToken>>;
+    async fn find_password_reset_token(
+        &self,
+        token: &str,
+    ) -> RepoResult<Option<PasswordResetToken>>;
 
     /// Mark a password reset token as used.
     async fn mark_password_reset_token_used(&self, token: &str) -> RepoResult<()>;
@@ -53,10 +61,18 @@ pub trait TokenRepository: Send + Sync {
     // ========================================================================
 
     /// Create a new email verification token.
-    async fn create_email_verification_token(&self, user_id: Uuid, token: &str, expires_at: DateTime<Utc>) -> RepoResult<EmailVerificationToken>;
+    async fn create_email_verification_token(
+        &self,
+        user_id: Uuid,
+        token: &str,
+        expires_at: DateTime<Utc>,
+    ) -> RepoResult<EmailVerificationToken>;
 
     /// Find an email verification token by token string.
-    async fn find_email_verification_token(&self, token: &str) -> RepoResult<Option<EmailVerificationToken>>;
+    async fn find_email_verification_token(
+        &self,
+        token: &str,
+    ) -> RepoResult<Option<EmailVerificationToken>>;
 
     /// Delete email verification tokens for a user (after verification).
     async fn delete_email_verification_tokens(&self, user_id: Uuid) -> RepoResult<()>;

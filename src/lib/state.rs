@@ -205,24 +205,19 @@ impl AppState {
         let allowed_origins = config.allowed_origins;
 
         // Initialize repositories
-        let users: Arc<dyn UserRepository> =
-            Arc::new(LibSqlUserRepository::new(db.clone()));
+        let users: Arc<dyn UserRepository> = Arc::new(LibSqlUserRepository::new(db.clone()));
         let articles: Arc<dyn ArticleRepository> =
             Arc::new(LibSqlArticleRepository::new(db.clone()));
-        let tags: Arc<dyn TagRepository> =
-            Arc::new(LibSqlTagRepository::new(db.clone()));
+        let tags: Arc<dyn TagRepository> = Arc::new(LibSqlTagRepository::new(db.clone()));
         let categories: Arc<dyn CategoryRepository> =
             Arc::new(LibSqlCategoryRepository::new(db.clone()));
         let comments: Arc<dyn CommentRepository> =
             Arc::new(LibSqlCommentRepository::new(db.clone()));
         let newsletters: Arc<dyn NewsletterRepository> =
             Arc::new(LibSqlNewsletterRepository::new(db.clone()));
-        let api_keys: Arc<dyn ApiKeyRepository> =
-            Arc::new(LibSqlApiKeyRepository::new(db.clone()));
-        let media: Arc<dyn MediaRepository> =
-            Arc::new(LibSqlMediaRepository::new(db.clone()));
-        let tokens: Arc<dyn TokenRepository> =
-            Arc::new(LibSqlTokenRepository::new(db.clone()));
+        let api_keys: Arc<dyn ApiKeyRepository> = Arc::new(LibSqlApiKeyRepository::new(db.clone()));
+        let media: Arc<dyn MediaRepository> = Arc::new(LibSqlMediaRepository::new(db.clone()));
+        let tokens: Arc<dyn TokenRepository> = Arc::new(LibSqlTokenRepository::new(db.clone()));
 
         Ok(Self {
             templates,
