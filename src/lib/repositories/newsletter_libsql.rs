@@ -41,7 +41,10 @@ impl LibSqlNewsletterRepository {
 #[async_trait]
 impl NewsletterRepository for LibSqlNewsletterRepository {
     async fn subscribe(&self, subscriber: &NewSubscriber) -> RepoResult<NewsletterSubscriber> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let id = Uuid::new_v4();
         let confirmation_token = Uuid::new_v4().to_string();
@@ -75,40 +78,57 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn confirm_subscription(&self, token: &str) -> RepoResult<NewsletterSubscriber> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let now = Utc::now();
 
-        let result = conn.execute(
-            r"UPDATE newsletter_subscribers
+        let result = conn
+            .execute(
+                r"UPDATE newsletter_subscribers
               SET confirmed = 1, confirmed_at = ?, confirmation_token = NULL, updated_at = ?
               WHERE confirmation_token = ? AND confirmed = 0",
-            libsql::params![now.to_rfc3339(), now.to_rfc3339(), token],
-        ).await?;
+                libsql::params![now.to_rfc3339(), now.to_rfc3339(), token],
+            )
+            .await?;
 
         if result == 0 {
-            return Err(RepositoryError::NotFound("Invalid or already used confirmation token".to_string()));
+            return Err(RepositoryError::NotFound(
+                "Invalid or already used confirmation token".to_string(),
+            ));
         }
 
         // Find the subscriber that was just confirmed
-        let mut rows = conn.query(
-            "SELECT id FROM newsletter_subscribers WHERE confirmed_at = ?",
-            libsql::params![now.to_rfc3339()],
-        ).await?;
+        let mut rows = conn
+            .query(
+                "SELECT id FROM newsletter_subscribers WHERE confirmed_at = ?",
+                libsql::params![now.to_rfc3339()],
+            )
+            .await?;
 
         if let Some(row) = rows.next().await? {
             let id_str: String = row.get(0)?;
-            let id = Uuid::parse_str(&id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?;
+            let id = Uuid::parse_str(&id_str)
+                .map_err(|e| RepositoryError::InternalError(e.to_string()))?;
             return self.find_subscriber_by_id(id).await?.ok_or_else(|| {
-                RepositoryError::InternalError("Subscriber not found after confirmation".to_string())
+                RepositoryError::InternalError(
+                    "Subscriber not found after confirmation".to_string(),
+                )
             });
         }
 
-        Err(RepositoryError::InternalError("Failed to find confirmed subscriber".to_string()))
+        Err(RepositoryError::InternalError(
+            "Failed to find confirmed subscriber".to_string(),
+        ))
     }
 
     async fn unsubscribe(&self, token: &str) -> RepoResult<()> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let now = Utc::now();
 
@@ -118,21 +138,31 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
         ).await?;
 
         if result == 0 {
-            return Err(RepositoryError::NotFound("Invalid unsubscribe token".to_string()));
+            return Err(RepositoryError::NotFound(
+                "Invalid unsubscribe token".to_string(),
+            ));
         }
 
         Ok(())
     }
 
-    async fn find_subscriber_by_email(&self, email: &str) -> RepoResult<Option<NewsletterSubscriber>> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+    async fn find_subscriber_by_email(
+        &self,
+        email: &str,
+    ) -> RepoResult<Option<NewsletterSubscriber>> {
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut rows = conn.query(
-            r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
+        let mut rows = conn
+            .query(
+                r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
                      subscribed_at, confirmed_at, unsubscribed_at, created_at, updated_at
               FROM newsletter_subscribers WHERE email = ?",
-            libsql::params![email],
-        ).await?;
+                libsql::params![email],
+            )
+            .await?;
 
         if let Some(row) = rows.next().await? {
             let id_str: String = row.get(0)?;
@@ -142,15 +172,22 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
             let updated_at_str: String = row.get(10)?;
 
             Ok(Some(NewsletterSubscriber {
-                id: Uuid::parse_str(&id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                id: Uuid::parse_str(&id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
                 email: row.get(1)?,
                 name: row.get(2).ok(),
                 confirmation_token: row.get(3).ok(),
                 unsubscribe_token: row.get(4)?,
                 confirmed: confirmed != 0,
                 subscribed_at: Self::parse_datetime(&subscribed_at_str)?,
-                confirmed_at: row.get::<String>(7).ok().and_then(|s| Self::parse_datetime(&s).ok()),
-                unsubscribed_at: row.get::<String>(8).ok().and_then(|s| Self::parse_datetime(&s).ok()),
+                confirmed_at: row
+                    .get::<String>(7)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
+                unsubscribed_at: row
+                    .get::<String>(8)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
                 created_at: Self::parse_datetime(&created_at_str)?,
                 updated_at: Self::parse_datetime(&updated_at_str)?,
             }))
@@ -160,14 +197,19 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn find_subscriber_by_id(&self, id: Uuid) -> RepoResult<Option<NewsletterSubscriber>> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut rows = conn.query(
-            r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
+        let mut rows = conn
+            .query(
+                r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
                      subscribed_at, confirmed_at, unsubscribed_at, created_at, updated_at
               FROM newsletter_subscribers WHERE id = ?",
-            libsql::params![id.to_string()],
-        ).await?;
+                libsql::params![id.to_string()],
+            )
+            .await?;
 
         if let Some(row) = rows.next().await? {
             let id_str: String = row.get(0)?;
@@ -177,15 +219,22 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
             let updated_at_str: String = row.get(10)?;
 
             Ok(Some(NewsletterSubscriber {
-                id: Uuid::parse_str(&id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                id: Uuid::parse_str(&id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
                 email: row.get(1)?,
                 name: row.get(2).ok(),
                 confirmation_token: row.get(3).ok(),
                 unsubscribe_token: row.get(4)?,
                 confirmed: confirmed != 0,
                 subscribed_at: Self::parse_datetime(&subscribed_at_str)?,
-                confirmed_at: row.get::<String>(7).ok().and_then(|s| Self::parse_datetime(&s).ok()),
-                unsubscribed_at: row.get::<String>(8).ok().and_then(|s| Self::parse_datetime(&s).ok()),
+                confirmed_at: row
+                    .get::<String>(7)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
+                unsubscribed_at: row
+                    .get::<String>(8)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
                 created_at: Self::parse_datetime(&created_at_str)?,
                 updated_at: Self::parse_datetime(&updated_at_str)?,
             }))
@@ -195,16 +244,21 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn list_confirmed_subscribers(&self) -> RepoResult<Vec<NewsletterSubscriber>> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut rows = conn.query(
-            r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
+        let mut rows = conn
+            .query(
+                r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
                      subscribed_at, confirmed_at, unsubscribed_at, created_at, updated_at
               FROM newsletter_subscribers
               WHERE confirmed = 1 AND unsubscribed_at IS NULL
               ORDER BY subscribed_at DESC",
-            (),
-        ).await?;
+                (),
+            )
+            .await?;
 
         let mut subscribers = Vec::new();
         while let Some(row) = rows.next().await? {
@@ -215,15 +269,22 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
             let updated_at_str: String = row.get(10)?;
 
             subscribers.push(NewsletterSubscriber {
-                id: Uuid::parse_str(&id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                id: Uuid::parse_str(&id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
                 email: row.get(1)?,
                 name: row.get(2).ok(),
                 confirmation_token: row.get(3).ok(),
                 unsubscribe_token: row.get(4)?,
                 confirmed: confirmed != 0,
                 subscribed_at: Self::parse_datetime(&subscribed_at_str)?,
-                confirmed_at: row.get::<String>(7).ok().and_then(|s| Self::parse_datetime(&s).ok()),
-                unsubscribed_at: row.get::<String>(8).ok().and_then(|s| Self::parse_datetime(&s).ok()),
+                confirmed_at: row
+                    .get::<String>(7)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
+                unsubscribed_at: row
+                    .get::<String>(8)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
                 created_at: Self::parse_datetime(&created_at_str)?,
                 updated_at: Self::parse_datetime(&updated_at_str)?,
             });
@@ -233,14 +294,19 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn list_all_subscribers(&self) -> RepoResult<Vec<NewsletterSubscriber>> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut rows = conn.query(
-            r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
+        let mut rows = conn
+            .query(
+                r"SELECT id, email, name, confirmation_token, unsubscribe_token, confirmed,
                      subscribed_at, confirmed_at, unsubscribed_at, created_at, updated_at
               FROM newsletter_subscribers ORDER BY created_at DESC",
-            (),
-        ).await?;
+                (),
+            )
+            .await?;
 
         let mut subscribers = Vec::new();
         while let Some(row) = rows.next().await? {
@@ -251,15 +317,22 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
             let updated_at_str: String = row.get(10)?;
 
             subscribers.push(NewsletterSubscriber {
-                id: Uuid::parse_str(&id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                id: Uuid::parse_str(&id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
                 email: row.get(1)?,
                 name: row.get(2).ok(),
                 confirmation_token: row.get(3).ok(),
                 unsubscribe_token: row.get(4)?,
                 confirmed: confirmed != 0,
                 subscribed_at: Self::parse_datetime(&subscribed_at_str)?,
-                confirmed_at: row.get::<String>(7).ok().and_then(|s| Self::parse_datetime(&s).ok()),
-                unsubscribed_at: row.get::<String>(8).ok().and_then(|s| Self::parse_datetime(&s).ok()),
+                confirmed_at: row
+                    .get::<String>(7)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
+                unsubscribed_at: row
+                    .get::<String>(8)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
                 created_at: Self::parse_datetime(&created_at_str)?,
                 updated_at: Self::parse_datetime(&updated_at_str)?,
             });
@@ -269,22 +342,33 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn delete_subscriber(&self, id: Uuid) -> RepoResult<()> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let result = conn.execute(
-            "DELETE FROM newsletter_subscribers WHERE id = ?",
-            libsql::params![id.to_string()],
-        ).await?;
+        let result = conn
+            .execute(
+                "DELETE FROM newsletter_subscribers WHERE id = ?",
+                libsql::params![id.to_string()],
+            )
+            .await?;
 
         if result == 0 {
-            return Err(RepositoryError::NotFound(format!("Subscriber with id {}", id)));
+            return Err(RepositoryError::NotFound(format!(
+                "Subscriber with id {}",
+                id
+            )));
         }
 
         Ok(())
     }
 
     async fn create_issue(&self, issue: &NewNewsletterIssue) -> RepoResult<NewsletterIssue> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let id = Uuid::new_v4();
         let now = Utc::now();
@@ -316,7 +400,10 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn find_issue_by_id(&self, id: Uuid) -> RepoResult<Option<NewsletterIssue>> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let mut rows = conn.query(
             r"SELECT id, title, subject, body, status, author_id, scheduled_at, sent_at, recipient_count, created_at, updated_at
@@ -333,14 +420,22 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
             let updated_at_str: String = row.get(10)?;
 
             Ok(Some(NewsletterIssue {
-                id: Uuid::parse_str(&id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                id: Uuid::parse_str(&id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
                 title: row.get(1)?,
                 subject: row.get(2)?,
                 body: row.get(3)?,
                 status: status_str.parse().unwrap_or(NewsletterStatus::Draft),
-                author_id: Uuid::parse_str(&author_id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
-                scheduled_at: row.get::<String>(6).ok().and_then(|s| Self::parse_datetime(&s).ok()),
-                sent_at: row.get::<String>(7).ok().and_then(|s| Self::parse_datetime(&s).ok()),
+                author_id: Uuid::parse_str(&author_id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                scheduled_at: row
+                    .get::<String>(6)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
+                sent_at: row
+                    .get::<String>(7)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
                 recipient_count,
                 created_at: Self::parse_datetime(&created_at_str)?,
                 updated_at: Self::parse_datetime(&updated_at_str)?,
@@ -351,7 +446,10 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn list_issues(&self) -> RepoResult<Vec<NewsletterIssue>> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let mut rows = conn.query(
             r"SELECT id, title, subject, body, status, author_id, scheduled_at, sent_at, recipient_count, created_at, updated_at
@@ -369,14 +467,22 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
             let updated_at_str: String = row.get(10)?;
 
             issues.push(NewsletterIssue {
-                id: Uuid::parse_str(&id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                id: Uuid::parse_str(&id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
                 title: row.get(1)?,
                 subject: row.get(2)?,
                 body: row.get(3)?,
                 status: status_str.parse().unwrap_or(NewsletterStatus::Draft),
-                author_id: Uuid::parse_str(&author_id_str).map_err(|e| RepositoryError::InternalError(e.to_string()))?,
-                scheduled_at: row.get::<String>(6).ok().and_then(|s| Self::parse_datetime(&s).ok()),
-                sent_at: row.get::<String>(7).ok().and_then(|s| Self::parse_datetime(&s).ok()),
+                author_id: Uuid::parse_str(&author_id_str)
+                    .map_err(|e| RepositoryError::InternalError(e.to_string()))?,
+                scheduled_at: row
+                    .get::<String>(6)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
+                sent_at: row
+                    .get::<String>(7)
+                    .ok()
+                    .and_then(|s| Self::parse_datetime(&s).ok()),
                 recipient_count,
                 created_at: Self::parse_datetime(&created_at_str)?,
                 updated_at: Self::parse_datetime(&updated_at_str)?,
@@ -386,8 +492,15 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
         Ok(issues)
     }
 
-    async fn update_issue(&self, id: Uuid, data: &UpdateNewsletterIssueData) -> RepoResult<NewsletterIssue> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+    async fn update_issue(
+        &self,
+        id: Uuid,
+        data: &UpdateNewsletterIssueData,
+    ) -> RepoResult<NewsletterIssue> {
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let mut updates = Vec::new();
         let mut params: Vec<libsql::Value> = Vec::new();
@@ -426,8 +539,12 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
         params.push(libsql::Value::Text(Utc::now().to_rfc3339()));
         params.push(libsql::Value::Text(id.to_string()));
 
-        let query = format!("UPDATE newsletter_issues SET {} WHERE id = ?", updates.join(", "));
-        conn.execute(&query, libsql::params_from_iter(params)).await?;
+        let query = format!(
+            "UPDATE newsletter_issues SET {} WHERE id = ?",
+            updates.join(", ")
+        );
+        conn.execute(&query, libsql::params_from_iter(params))
+            .await?;
 
         self.find_issue_by_id(id).await?.ok_or_else(|| {
             RepositoryError::InternalError("Failed to update newsletter issue".to_string())
@@ -435,22 +552,33 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn delete_issue(&self, id: Uuid) -> RepoResult<()> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let result = conn.execute(
-            "DELETE FROM newsletter_issues WHERE id = ?",
-            libsql::params![id.to_string()],
-        ).await?;
+        let result = conn
+            .execute(
+                "DELETE FROM newsletter_issues WHERE id = ?",
+                libsql::params![id.to_string()],
+            )
+            .await?;
 
         if result == 0 {
-            return Err(RepositoryError::NotFound(format!("Newsletter issue with id {}", id)));
+            return Err(RepositoryError::NotFound(format!(
+                "Newsletter issue with id {}",
+                id
+            )));
         }
 
         Ok(())
     }
 
     async fn mark_issue_sent(&self, id: Uuid, recipient_count: i32) -> RepoResult<()> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let now = Utc::now();
         conn.execute(
@@ -461,8 +589,17 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
         Ok(())
     }
 
-    async fn log_delivery(&self, issue_id: Uuid, subscriber_id: Uuid, status: &str, error: Option<&str>) -> RepoResult<()> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+    async fn log_delivery(
+        &self,
+        issue_id: Uuid,
+        subscriber_id: Uuid,
+        status: &str,
+        error: Option<&str>,
+    ) -> RepoResult<()> {
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
         let id = Uuid::new_v4();
         let now = Utc::now();
@@ -490,27 +627,50 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
     }
 
     async fn get_stats(&self) -> RepoResult<NewsletterStatsData> {
-        let conn = self.db.connect().map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut total_rows = conn.query("SELECT COUNT(*) FROM newsletter_subscribers WHERE unsubscribed_at IS NULL", ()).await?;
+        let mut total_rows = conn
+            .query(
+                "SELECT COUNT(*) FROM newsletter_subscribers WHERE unsubscribed_at IS NULL",
+                (),
+            )
+            .await?;
         let total_subscribers: i32 = if let Some(row) = total_rows.next().await? {
             row.get(0).unwrap_or(0)
-        } else { 0 };
+        } else {
+            0
+        };
 
         let mut confirmed_rows = conn.query("SELECT COUNT(*) FROM newsletter_subscribers WHERE confirmed = 1 AND unsubscribed_at IS NULL", ()).await?;
         let confirmed_subscribers: i32 = if let Some(row) = confirmed_rows.next().await? {
             row.get(0).unwrap_or(0)
-        } else { 0 };
+        } else {
+            0
+        };
 
-        let mut issues_rows = conn.query("SELECT COUNT(*) FROM newsletter_issues", ()).await?;
+        let mut issues_rows = conn
+            .query("SELECT COUNT(*) FROM newsletter_issues", ())
+            .await?;
         let total_issues: i32 = if let Some(row) = issues_rows.next().await? {
             row.get(0).unwrap_or(0)
-        } else { 0 };
+        } else {
+            0
+        };
 
-        let mut sent_rows = conn.query("SELECT COUNT(*) FROM newsletter_issues WHERE status = 'sent'", ()).await?;
+        let mut sent_rows = conn
+            .query(
+                "SELECT COUNT(*) FROM newsletter_issues WHERE status = 'sent'",
+                (),
+            )
+            .await?;
         let sent_issues: i32 = if let Some(row) = sent_rows.next().await? {
             row.get(0).unwrap_or(0)
-        } else { 0 };
+        } else {
+            0
+        };
 
         Ok(NewsletterStatsData {
             total_subscribers,

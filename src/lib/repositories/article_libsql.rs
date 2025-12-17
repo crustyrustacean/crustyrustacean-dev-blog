@@ -10,10 +10,10 @@ use uuid::Uuid;
 use crate::database::DatabaseConnection;
 use crate::models::{ArticleQuery, FeedQuery, UserProfile};
 
-use super::error::{RepoResult, RepositoryError};
 use super::article::{
     ArticleRecord, ArticleRepository, ArticleWithDetails, NewArticle, UpdateArticleData,
 };
+use super::error::{RepoResult, RepositoryError};
 
 /// LibSQL implementation of the ArticleRepository.
 #[derive(Debug, Clone)]
@@ -147,9 +147,9 @@ impl ArticleRepository for LibSqlArticleRepository {
         )
         .await?;
 
-        self.find_by_id(id)
-            .await?
-            .ok_or_else(|| RepositoryError::InternalError("Failed to retrieve created article".to_string()))
+        self.find_by_id(id).await?.ok_or_else(|| {
+            RepositoryError::InternalError("Failed to retrieve created article".to_string())
+        })
     }
 
     async fn find_by_id(&self, id: Uuid) -> RepoResult<Option<ArticleRecord>> {
@@ -341,7 +341,9 @@ impl ArticleRepository for LibSqlArticleRepository {
         params.push(libsql::Value::Integer(limit as i64));
         params.push(libsql::Value::Integer(offset as i64));
 
-        let mut rows = conn.query(&query_str, libsql::params_from_iter(params)).await?;
+        let mut rows = conn
+            .query(&query_str, libsql::params_from_iter(params))
+            .await?;
 
         let mut articles = Vec::new();
         while let Some(row) = rows.next().await? {
@@ -442,7 +444,9 @@ impl ArticleRepository for LibSqlArticleRepository {
             where_clause
         );
 
-        let mut rows = conn.query(&query_str, libsql::params_from_iter(params)).await?;
+        let mut rows = conn
+            .query(&query_str, libsql::params_from_iter(params))
+            .await?;
 
         if let Some(row) = rows.next().await? {
             Ok(row.get(0).unwrap_or(0))
@@ -612,7 +616,10 @@ impl ArticleRepository for LibSqlArticleRepository {
 
         let existing = self.find_by_slug(slug).await?;
         if existing.is_none() {
-            return Err(RepositoryError::NotFound(format!("Article with slug {}", slug)));
+            return Err(RepositoryError::NotFound(format!(
+                "Article with slug {}",
+                slug
+            )));
         }
 
         let mut updates = Vec::new();

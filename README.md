@@ -24,7 +24,7 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Full CRUD operations for articles
   - Admin dashboard for content management with copy-to-clipboard slug functionality
 - **Professional frontend** with Tera templating:
-  - Bootstrap-based responsive design
+  - Modern, standards-compliant CSS (no external framework dependencies)
   - SEO-friendly URLs with canonical tags and meta descriptions
   - JSON-LD structured data for articles (BlogPosting schema)
   - User-friendly navigation and error handling
@@ -177,6 +177,16 @@ A developer blog application built with [Axum](https://github.com/tokio-rs/axum)
   - Database error sanitization for security
   - Consistent error handling patterns across all routes
   - Automatic error logging while protecting sensitive details
+- **Modern CSS Theme System** (Bootstrap-free):
+  - Standards-compliant CSS using CSS Custom Properties and CSS Layers
+  - TOML-based theme configuration (`themes/{theme-id}/theme.toml`)
+  - Built-in themes: Crusty Light (default), Crusty Dark, High Contrast
+  - Support for light, dark, and auto (system preference) color schemes
+  - Client-side theme switching via `data-theme` attribute
+  - CSS `color-mix()` for dynamic color calculations with fallbacks
+  - Vanilla JavaScript components (Modal, Dropdown, Collapse, Tab, Alert)
+  - ~105KB bundle size reduction from Bootstrap removal
+  - Accessibility-focused high contrast theme option
 
 ### 🚧 Planned
 - Image processing and optimization
@@ -200,6 +210,7 @@ src/
     startup.rs      # App initialization and router setup
     state.rs        # Shared application state
     telemetry.rs    # Tracing/logging setup
+    theme.rs        # Theme configuration system (TOML parsing, validation, CSS generation)
     models/         # Database entities (User, Article, Comment, Tag, Category, Media, Newsletter)
     routes/         # HTTP route handlers
     shortcodes.rs   # Shortcode parsing for internal article links
@@ -217,8 +228,13 @@ src/
       mod.rs        # Routes module
 static/
   css/
+    variables.css   # CSS custom properties and theme variable mappings
+    base.css        # Theme-agnostic base styles using CSS layers
+    bootstrap-replacement.css  # Bootstrap-compatible grid and utilities
     styles.css      # Main stylesheet with responsive design
-  js/               # Modular JavaScript architecture (20 modules)
+    media-library.css  # Media library specific styles
+  js/               # Modular JavaScript architecture (21 modules)
+    components.js   # Vanilla JS Bootstrap-compatible components (Modal, Dropdown, etc.)
     admin.js        # Admin dashboard with copy-to-clipboard functionality
     article-init.js # Article initialization
     article-list.js # Articles listing interactions
@@ -240,6 +256,13 @@ static/
     media-library.js # Media library management
     utils.js        # Shared utilities and helpers
   images/           # Static images and assets
+themes/             # Theme configuration files
+  default/
+    theme.toml      # Crusty Light theme (warm orange accents)
+  dark/
+    theme.toml      # Crusty Dark theme (GitHub-inspired dark mode)
+  high-contrast/
+    theme.toml      # High Contrast theme (accessibility-focused)
 templates/          # Tera templates for HTML rendering
   base.html         # Base layout template
   index.html        # Dynamic homepage
@@ -524,7 +547,8 @@ The application now includes a complete blog system:
 20. **Newsletter System**: Email subscription with double opt-in, newsletter creation and delivery management, subscriber management
 21. **User Profile Pages**: Real profile pages with articles, followers, following counts, and pagination
 22. **SEO Features**: Canonical URLs, meta descriptions, JSON-LD structured data, W3C-compliant sitemap
-23. **Responsive Design**: Bootstrap-based UI that works on all device sizes
+23. **Responsive Design**: Modern CSS-based UI that works on all device sizes (no Bootstrap dependency)
+24. **Theme System**: TOML-configured themes with light/dark/high-contrast modes and CSS custom properties
 
 ### Authentication Flow
 1. **Register**: `POST /api/users` with `{user: {username, email, password}}`
@@ -564,7 +588,8 @@ The application now includes a complete blog system:
 - **Maintainable Codebase**: Clean separation of concerns and consistent patterns
 - **Role-Based Security**: Production-ready RBAC system with hierarchical permissions
 - **Cloud-Native Storage**: OpenDAL integration for flexible storage backend options
-- **Modular JavaScript**: 20+ JavaScript modules with separation of concerns
+- **Modular JavaScript**: 21+ JavaScript modules with separation of concerns
+- **Modern CSS Architecture**: CSS Layers, Custom Properties, and standards-compliant styling without Bootstrap
 - **Content Management**: Complete draft workflow with author-only visibility
 - **Internal Linking**: Shortcode system for seamless article cross-referencing
 

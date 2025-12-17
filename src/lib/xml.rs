@@ -33,7 +33,10 @@ mod tests {
 
     #[test]
     fn test_escape_xml_quotes() {
-        assert_eq!(escape_xml(r#"It's "quoted""#), "It&apos;s &quot;quoted&quot;");
+        assert_eq!(
+            escape_xml(r#"It's "quoted""#),
+            "It&apos;s &quot;quoted&quot;"
+        );
     }
 
     #[test]

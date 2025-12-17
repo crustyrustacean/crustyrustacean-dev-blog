@@ -53,7 +53,12 @@ pub trait MediaRepository: Send + Sync {
     async fn delete(&self, id: &str) -> RepoResult<()>;
 
     /// Track media usage in an article.
-    async fn track_usage(&self, media_id: &str, article_slug: &str, context: Option<&str>) -> RepoResult<()>;
+    async fn track_usage(
+        &self,
+        media_id: &str,
+        article_slug: &str,
+        context: Option<&str>,
+    ) -> RepoResult<()>;
 
     /// Remove usage tracking for an article.
     async fn remove_usage(&self, article_slug: &str) -> RepoResult<()>;

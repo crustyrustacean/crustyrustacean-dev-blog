@@ -1,6 +1,7 @@
 /* CrustyRustacean Dev Blog - Base Styles
- * This file contains theme-agnostic styles using CSS layers
- * Theme variables are injected separately via theme.toml configuration
+ * This file contains theme-agnostic styles using CSS layers.
+ * CSS custom properties are defined in variables.css (loaded first).
+ * Theme variables (--theme-*) are provided via theme.toml configuration.
  */
 
 /* Layer order declaration - controls specificity */
@@ -51,52 +52,9 @@
 
 /* ============================================
    BASE LAYER - Typography and layout defaults
+   Note: CSS custom properties are defined in variables.css
    ============================================ */
 @layer base {
-    :root {
-        /* Color scheme hint for browser UI */
-        color-scheme: light dark;
-
-        /* Theme variable mappings with fallbacks */
-        --color-primary: var(--theme-primary, #ff6b35);
-        --color-primary-hover: var(--theme-primary-hover, color-mix(in oklch, var(--color-primary), black 15%));
-        --color-secondary: var(--theme-secondary, #2c3e50);
-        --color-accent: var(--theme-accent, #e74c3c);
-
-        /* Background colors */
-        --color-bg-body: var(--theme-bg-body, #ffffff);
-        --color-bg-surface: var(--theme-bg-surface, #f8f9fa);
-        --color-bg-elevated: var(--theme-bg-elevated, #ffffff);
-        --color-bg-gradient-start: var(--theme-bg-gradient-start, #667eea);
-        --color-bg-gradient-end: var(--theme-bg-gradient-end, #764ba2);
-
-        /* Text colors */
-        --color-text-primary: var(--theme-text-primary, #000000);
-        --color-text-secondary: var(--theme-text-secondary, #2d3748);
-        --color-text-muted: var(--theme-text-muted, #6c757d);
-        --color-text-on-primary: var(--theme-text-on-primary, #ffffff);
-
-        /* Semantic colors */
-        --color-success: var(--theme-success, #28a745);
-        --color-warning: var(--theme-warning, #ffc107);
-        --color-danger: var(--theme-danger, #dc3545);
-        --color-info: var(--theme-info, #17a2b8);
-
-        /* Borders and effects */
-        --color-border: var(--theme-border-color, #dee2e6);
-        --border-radius: var(--theme-border-radius, 12px);
-        --shadow: var(--theme-shadow, 0 2px 15px rgba(0, 0, 0, 0.1));
-        --shadow-hover: var(--theme-shadow-hover, 0 5px 25px rgba(0, 0, 0, 0.15));
-
-        /* Typography */
-        --font-body: var(--theme-font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-        --font-heading: var(--theme-font-heading, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-        --font-mono: var(--theme-font-mono, 'Monaco', 'Menlo', 'Ubuntu Mono', monospace);
-
-        /* Transition for smooth theme switching */
-        --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-    }
-
     /* Apply theme transition to key elements */
     body,
     .card,
@@ -713,32 +671,14 @@
 /* ============================================
    THEME LAYER - Theme-specific overrides
    This layer has highest specificity and is
-   where theme.toml-generated CSS is injected
+   where theme.toml-generated CSS is injected.
+   Theme variable overrides (data-theme attributes)
+   are defined in variables.css
    ============================================ */
 @layer theme {
     /* Theme-specific styles will be injected here */
     /* This layer is populated by theme variables from theme.toml */
-
-    /* Dark theme data attribute styles */
-    [data-theme="dark"] {
-        --color-bg-body: var(--theme-bg-body, #0d1117);
-        --color-bg-surface: var(--theme-bg-surface, #161b22);
-        --color-bg-elevated: var(--theme-bg-elevated, #21262d);
-        --color-text-primary: var(--theme-text-primary, #f0f6fc);
-        --color-text-secondary: var(--theme-text-secondary, #8b949e);
-        --color-text-muted: var(--theme-text-muted, #6e7681);
-        --color-border: var(--theme-border-color, #30363d);
-    }
-
-    [data-theme="high-contrast"] {
-        --color-primary: var(--theme-primary, #0066cc);
-        --color-bg-body: var(--theme-bg-body, #ffffff);
-        --color-text-primary: var(--theme-text-primary, #000000);
-        --color-border: var(--theme-border-color, #000000);
-        --border-radius: var(--theme-border-radius, 0px);
-        --shadow: var(--theme-shadow, none);
-        --shadow-hover: var(--theme-shadow-hover, none);
-    }
+    /* See variables.css for [data-theme] attribute overrides */
 }
 
 /* Fallback for browsers that don't support color-mix */

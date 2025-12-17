@@ -65,16 +65,14 @@ fn setup_templates(config: &AppConfig) -> Result<&'static Tera, tera::Error> {
 
 // Load themes from the themes directory
 fn setup_themes() -> &'static ThemeRegistry {
-    THEME_REGISTRY.get_or_init(|| {
-        match ThemeRegistry::load_from_directory("themes") {
-            Ok(registry) => {
-                tracing::info!("Loaded {} themes", registry.len());
-                registry
-            }
-            Err(e) => {
-                tracing::warn!("Failed to load themes: {}, using empty registry", e);
-                ThemeRegistry::new()
-            }
+    THEME_REGISTRY.get_or_init(|| match ThemeRegistry::load_from_directory("themes") {
+        Ok(registry) => {
+            tracing::info!("Loaded {} themes", registry.len());
+            registry
+        }
+        Err(e) => {
+            tracing::warn!("Failed to load themes: {}, using empty registry", e);
+            ThemeRegistry::new()
         }
     })
 }
@@ -84,27 +82,13 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
     COMPILED_TEMPLATES.get_or_try_init(|| {
         let mut tera = Tera::new(templates_dir)?;
 
-        let external = config.external_stylesheet.clone();
-        let override_css = config.override_stylesheet.clone();
-
-        // Legacy theme_stylesheet function (for backwards compatibility)
+        // Deprecated: Bootstrap has been removed. This function now returns empty strings.
+        // Kept for backwards compatibility in case any templates still reference it.
         tera.register_function(
             "theme_stylesheet",
-            move |args: &HashMap<String, Value>| -> tera::Result<Value> {
-                use tera::from_value;
-
-                let which = args
-                    .get("which")
-                    .and_then(|v| from_value::<String>(v.clone()).ok())
-                    .unwrap_or_else(|| "external".to_string());
-
-                let url = match which.as_str() {
-                    "external" => &external,
-                    "override" => &override_css,
-                    _ => "",
-                };
-
-                Ok(Value::String(url.to_string()))
+            |_args: &HashMap<String, Value>| -> tera::Result<Value> {
+                // Bootstrap has been removed - return empty string
+                Ok(Value::String(String::new()))
             },
         );
 
@@ -159,9 +143,8 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
             "available_themes",
             |_args: &HashMap<String, Value>| -> tera::Result<Value> {
                 let registry = THEME_REGISTRY.get();
-                let themes: Vec<ThemeListItem> = registry
-                    .map(|r| r.to_theme_list())
-                    .unwrap_or_default();
+                let themes: Vec<ThemeListItem> =
+                    registry.map(|r| r.to_theme_list()).unwrap_or_default();
 
                 serde_json::to_value(themes)
                     .map(|v| tera::to_value(v).unwrap_or(Value::Array(vec![])))
@@ -196,9 +179,7 @@ fn load_templates(templates_dir: &str, config: &AppConfig) -> Result<&'static Te
             "all_themes_css",
             |_args: &HashMap<String, Value>| -> tera::Result<Value> {
                 let registry = THEME_REGISTRY.get();
-                let css = registry
-                    .map(|r| r.all_themes_css())
-                    .unwrap_or_default();
+                let css = registry.map(|r| r.all_themes_css()).unwrap_or_default();
 
                 Ok(Value::String(css))
             },
@@ -224,24 +205,19 @@ impl AppState {
         let allowed_origins = config.allowed_origins;
 
         // Initialize repositories
-        let users: Arc<dyn UserRepository> =
-            Arc::new(LibSqlUserRepository::new(db.clone()));
+        let users: Arc<dyn UserRepository> = Arc::new(LibSqlUserRepository::new(db.clone()));
         let articles: Arc<dyn ArticleRepository> =
             Arc::new(LibSqlArticleRepository::new(db.clone()));
-        let tags: Arc<dyn TagRepository> =
-            Arc::new(LibSqlTagRepository::new(db.clone()));
+        let tags: Arc<dyn TagRepository> = Arc::new(LibSqlTagRepository::new(db.clone()));
         let categories: Arc<dyn CategoryRepository> =
             Arc::new(LibSqlCategoryRepository::new(db.clone()));
         let comments: Arc<dyn CommentRepository> =
             Arc::new(LibSqlCommentRepository::new(db.clone()));
         let newsletters: Arc<dyn NewsletterRepository> =
             Arc::new(LibSqlNewsletterRepository::new(db.clone()));
-        let api_keys: Arc<dyn ApiKeyRepository> =
-            Arc::new(LibSqlApiKeyRepository::new(db.clone()));
-        let media: Arc<dyn MediaRepository> =
-            Arc::new(LibSqlMediaRepository::new(db.clone()));
-        let tokens: Arc<dyn TokenRepository> =
-            Arc::new(LibSqlTokenRepository::new(db.clone()));
+        let api_keys: Arc<dyn ApiKeyRepository> = Arc::new(LibSqlApiKeyRepository::new(db.clone()));
+        let media: Arc<dyn MediaRepository> = Arc::new(LibSqlMediaRepository::new(db.clone()));
+        let tokens: Arc<dyn TokenRepository> = Arc::new(LibSqlTokenRepository::new(db.clone()));
 
         Ok(Self {
             templates,

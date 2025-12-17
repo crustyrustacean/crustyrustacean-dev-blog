@@ -40,9 +40,9 @@ impl TagRepository for LibSqlTagRepository {
         .await?;
 
         // Get the tag (either newly created or existing)
-        self.find_by_name(name)
-            .await?
-            .ok_or_else(|| RepositoryError::InternalError("Failed to create or get tag".to_string()))
+        self.find_by_name(name).await?.ok_or_else(|| {
+            RepositoryError::InternalError("Failed to create or get tag".to_string())
+        })
     }
 
     async fn find_by_id(&self, id: Uuid) -> RepoResult<Option<TagRecord>> {
@@ -155,8 +155,11 @@ impl TagRepository for LibSqlTagRepository {
         }
 
         // Check if new name already exists
-        if let Some(_) = self.find_by_name(new_name).await? {
-            return Err(RepositoryError::AlreadyExists(format!("Tag '{}'", new_name)));
+        if (self.find_by_name(new_name).await?).is_some() {
+            return Err(RepositoryError::AlreadyExists(format!(
+                "Tag '{}'",
+                new_name
+            )));
         }
 
         conn.execute(

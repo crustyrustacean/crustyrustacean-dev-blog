@@ -73,6 +73,7 @@ pub enum ThemeError {
     IoError(std::io::Error),
     ParseError(toml::de::Error),
     NotFound(String),
+    ValidationError(Vec<String>),
 }
 
 impl std::fmt::Display for ThemeError {
@@ -81,6 +82,9 @@ impl std::fmt::Display for ThemeError {
             ThemeError::IoError(e) => write!(f, "IO error: {}", e),
             ThemeError::ParseError(e) => write!(f, "Parse error: {}", e),
             ThemeError::NotFound(id) => write!(f, "Theme not found: {}", id),
+            ThemeError::ValidationError(errors) => {
+                write!(f, "Theme validation failed: {}", errors.join("; "))
+            }
         }
     }
 }
@@ -99,12 +103,133 @@ impl From<toml::de::Error> for ThemeError {
     }
 }
 
+/// Required color keys that must be present in every theme
+const REQUIRED_COLOR_KEYS: &[&str] = &["primary", "bg-body", "text-primary"];
+
+/// Valid color scheme values
+const VALID_COLOR_SCHEMES: &[&str] = &["light", "dark", "auto"];
+
+/// Keys in the colors map that are NOT actual colors (CSS values like border-radius, shadows)
+const NON_COLOR_KEYS: &[&str] = &["border-radius", "shadow", "shadow-hover"];
+
 impl ThemeConfig {
     /// Load a theme from a TOML file
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, ThemeError> {
         let content = fs::read_to_string(path)?;
         let config: ThemeConfig = toml::from_str(&content)?;
         Ok(config)
+    }
+
+    /// Load and validate a theme from a TOML file
+    pub fn load_validated<P: AsRef<Path>>(path: P) -> Result<Self, ThemeError> {
+        let config = Self::load(path)?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    /// Validate the theme configuration
+    pub fn validate(&self) -> Result<(), ThemeError> {
+        let mut errors = Vec::new();
+
+        // Validate theme ID (alphanumeric and hyphens only)
+        if !self
+            .theme
+            .id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-')
+        {
+            errors.push(format!(
+                "Invalid theme ID '{}': must contain only alphanumeric characters and hyphens",
+                self.theme.id
+            ));
+        }
+
+        // Validate theme ID is not empty
+        if self.theme.id.is_empty() {
+            errors.push("Theme ID cannot be empty".to_string());
+        }
+
+        // Validate color scheme
+        if !VALID_COLOR_SCHEMES.contains(&self.theme.supports.color_scheme.as_str()) {
+            errors.push(format!(
+                "Invalid color_scheme '{}': must be one of {:?}",
+                self.theme.supports.color_scheme, VALID_COLOR_SCHEMES
+            ));
+        }
+
+        // Validate required color keys exist
+        for key in REQUIRED_COLOR_KEYS {
+            if !self.theme.colors.contains_key(*key) {
+                errors.push(format!("Missing required color key: '{}'", key));
+            }
+        }
+
+        // Validate color format (hex colors should start with #)
+        // Skip non-color keys like border-radius, shadow, etc.
+        for (key, value) in &self.theme.colors {
+            if NON_COLOR_KEYS.contains(&key.as_str()) {
+                continue; // Skip validation for non-color CSS values
+            }
+            if !Self::is_valid_color_value(value) {
+                errors.push(format!(
+                    "Invalid color value for '{}': '{}' (expected hex color like #ffffff or CSS function)",
+                    key, value
+                ));
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(ThemeError::ValidationError(errors))
+        }
+    }
+
+    /// Check if a color value is valid
+    /// Accepts: hex colors (#xxx, #xxxxxx, #xxxxxxxx), CSS functions, CSS keywords
+    fn is_valid_color_value(value: &str) -> bool {
+        let value = value.trim();
+
+        // Accept hex colors
+        if let Some(hex_part) = value.strip_prefix('#') {
+            let valid_length = matches!(hex_part.len(), 3 | 4 | 6 | 8);
+            let valid_chars = hex_part.chars().all(|c| c.is_ascii_hexdigit());
+            return valid_length && valid_chars;
+        }
+
+        // Accept CSS functions (rgb, rgba, hsl, hsla, color-mix, etc.)
+        if value.contains('(') && value.ends_with(')') {
+            return true;
+        }
+
+        // Accept 'none' or 'transparent'
+        if value == "none" || value == "transparent" {
+            return true;
+        }
+
+        // Accept CSS keywords (basic color names)
+        let css_keywords = [
+            "inherit",
+            "initial",
+            "unset",
+            "currentColor",
+            "black",
+            "white",
+            "red",
+            "green",
+            "blue",
+            "yellow",
+            "orange",
+            "purple",
+            "pink",
+            "gray",
+            "grey",
+        ];
+        if css_keywords.contains(&value) {
+            return true;
+        }
+
+        false
     }
 
     /// Generate CSS custom properties from theme colors (for :root)
@@ -167,7 +292,11 @@ impl ThemeConfig {
             .unwrap_or_else(|| {
                 // Fallback to primary, secondary, and first background color
                 vec![
-                    self.theme.colors.get("primary").cloned().unwrap_or_default(),
+                    self.theme
+                        .colors
+                        .get("primary")
+                        .cloned()
+                        .unwrap_or_default(),
                     self.theme
                         .colors
                         .get("secondary")
@@ -201,6 +330,14 @@ impl ThemeRegistry {
 
     /// Load all themes from a directory
     pub fn load_from_directory<P: AsRef<Path>>(themes_dir: P) -> Result<Self, ThemeError> {
+        Self::load_from_directory_with_options(themes_dir, true)
+    }
+
+    /// Load all themes from a directory with validation option
+    pub fn load_from_directory_with_options<P: AsRef<Path>>(
+        themes_dir: P,
+        validate: bool,
+    ) -> Result<Self, ThemeError> {
         let mut registry = Self::new();
         let themes_path = themes_dir.as_ref();
 
@@ -216,8 +353,26 @@ impl ThemeRegistry {
             if path.is_dir() {
                 let theme_toml = path.join("theme.toml");
                 if theme_toml.exists() {
-                    match ThemeConfig::load(&theme_toml) {
+                    let load_result = if validate {
+                        ThemeConfig::load_validated(&theme_toml)
+                    } else {
+                        ThemeConfig::load(&theme_toml)
+                    };
+
+                    match load_result {
                         Ok(config) => {
+                            // Verify that the theme ID matches the directory name
+                            let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+                            if config.theme.id != dir_name {
+                                tracing::warn!(
+                                    "Theme ID '{}' doesn't match directory name '{}' in {:?}",
+                                    config.theme.id,
+                                    dir_name,
+                                    theme_toml
+                                );
+                            }
+
                             let theme_id = config.theme.id.clone();
                             tracing::info!("Loaded theme: {} ({})", config.theme.name, theme_id);
                             registry.themes.insert(theme_id, config);
@@ -449,7 +604,7 @@ preview_colors = ["#ff6b35", "#2c3e50", "#ffffff"]
     fn test_all_themes_css() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Create two test themes
+        // Create two test themes with all required colors
         let theme1_dir = temp_dir.path().join("light");
         fs::create_dir(&theme1_dir).unwrap();
         fs::write(
@@ -463,6 +618,8 @@ version = "1.0.0"
 color_scheme = "light"
 [theme.colors]
 primary = "#ffffff"
+bg-body = "#ffffff"
+text-primary = "#000000"
 "##,
         )
         .unwrap();
@@ -480,6 +637,8 @@ version = "1.0.0"
 color_scheme = "dark"
 [theme.colors]
 primary = "#000000"
+bg-body = "#1a1a1a"
+text-primary = "#ffffff"
 "##,
         )
         .unwrap();
@@ -492,5 +651,170 @@ primary = "#000000"
         assert!(css.contains("[data-theme=\"dark\"]"));
         assert!(css.contains("--theme-primary: #ffffff"));
         assert!(css.contains("--theme-primary: #000000"));
+    }
+
+    // ============================================
+    // Theme Validation Tests
+    // ============================================
+
+    #[test]
+    fn test_valid_theme_passes_validation() {
+        let toml_content = create_test_theme_toml();
+        let config: ThemeConfig = toml::from_str(&toml_content).unwrap();
+
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_color_scheme_fails_validation() {
+        let toml_content = r##"
+[theme]
+id = "test"
+name = "Test Theme"
+version = "1.0.0"
+[theme.supports]
+color_scheme = "invalid"
+[theme.colors]
+primary = "#ff6b35"
+bg-body = "#ffffff"
+text-primary = "#000000"
+"##;
+        let config: ThemeConfig = toml::from_str(toml_content).unwrap();
+        let result = config.validate();
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid color_scheme"));
+    }
+
+    #[test]
+    fn test_missing_required_color_fails_validation() {
+        let toml_content = r##"
+[theme]
+id = "test"
+name = "Test Theme"
+version = "1.0.0"
+[theme.supports]
+color_scheme = "light"
+[theme.colors]
+secondary = "#2c3e50"
+"##;
+        let config: ThemeConfig = toml::from_str(toml_content).unwrap();
+        let result = config.validate();
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Missing required color key: 'primary'"));
+        assert!(err_msg.contains("Missing required color key: 'bg-body'"));
+        assert!(err_msg.contains("Missing required color key: 'text-primary'"));
+    }
+
+    #[test]
+    fn test_invalid_hex_color_fails_validation() {
+        let toml_content = r##"
+[theme]
+id = "test"
+name = "Test Theme"
+version = "1.0.0"
+[theme.supports]
+color_scheme = "light"
+[theme.colors]
+primary = "#gggggg"
+bg-body = "#ffffff"
+text-primary = "#000000"
+"##;
+        let config: ThemeConfig = toml::from_str(toml_content).unwrap();
+        let result = config.validate();
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid color value for 'primary'"));
+    }
+
+    #[test]
+    fn test_invalid_theme_id_fails_validation() {
+        let toml_content = r##"
+[theme]
+id = "test theme!"
+name = "Test Theme"
+version = "1.0.0"
+[theme.supports]
+color_scheme = "light"
+[theme.colors]
+primary = "#ff6b35"
+bg-body = "#ffffff"
+text-primary = "#000000"
+"##;
+        let config: ThemeConfig = toml::from_str(toml_content).unwrap();
+        let result = config.validate();
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid theme ID"));
+    }
+
+    #[test]
+    fn test_valid_color_formats() {
+        // Test various valid color formats
+        assert!(ThemeConfig::is_valid_color_value("#fff"));
+        assert!(ThemeConfig::is_valid_color_value("#ffffff"));
+        assert!(ThemeConfig::is_valid_color_value("#ffffffff"));
+        assert!(ThemeConfig::is_valid_color_value("rgb(255, 255, 255)"));
+        assert!(ThemeConfig::is_valid_color_value(
+            "rgba(255, 255, 255, 0.5)"
+        ));
+        assert!(ThemeConfig::is_valid_color_value("hsl(0, 100%, 50%)"));
+        assert!(ThemeConfig::is_valid_color_value(
+            "color-mix(in oklch, #ff0000, #0000ff)"
+        ));
+        assert!(ThemeConfig::is_valid_color_value("transparent"));
+        assert!(ThemeConfig::is_valid_color_value("none"));
+        assert!(ThemeConfig::is_valid_color_value("currentColor"));
+    }
+
+    #[test]
+    fn test_invalid_color_formats() {
+        // Test various invalid color formats
+        assert!(!ThemeConfig::is_valid_color_value("not-a-color"));
+        assert!(!ThemeConfig::is_valid_color_value("#gggggg"));
+        assert!(!ThemeConfig::is_valid_color_value("#12345")); // Wrong length
+        assert!(!ThemeConfig::is_valid_color_value("123456")); // Missing #
+    }
+
+    #[test]
+    fn test_load_validated_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let theme_dir = temp_dir.path().join("test");
+        fs::create_dir(&theme_dir).unwrap();
+        fs::write(theme_dir.join("theme.toml"), create_test_theme_toml()).unwrap();
+
+        let result = ThemeConfig::load_validated(theme_dir.join("theme.toml"));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_load_validated_fails_on_invalid() {
+        let temp_dir = TempDir::new().unwrap();
+        let theme_dir = temp_dir.path().join("invalid");
+        fs::create_dir(&theme_dir).unwrap();
+        fs::write(
+            theme_dir.join("theme.toml"),
+            r##"
+[theme]
+id = "invalid"
+name = "Invalid Theme"
+version = "1.0.0"
+[theme.supports]
+color_scheme = "invalid-scheme"
+[theme.colors]
+primary = "#ff6b35"
+bg-body = "#ffffff"
+text-primary = "#000000"
+"##,
+        )
+        .unwrap();
+
+        let result = ThemeConfig::load_validated(theme_dir.join("theme.toml"));
+        assert!(result.is_err());
     }
 }

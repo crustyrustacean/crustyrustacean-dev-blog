@@ -9,8 +9,10 @@ use uuid::Uuid;
 
 use crate::database::DatabaseConnection;
 
+use super::category::{
+    CategoryRecord, CategoryRepository, CategoryWithCount, NewCategory, UpdateCategoryData,
+};
 use super::error::{RepoResult, RepositoryError};
-use super::category::{CategoryRecord, CategoryRepository, CategoryWithCount, NewCategory, UpdateCategoryData};
 
 /// LibSQL implementation of the CategoryRepository.
 #[derive(Debug, Clone)]
@@ -206,7 +208,10 @@ impl CategoryRepository for LibSqlCategoryRepository {
 
         let existing = self.find_by_slug(slug).await?;
         if existing.is_none() {
-            return Err(RepositoryError::NotFound(format!("Category with slug '{}'", slug)));
+            return Err(RepositoryError::NotFound(format!(
+                "Category with slug '{}'",
+                slug
+            )));
         }
 
         let mut updates = Vec::new();
@@ -235,7 +240,10 @@ impl CategoryRepository for LibSqlCategoryRepository {
 
         params.push(libsql::Value::Text(slug.to_string()));
 
-        let update_query = format!("UPDATE categories SET {} WHERE slug = ?", updates.join(", "));
+        let update_query = format!(
+            "UPDATE categories SET {} WHERE slug = ?",
+            updates.join(", ")
+        );
 
         conn.execute(&update_query, libsql::params_from_iter(params))
             .await?;
@@ -276,7 +284,10 @@ impl CategoryRepository for LibSqlCategoryRepository {
             .await?;
 
         if result == 0 {
-            return Err(RepositoryError::NotFound(format!("Category with slug '{}'", slug)));
+            return Err(RepositoryError::NotFound(format!(
+                "Category with slug '{}'",
+                slug
+            )));
         }
 
         Ok(())

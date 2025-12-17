@@ -162,9 +162,7 @@ impl MediaRepository for LibSqlMediaRepository {
         let offset = query.offset.unwrap_or(0);
         sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
 
-        let mut rows = conn
-            .query(&sql, libsql::params_from_iter(params))
-            .await?;
+        let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
 
         let mut media_list = Vec::new();
         while let Some(row) = rows.next().await? {
@@ -188,9 +186,7 @@ impl MediaRepository for LibSqlMediaRepository {
             params.push(libsql::Value::Text(format!("{}%", mime_type)));
         }
 
-        let mut rows = conn
-            .query(&sql, libsql::params_from_iter(params))
-            .await?;
+        let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
 
         if let Some(row) = rows.next().await? {
             let count: i64 = row.get(0)?;
@@ -208,10 +204,7 @@ impl MediaRepository for LibSqlMediaRepository {
 
         // Verify the media exists
         if self.find_by_id(id).await?.is_none() {
-            return Err(RepositoryError::NotFound(format!(
-                "Media with id '{}'",
-                id
-            )));
+            return Err(RepositoryError::NotFound(format!("Media with id '{}'", id)));
         }
 
         let mut updates = Vec::new();
@@ -273,10 +266,7 @@ impl MediaRepository for LibSqlMediaRepository {
             .await?;
 
         if result == 0 {
-            return Err(RepositoryError::NotFound(format!(
-                "Media with id '{}'",
-                id
-            )));
+            return Err(RepositoryError::NotFound(format!("Media with id '{}'", id)));
         }
 
         Ok(())

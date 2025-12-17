@@ -9,8 +9,8 @@ use uuid::Uuid;
 use crate::database::DatabaseConnection;
 use crate::models::UserProfile;
 
-use super::error::{RepoResult, RepositoryError};
 use super::comment::{CommentRecord, CommentRepository, CommentWithAuthor, NewComment};
+use super::error::{RepoResult, RepositoryError};
 
 /// LibSQL implementation of the CommentRepository.
 #[derive(Debug, Clone)]
@@ -85,11 +85,13 @@ impl CommentRepository for LibSqlCommentRepository {
                 .map_err(|e| RepositoryError::InternalError(format!("Invalid UUID: {}", e)))?;
             let body: String = row.get(1)?;
             let author_id_str: String = row.get(2)?;
-            let author_id = Uuid::parse_str(&author_id_str)
-                .map_err(|e| RepositoryError::InternalError(format!("Invalid author UUID: {}", e)))?;
+            let author_id = Uuid::parse_str(&author_id_str).map_err(|e| {
+                RepositoryError::InternalError(format!("Invalid author UUID: {}", e))
+            })?;
             let article_id_str: String = row.get(3)?;
-            let article_id = Uuid::parse_str(&article_id_str)
-                .map_err(|e| RepositoryError::InternalError(format!("Invalid article UUID: {}", e)))?;
+            let article_id = Uuid::parse_str(&article_id_str).map_err(|e| {
+                RepositoryError::InternalError(format!("Invalid article UUID: {}", e))
+            })?;
             let created_at_str: String = row.get(4)?;
             let updated_at_str: String = row.get(5)?;
 
@@ -133,11 +135,13 @@ impl CommentRepository for LibSqlCommentRepository {
                 .map_err(|e| RepositoryError::InternalError(format!("Invalid UUID: {}", e)))?;
             let body: String = row.get(1)?;
             let author_id_str: String = row.get(2)?;
-            let author_id = Uuid::parse_str(&author_id_str)
-                .map_err(|e| RepositoryError::InternalError(format!("Invalid author UUID: {}", e)))?;
+            let author_id = Uuid::parse_str(&author_id_str).map_err(|e| {
+                RepositoryError::InternalError(format!("Invalid author UUID: {}", e))
+            })?;
             let article_id_str: String = row.get(3)?;
-            let article_id = Uuid::parse_str(&article_id_str)
-                .map_err(|e| RepositoryError::InternalError(format!("Invalid article UUID: {}", e)))?;
+            let article_id = Uuid::parse_str(&article_id_str).map_err(|e| {
+                RepositoryError::InternalError(format!("Invalid article UUID: {}", e))
+            })?;
             let created_at_str: String = row.get(4)?;
             let updated_at_str: String = row.get(5)?;
             let username: String = row.get(6)?;
@@ -207,11 +211,13 @@ impl CommentRepository for LibSqlCommentRepository {
                 .map_err(|e| RepositoryError::InternalError(format!("Invalid UUID: {}", e)))?;
             let body: String = row.get(1)?;
             let author_id_str: String = row.get(2)?;
-            let author_id = Uuid::parse_str(&author_id_str)
-                .map_err(|e| RepositoryError::InternalError(format!("Invalid author UUID: {}", e)))?;
+            let author_id = Uuid::parse_str(&author_id_str).map_err(|e| {
+                RepositoryError::InternalError(format!("Invalid author UUID: {}", e))
+            })?;
             let article_id_str: String = row.get(3)?;
-            let article_id = Uuid::parse_str(&article_id_str)
-                .map_err(|e| RepositoryError::InternalError(format!("Invalid article UUID: {}", e)))?;
+            let article_id = Uuid::parse_str(&article_id_str).map_err(|e| {
+                RepositoryError::InternalError(format!("Invalid article UUID: {}", e))
+            })?;
             let created_at_str: String = row.get(4)?;
             let updated_at_str: String = row.get(5)?;
             let username: String = row.get(6)?;

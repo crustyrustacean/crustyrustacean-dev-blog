@@ -671,8 +671,7 @@ pub fn assert_navbar_authenticated(body: &str, username: &str) {
 
     // Login and Register links should not both be visible
     let body_lowercase = body.to_lowercase();
-    let has_login_link =
-        body_lowercase.contains(">login<") || body_lowercase.contains("login</a>");
+    let has_login_link = body_lowercase.contains(">login<") || body_lowercase.contains("login</a>");
     let has_register_link =
         body_lowercase.contains(">register<") || body_lowercase.contains("register</a>");
 

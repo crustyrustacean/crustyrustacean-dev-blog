@@ -10,7 +10,9 @@ use shuttle_runtime::{CustomError, SecretStore};
 pub struct AppConfig {
     pub jwt_secret: String,
     pub templates_dir: String,
+    /// Deprecated: Bootstrap has been removed. Kept for backwards compatibility.
     pub external_stylesheet: String,
+    /// Deprecated: Bootstrap has been removed. Kept for backwards compatibility.
     pub override_stylesheet: String,
     pub app_version: String,
     pub allowed_origins: Vec<String>,
@@ -30,13 +32,10 @@ impl TryFrom<&SecretStore> for AppConfig {
             .get("TEMPLATES_DIR")
             .ok_or_else(|| anyhow!("Missing required templates directory: TEMPLATES_DIR"))?;
 
-        let external_stylesheet = secrets
-            .get("EXTERNAL_STYLESHEET")
-            .ok_or_else(|| anyhow!("Missing required configuration secret: EXTERNAL_STYLESHEET"))?;
+        // Deprecated: Bootstrap has been removed. These now default to empty strings.
+        let external_stylesheet = secrets.get("EXTERNAL_STYLESHEET").unwrap_or_default();
 
-        let override_stylesheet = secrets
-            .get("OVERRIDE_STYLESHEET")
-            .ok_or_else(|| anyhow!("Missing required configuration secret: OVERRIDE_STYLESHEET"))?;
+        let override_stylesheet = secrets.get("OVERRIDE_STYLESHEET").unwrap_or_default();
 
         // Get version from Cargo.toml at compile time
         let app_version = env!("CARGO_PKG_VERSION").to_string();

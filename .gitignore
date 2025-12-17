@@ -6,7 +6,8 @@
 # Cursor
 .cursor/
 
-# LLM rules
+# LLM rules and Settings
+.claude
 CLAUDE.*
 
 # Build outputs

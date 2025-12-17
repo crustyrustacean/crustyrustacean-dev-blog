@@ -93,7 +93,10 @@ pub async fn subscribe(
                 )
                 .await
             {
-                warn!("Failed to send newsletter confirmation email to {}: {}", email, e);
+                warn!(
+                    "Failed to send newsletter confirmation email to {}: {}",
+                    email, e
+                );
             } else {
                 info!("Sent newsletter re-subscription confirmation to {}", email);
             }
@@ -111,7 +114,10 @@ pub async fn subscribe(
                 .send_newsletter_confirmation(&email, name.as_deref(), &token, &base_url)
                 .await
             {
-                warn!("Failed to resend newsletter confirmation email to {}: {}", email, e);
+                warn!(
+                    "Failed to resend newsletter confirmation email to {}: {}",
+                    email, e
+                );
             } else {
                 info!("Resent newsletter confirmation to {}", email);
             }
@@ -151,7 +157,10 @@ pub async fn subscribe(
         .send_newsletter_confirmation(&email, name.as_deref(), &confirmation_token, &base_url)
         .await
     {
-        warn!("Failed to send newsletter confirmation email to {}: {}", email, e);
+        warn!(
+            "Failed to send newsletter confirmation email to {}: {}",
+            email, e
+        );
     } else {
         info!("Sent newsletter confirmation email to {}", email);
     }
@@ -664,13 +673,9 @@ pub async fn send_newsletter(
     for subscriber in subscribers {
         // Get personalized content: recent articles from authors this subscriber's user follows
         // Note: Newsletter subscribers may not have a user account, so this is optional
-        let author_articles = get_followed_author_articles(
-            &conn,
-            &subscriber.email,
-            &base_url,
-        )
-        .await
-        .unwrap_or_default();
+        let author_articles = get_followed_author_articles(&conn, &subscriber.email, &base_url)
+            .await
+            .unwrap_or_default();
 
         let author_articles_ref: Option<&[AuthorArticleSummary]> = if author_articles.is_empty() {
             None
