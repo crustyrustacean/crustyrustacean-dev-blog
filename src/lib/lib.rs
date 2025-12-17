@@ -10,6 +10,7 @@ pub mod database;
 pub mod email;
 pub mod errors;
 pub mod markdown;
+pub mod migrations;
 pub mod models;
 pub mod repositories;
 pub mod response;
