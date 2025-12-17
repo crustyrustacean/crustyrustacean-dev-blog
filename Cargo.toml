@@ -1,6 +1,6 @@
 [package]
 name = "crustyrustacean-dev-blog"
-version = "2.20.2"
+version = "2.20.3"
 edition = "2024"
 authors = ["Jeffery D. Mitchell", "<crusty.rustacean@gmail.com>"]
 description = "A developer blog application built with Axum, Tera, and Turso database, hosted on Shuttle."
