@@ -143,24 +143,24 @@ impl TagRepository for LibSqlTagRepository {
     }
 
     async fn rename(&self, old_name: &str, new_name: &str) -> RepoResult<TagRecord> {
+        // Check if old tag exists
+        let existing = self.find_by_name(old_name).await?;
+        let existing = existing.ok_or_else(|| RepositoryError::NotFound(format!("Tag '{}'", old_name)))?;
+
+        // If renaming to the same name, just return the existing tag (idempotent)
+        if old_name == new_name {
+            return Ok(existing);
+        }
+
+        // Check if new name already exists (different tag)
+        if self.find_by_name(new_name).await?.is_some() {
+            return Err(RepositoryError::AlreadyExists(format!("Tag '{}'", new_name)));
+        }
+
         let conn = self
             .db
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
-
-        // Check if old tag exists
-        let existing = self.find_by_name(old_name).await?;
-        if existing.is_none() {
-            return Err(RepositoryError::NotFound(format!("Tag '{}'", old_name)));
-        }
-
-        // Check if new name already exists
-        if (self.find_by_name(new_name).await?).is_some() {
-            return Err(RepositoryError::AlreadyExists(format!(
-                "Tag '{}'",
-                new_name
-            )));
-        }
 
         conn.execute(
             "UPDATE tags SET name = ? WHERE name = ?",

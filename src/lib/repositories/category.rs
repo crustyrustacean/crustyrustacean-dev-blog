@@ -57,6 +57,9 @@ pub trait CategoryRepository: Send + Sync {
     /// Find a category by its slug.
     async fn find_by_slug(&self, slug: &str) -> RepoResult<Option<CategoryRecord>>;
 
+    /// Find a category by its slug with article count.
+    async fn find_by_slug_with_count(&self, slug: &str) -> RepoResult<Option<CategoryWithCount>>;
+
     /// Find a category by its name.
     async fn find_by_name(&self, name: &str) -> RepoResult<Option<CategoryRecord>>;
 

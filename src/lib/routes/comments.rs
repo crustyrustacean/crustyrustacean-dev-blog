@@ -7,13 +7,13 @@ use crate::{
         CommentResponse, CreateComment, MultipleCommentsResponse, SingleCommentResponse,
         UserProfile,
     },
+    repositories::NewComment,
 };
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Json},
 };
-use chrono::Utc;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -35,158 +35,75 @@ pub async fn add_comment(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Check if article exists
-    let mut article_rows = conn
-        .query(
-            "SELECT id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_row = article_rows
-        .next()
+    let article = state
+        .articles
+        .find_by_slug(&slug)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row.get(0)?;
-
     // Create comment
-    let comment_id = Uuid::new_v4();
-    let now = Utc::now();
+    let new_comment = NewComment {
+        body: comment_data.body.clone(),
+        author_id: user.user_id,
+        article_id: article.id,
+    };
 
-    conn.execute(
-        "INSERT INTO comments (id, body, author_id, article_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        libsql::params![
-            comment_id.to_string(),
-            comment_data.body.clone(),
-            user.user_id.to_string(),
-            article_id,
-            now.to_rfc3339(),
-            now.to_rfc3339(),
-        ],
-    )
-    .await?;
+    let comment = state.comments.create(&new_comment).await?;
 
     // Get author profile
-    let mut author_rows = conn
-        .query(
-            "SELECT username, bio, image FROM users WHERE id = ?",
-            libsql::params![user.user_id.to_string()],
-        )
-        .await?;
-
-    let author_row = author_rows
-        .next()
+    let author_user = state
+        .users
+        .find_by_id(user.user_id)
         .await?
         .ok_or_else(|| ApiError::InternalServerError("Author not found".to_string()))?;
 
-    let username: String = author_row.get(0)?;
-    let bio: Option<String> = author_row.get(1).ok();
-    let image: Option<String> = author_row.get(2).ok();
-
     let author = UserProfile {
-        username,
-        bio,
-        image,
+        username: author_user.username,
+        bio: author_user.bio,
+        image: author_user.image,
         following: false,
     };
 
     let comment_response = CommentResponse {
-        id: comment_id,
-        created_at: now,
-        updated_at: now,
-        body: comment_data.body,
+        id: comment.id,
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        body: comment.body,
         author,
     };
 
-    let response = SingleCommentResponse {
+    Ok(Json(SingleCommentResponse {
         comment: comment_response,
-    };
-
-    Ok(Json(response))
+    }))
 }
 
 pub async fn get_comments(
     State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> Result<Json<MultipleCommentsResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Check if article exists
-    let mut article_rows = conn
-        .query(
-            "SELECT id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_row = article_rows
-        .next()
+    let article = state
+        .articles
+        .find_by_slug(&slug)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row.get(0)?;
+    // Get all comments for the article with author info
+    let comments_with_authors = state.comments.list_for_article(article.id, None).await?;
 
-    // Get all comments for the article
-    let mut comment_rows = conn
-        .query(
-            "SELECT c.id, c.body, c.created_at, c.updated_at, c.author_id, u.username, u.bio, u.image
-             FROM comments c
-             JOIN users u ON c.author_id = u.id
-             WHERE c.article_id = ?
-             ORDER BY c.created_at DESC",
-            libsql::params![article_id],
-        )
-        .await
-        ?;
+    let comments: Vec<CommentResponse> = comments_with_authors
+        .into_iter()
+        .map(|cwa| CommentResponse {
+            id: cwa.comment.id,
+            created_at: cwa.comment.created_at,
+            updated_at: cwa.comment.updated_at,
+            body: cwa.comment.body,
+            author: cwa.author,
+        })
+        .collect();
 
-    let mut comments = Vec::new();
-
-    while let Some(row) = comment_rows.next().await? {
-        let comment_id_str: String = row.get(0)?;
-        let comment_id = Uuid::parse_str(&comment_id_str)?;
-
-        let body: String = row.get(1)?;
-
-        let created_at_str: String = row.get(2)?;
-        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)?.with_timezone(&Utc);
-
-        let updated_at_str: String = row.get(3)?;
-        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)?.with_timezone(&Utc);
-
-        let username: String = row.get(5)?;
-        let bio: Option<String> = row.get(6).ok();
-        let image: Option<String> = row.get(7).ok();
-
-        let author = UserProfile {
-            username,
-            bio,
-            image,
-            following: false,
-        };
-
-        let comment_response = CommentResponse {
-            id: comment_id,
-            created_at,
-            updated_at,
-            body,
-            author,
-        };
-
-        comments.push(comment_response);
-    }
-
-    let response = MultipleCommentsResponse { comments };
-
-    Ok(Json(response))
+    Ok(Json(MultipleCommentsResponse { comments }))
 }
 
 pub async fn delete_comment(
@@ -194,52 +111,33 @@ pub async fn delete_comment(
     Path((slug, comment_id)): Path<(String, String)>,
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Check if article exists
-    let mut article_rows = conn
-        .query(
-            "SELECT id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let _article_row = article_rows
-        .next()
+    let _article = state
+        .articles
+        .find_by_slug(&slug)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    // Check if comment exists and verify ownership
-    let mut comment_rows = conn
-        .query(
-            "SELECT author_id FROM comments WHERE id = ?",
-            libsql::params![comment_id.clone()],
-        )
-        .await?;
+    // Parse comment ID - treat invalid UUID as "not found"
+    let comment_uuid = Uuid::parse_str(&comment_id)
+        .map_err(|_| ApiError::NotFound("Comment not found".to_string()))?;
 
-    let comment_row = comment_rows
-        .next()
+    // Check if comment exists and verify ownership
+    let comment = state
+        .comments
+        .find_by_id(comment_uuid)
         .await?
         .ok_or_else(|| ApiError::NotFound("Comment not found".to_string()))?;
 
-    let author_id: String = comment_row.get(0)?;
-
     // Verify the user is the comment author
-    if author_id != user.user_id.to_string() {
+    if comment.author_id != user.user_id {
         return Err(ApiError::Forbidden(
             "You can only delete your own comments".to_string(),
         ));
     }
 
     // Delete the comment
-    conn.execute(
-        "DELETE FROM comments WHERE id = ?",
-        libsql::params![comment_id],
-    )
-    .await?;
+    state.comments.delete(comment_uuid).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
