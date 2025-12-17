@@ -130,13 +130,13 @@ pub async fn update_category(
         .ok_or_else(|| ApiError::NotFound("Category not found".to_string()))?;
 
     // Check for name conflicts (excluding current category)
-    if let Some(conflict) = state.categories.find_by_name(&update_data.name).await? {
-        if conflict.id != existing.id {
+    if let Some(conflict) = state.categories.find_by_name(&update_data.name).await? 
+        && conflict.id != existing.id {
             return Err(ApiError::Conflict(
                 "A category with this name or slug already exists".to_string(),
             ));
         }
-    }
+    
 
     let data = UpdateCategoryData {
         name: Some(update_data.name.clone()),
