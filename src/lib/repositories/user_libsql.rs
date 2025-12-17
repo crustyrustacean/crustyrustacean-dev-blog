@@ -344,23 +344,30 @@ impl UserRepository for LibSqlUserRepository {
         let limit = query.limit.unwrap_or(20).min(100);
         let offset = query.offset.unwrap_or(0);
 
+        let user_id_param = current_user_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+
         // Only show users with Author or Admin role (not Subscribers)
         let mut where_clauses = vec![
-            "disabled = 0".to_string(),
-            "(role = 'author' OR role = 'admin')".to_string(),
+            "u.disabled = 0".to_string(),
+            "(u.role = 'author' OR u.role = 'admin')".to_string(),
         ];
         let mut params: Vec<libsql::Value> = Vec::new();
 
+        // First param is for the is_following subquery
+        params.push(libsql::Value::Text(user_id_param));
+
         // Exclude current user from results
         if let Some(current_id) = current_user_id {
-            where_clauses.push("id != ?".to_string());
+            where_clauses.push("u.id != ?".to_string());
             params.push(libsql::Value::Text(current_id.to_string()));
         }
 
         if let Some(search) = &query.search
             && !search.trim().is_empty()
         {
-            where_clauses.push("(username LIKE ? OR bio LIKE ?)".to_string());
+            where_clauses.push("(u.username LIKE ? OR u.bio LIKE ?)".to_string());
             let search_pattern = format!("%{}%", search.trim());
             params.push(libsql::Value::Text(search_pattern.clone()));
             params.push(libsql::Value::Text(search_pattern));
@@ -368,10 +375,13 @@ impl UserRepository for LibSqlUserRepository {
 
         let where_clause = where_clauses.join(" AND ");
 
+        // Optimized query that fetches following status in the same query
         let query_str = format!(
-            r"SELECT id, username, bio, image FROM users
+            r"SELECT u.id, u.username, u.bio, u.image,
+                     (SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = u.id) as is_following
+              FROM users u
               WHERE {}
-              ORDER BY username ASC
+              ORDER BY u.username ASC
               LIMIT ? OFFSET ?",
             where_clause
         );
@@ -385,20 +395,12 @@ impl UserRepository for LibSqlUserRepository {
 
         let mut profiles = Vec::new();
         while let Some(row) = rows.next().await? {
-            let user_id_str: String = row.get(0)?;
-            let user_id = Uuid::parse_str(&user_id_str)
-                .map_err(|e| RepositoryError::InternalError(format!("Invalid UUID: {}", e)))?;
-
             let username: String = row.get(1)?;
             let bio: Option<String> = row.get(2).ok();
             let image: Option<String> = row.get(3).ok();
 
-            // Check following status if current user is authenticated
-            let following = if let Some(current_id) = current_user_id {
-                self.is_following(current_id, user_id).await?
-            } else {
-                false
-            };
+            // Check following status from subquery result
+            let following = current_user_id.is_some() && row.get::<i64>(4).unwrap_or(0) == 1;
 
             profiles.push(UserProfile {
                 username,

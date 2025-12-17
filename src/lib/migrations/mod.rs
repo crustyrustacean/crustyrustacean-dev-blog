@@ -103,6 +103,12 @@ pub const MIGRATIONS: &[Migration] = &[
         up: include_str!("sql/013_add_article_columns.sql"),
         down: None,
     },
+    Migration {
+        version: 14,
+        name: "add_performance_indexes",
+        up: include_str!("sql/014_add_performance_indexes.sql"),
+        down: None, // Indexes don't need rollback
+    },
 ];
 
 /// Error type for migration operations.

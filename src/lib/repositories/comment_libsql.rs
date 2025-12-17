@@ -192,15 +192,21 @@ impl CommentRepository for LibSqlCommentRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
+        let user_id_param = current_user_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+
+        // Optimized query that fetches following status in the same query
         let mut rows = conn
             .query(
                 r"SELECT c.id, c.body, c.author_id, c.article_id, c.created_at, c.updated_at,
-                         u.username, u.bio, u.image
+                         u.username, u.bio, u.image,
+                         (SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = c.author_id) as is_following
                   FROM comments c
                   JOIN users u ON c.author_id = u.id
                   WHERE c.article_id = ?
                   ORDER BY c.created_at ASC",
-                libsql::params![article_id.to_string()],
+                libsql::params![user_id_param, article_id.to_string()],
             )
             .await?;
 
@@ -224,18 +230,8 @@ impl CommentRepository for LibSqlCommentRepository {
             let bio: Option<String> = row.get(7).ok();
             let image: Option<String> = row.get(8).ok();
 
-            // Check following status
-            let following = if let Some(user_id) = current_user_id {
-                let mut follow_rows = conn
-                    .query(
-                        "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
-                        libsql::params![user_id.to_string(), author_id.to_string()],
-                    )
-                    .await?;
-                follow_rows.next().await?.is_some()
-            } else {
-                false
-            };
+            // Check following status from subquery result
+            let following = current_user_id.is_some() && row.get::<i64>(9).unwrap_or(0) == 1;
 
             comments.push(CommentWithAuthor {
                 comment: CommentRecord {

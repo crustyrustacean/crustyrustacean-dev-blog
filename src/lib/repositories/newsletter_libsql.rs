@@ -632,51 +632,32 @@ impl NewsletterRepository for LibSqlNewsletterRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut total_rows = conn
+        // Optimized: fetch all stats in a single query instead of 4 separate queries
+        let mut rows = conn
             .query(
-                "SELECT COUNT(*) FROM newsletter_subscribers WHERE unsubscribed_at IS NULL",
+                r"SELECT
+                    (SELECT COUNT(*) FROM newsletter_subscribers WHERE unsubscribed_at IS NULL) as total_subscribers,
+                    (SELECT COUNT(*) FROM newsletter_subscribers WHERE confirmed = 1 AND unsubscribed_at IS NULL) as confirmed_subscribers,
+                    (SELECT COUNT(*) FROM newsletter_issues) as total_issues,
+                    (SELECT COUNT(*) FROM newsletter_issues WHERE status = 'sent') as sent_issues",
                 (),
             )
             .await?;
-        let total_subscribers: i32 = if let Some(row) = total_rows.next().await? {
-            row.get(0).unwrap_or(0)
-        } else {
-            0
-        };
 
-        let mut confirmed_rows = conn.query("SELECT COUNT(*) FROM newsletter_subscribers WHERE confirmed = 1 AND unsubscribed_at IS NULL", ()).await?;
-        let confirmed_subscribers: i32 = if let Some(row) = confirmed_rows.next().await? {
-            row.get(0).unwrap_or(0)
+        if let Some(row) = rows.next().await? {
+            Ok(NewsletterStatsData {
+                total_subscribers: row.get(0).unwrap_or(0),
+                confirmed_subscribers: row.get(1).unwrap_or(0),
+                total_issues: row.get(2).unwrap_or(0),
+                sent_issues: row.get(3).unwrap_or(0),
+            })
         } else {
-            0
-        };
-
-        let mut issues_rows = conn
-            .query("SELECT COUNT(*) FROM newsletter_issues", ())
-            .await?;
-        let total_issues: i32 = if let Some(row) = issues_rows.next().await? {
-            row.get(0).unwrap_or(0)
-        } else {
-            0
-        };
-
-        let mut sent_rows = conn
-            .query(
-                "SELECT COUNT(*) FROM newsletter_issues WHERE status = 'sent'",
-                (),
-            )
-            .await?;
-        let sent_issues: i32 = if let Some(row) = sent_rows.next().await? {
-            row.get(0).unwrap_or(0)
-        } else {
-            0
-        };
-
-        Ok(NewsletterStatsData {
-            total_subscribers,
-            confirmed_subscribers,
-            total_issues,
-            sent_issues,
-        })
+            Ok(NewsletterStatsData {
+                total_subscribers: 0,
+                confirmed_subscribers: 0,
+                total_issues: 0,
+                sent_issues: 0,
+            })
+        }
     }
 }
