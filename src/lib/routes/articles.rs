@@ -6,7 +6,7 @@ use crate::{
     markdown::markdown_to_html,
     models::{
         ArticleQuery, ArticleResponse, CreateArticle, FeedQuery, MultipleArticlesResponse,
-        SingleArticleResponse, UpdateArticle, UserProfile,
+        SingleArticleResponse, UpdateArticle,
     },
 };
 use axum::{
@@ -16,19 +16,8 @@ use axum::{
 };
 use chrono::{Datelike, Utc};
 use serde_json::{Value, json};
-use slug::slugify;
 use uuid::Uuid;
 use validator::Validate;
-
-/// Helper function to convert a boolean draft status to SQLite INTEGER (0 or 1)
-///
-/// SQLite doesn't have a native boolean type, so we use INTEGER where:
-/// - 0 = published (false)
-/// - 1 = draft (true)
-#[inline]
-pub(crate) fn draft_bool_to_int(draft: bool) -> i64 {
-    if draft { 1 } else { 0 }
-}
 
 /// Helper function to convert SQLite INTEGER to boolean draft status
 ///
@@ -40,97 +29,13 @@ pub(crate) fn draft_int_to_bool(draft: i64) -> bool {
     draft != 0
 }
 
-/// Helper function to validate draft article visibility
-///
-/// Checks if a user is authorized to view a draft article.
-/// Only the article author can view their own drafts.
-///
-/// # Arguments
-/// * `is_draft` - Whether the article is a draft
-/// * `author_id` - The UUID of the article's author
-/// * `optional_user` - The optional authenticated user attempting to view the article
-///
-/// # Returns
-/// * `Ok(())` if the user is authorized to view the article
-/// * `Err(ApiError::NotFound)` if the article is a draft and the user is not authorized
-fn check_draft_visibility(
-    is_draft: bool,
-    author_id: &str,
-    optional_user: &OptionalUser,
-) -> Result<(), ApiError> {
-    if is_draft {
-        if let Some(auth_user) = &optional_user.user {
-            let author_uuid = Uuid::parse_str(author_id)
-                .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
-            if auth_user.user_id != author_uuid {
-                return Err(ApiError::NotFound("Article not found".to_string()));
-            }
-        } else {
-            return Err(ApiError::NotFound("Article not found".to_string()));
-        }
-    }
-    Ok(())
-}
-
-/// Helper function to handle tag association for articles
-///
-/// This function handles the common logic for associating tags with articles:
-/// 1. Creates tags if they don't exist
-/// 2. Links the article to the tags in the article_tags junction table
-///
-/// # Arguments
-/// * `conn` - Database connection
-/// * `article_id` - UUID of the article to associate tags with
-/// * `tag_list` - List of tag names to associate
-///
-/// # Returns
-/// * `Vec<String>` - List of tag names that were successfully associated
-async fn associate_tags_with_article(
-    conn: &libsql::Connection,
-    article_id: &str,
-    tag_list: &[String],
-) -> Result<Vec<String>, ApiError> {
-    let mut associated_tags = Vec::new();
-
-    for tag_name in tag_list {
-        // Insert tag if it doesn't exist
-        let tag_id = Uuid::new_v4();
-        conn.execute(
-            "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
-            libsql::params![tag_id.to_string(), tag_name.clone()],
-        )
-        .await?;
-
-        // Get the tag ID (either newly created or existing)
-        let mut tag_rows = conn
-            .query(
-                "SELECT id FROM tags WHERE name = ?",
-                libsql::params![tag_name.clone()],
-            )
-            .await?;
-
-        if let Some(tag_row) = tag_rows.next().await? {
-            let existing_tag_id: String = tag_row.get(0)?;
-
-            // Link article to tag
-            conn.execute(
-                "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
-                libsql::params![article_id, existing_tag_id],
-            )
-            .await?;
-
-            associated_tags.push(tag_name.clone());
-        }
-    }
-
-    Ok(associated_tags)
-}
-
 pub async fn create_article(
     State(state): State<AppState>,
     user: AuthorUser,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<(StatusCode, Json<SingleArticleResponse>), ApiError> {
+    use crate::repositories::NewArticle;
+
     let article_data: CreateArticle = serde_json::from_value(
         payload
             .get("article")
@@ -143,35 +48,6 @@ pub async fn create_article(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect()?;
-
-    // Generate base slug from title
-    let base_slug = slugify(&article_data.title);
-
-    // Check if slug already exists and generate unique one if needed
-    let mut slug = base_slug.clone();
-    let mut counter = 1;
-
-    loop {
-        let mut slug_check = conn
-            .query(
-                "SELECT id FROM articles WHERE slug = ?",
-                libsql::params![slug.clone()],
-            )
-            .await?;
-
-        if slug_check.next().await?.is_none() {
-            break; // Slug is unique
-        }
-
-        // Generate a new slug with counter
-        slug = format!("{}-{}", base_slug, counter);
-        counter += 1;
-    }
-
-    let article_id = Uuid::new_v4();
-    let now = Utc::now();
-
     // Process shortcodes in article body before storing
     let processed_body = crate::shortcodes::process_shortcodes(&article_data.body, &state.db)
         .await
@@ -180,106 +56,52 @@ pub async fn create_article(
             ApiError::InternalServerError("Failed to process article links".to_string())
         })?;
 
-    // Handle category if provided
-    let (category_id, category_slug) = if let Some(ref cat_slug) = article_data.category {
-        let mut cat_rows = conn
-            .query(
-                "SELECT id FROM categories WHERE slug = ?",
-                libsql::params![cat_slug.clone()],
-            )
-            .await?;
-
-        if let Some(cat_row) = cat_rows.next().await? {
-            let cat_id: String = cat_row.get(0)?;
-            (Some(cat_id), Some(cat_slug.clone()))
-        } else {
-            return Err(ApiError::BadRequest(format!(
-                "Category '{}' does not exist",
-                cat_slug
-            )));
-        }
+    // Validate category if provided
+    let category_id = if let Some(ref cat_slug) = article_data.category {
+        let category = state
+            .categories
+            .find_by_slug(cat_slug)
+            .await?
+            .ok_or_else(|| {
+                ApiError::BadRequest(format!("Category '{}' does not exist", cat_slug))
+            })?;
+        Some(category.id)
     } else {
-        (None, None)
+        None
     };
 
-    // Insert the article
-    let category_id_param = match category_id {
-        Some(id) => libsql::Value::Text(id),
-        None => libsql::Value::Null,
-    };
-
-    conn.execute(
-        "INSERT INTO articles (id, slug, title, description, body, author_id, category_id, draft, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        vec![
-            libsql::Value::Text(article_id.to_string()),
-            libsql::Value::Text(slug.clone()),
-            libsql::Value::Text(article_data.title.clone()),
-            libsql::Value::Text(article_data.description.clone()),
-            libsql::Value::Text(processed_body.clone()),
-            libsql::Value::Text(user.user_id.to_string()),
-            category_id_param,
-            libsql::Value::Integer(draft_bool_to_int(article_data.draft)),
-            libsql::Value::Text(now.to_rfc3339()),
-            libsql::Value::Text(now.to_rfc3339()),
-        ],
-    )
-    .await
-    ?;
-
-    // Handle tags if provided
-    let tag_names = if let Some(tags) = &article_data.tag_list {
-        associate_tags_with_article(&conn, &article_id.to_string(), tags).await?
-    } else {
-        Vec::new()
-    };
-
-    // Get author profile
-    let mut author_rows = conn
-        .query(
-            "SELECT username, bio, image FROM users WHERE id = ?",
-            libsql::params![user.user_id.to_string()],
-        )
-        .await?;
-
-    let author_row = author_rows
-        .next()
-        .await?
-        .ok_or_else(|| ApiError::InternalServerError("Author not found".to_string()))?;
-
-    let username: String = author_row.get(0)?;
-    let bio: Option<String> = author_row.get(1).ok();
-    let image: Option<String> = author_row.get(2).ok();
-
-    let author = UserProfile {
-        username,
-        bio,
-        image,
-        following: false, // Not relevant for article creation
-    };
-
-    let rendered_body = markdown_to_html(&processed_body);
-
-    let article_response = ArticleResponse {
-        slug: slug.clone(),
-        title: article_data.title,
-        description: article_data.description,
+    // Create the article using repository
+    let new_article = NewArticle {
+        title: article_data.title.clone(),
+        description: article_data.description.clone(),
         body: processed_body,
-        rendered_body: Some(rendered_body),
-        tag_list: tag_names,
-        category: category_slug,
+        author_id: user.user_id,
+        category_id,
         draft: article_data.draft,
-        created_at: now,
-        updated_at: now,
-        favorited: false, // New article is not favorited by creator
-        favorites_count: 0,
-        author,
     };
 
-    let response = SingleArticleResponse {
-        article: article_response,
-    };
+    let article = state.articles.create(&new_article).await?;
 
-    Ok((StatusCode::CREATED, Json(response)))
+    // Set tags if provided
+    if let Some(tags) = &article_data.tag_list {
+        state.articles.set_tags(article.id, tags).await?;
+    }
+
+    // Get the full article with details for the response
+    let details = state
+        .articles
+        .get_with_details(&article.slug, Some(user.user_id))
+        .await?
+        .ok_or_else(|| ApiError::InternalServerError("Failed to retrieve created article".to_string()))?;
+
+    let rendered_body = markdown_to_html(&details.article.body);
+
+    Ok((
+        StatusCode::CREATED,
+        Json(SingleArticleResponse {
+            article: details.to_response(Some(rendered_body)),
+        }),
+    ))
 }
 
 pub async fn get_article(
@@ -287,134 +109,26 @@ pub async fn get_article(
     Path(slug): Path<String>,
     optional_user: OptionalUser,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state.db.connect()?;
+    let current_user_id = optional_user.user.as_ref().map(|u| u.user_id);
 
-    // Get the article with author information
-    let mut article_rows = conn
-        .query(
-            r#"
-            SELECT
-                a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
-                u.username, u.bio, u.image,
-                c.slug as category_slug, a.draft
-            FROM articles a
-            JOIN users u ON a.author_id = u.id
-            LEFT JOIN categories c ON a.category_id = c.id
-            WHERE a.slug = ?
-            "#,
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_row = article_rows
-        .next()
+    let article_details = state
+        .articles
+        .get_with_details(&slug, current_user_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_slug: String = article_row.get(0)?;
-    let title: String = article_row.get(1)?;
-    let description: String = article_row.get(2)?;
-    let body: String = article_row.get(3)?;
-    let created_at_str: String = article_row.get(4)?;
-    let updated_at_str: String = article_row.get(5)?;
-    let author_id_str: String = article_row.get(6)?;
-    let username: String = article_row.get(7)?;
-    let bio: Option<String> = article_row.get(8).ok();
-    let image: Option<String> = article_row.get(9).ok();
-    let category_slug: Option<String> = article_row.get(10).ok();
-    let draft: i64 = article_row.get(11)?;
-    let is_draft = draft_int_to_bool(draft);
-
     // If article is a draft, only the author can see it
-    check_draft_visibility(is_draft, &author_id_str, &optional_user)?;
-
-    // Parse the timestamps
-    let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-        .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-        .with_timezone(&Utc);
-    let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-        .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-        .with_timezone(&Utc);
-
-    // Get article ID by slug for tags
-    let mut article_id_rows = conn
-        .query(
-            "SELECT id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_id_row = article_id_rows
-        .next()
-        .await?
-        .ok_or_else(|| ApiError::InternalServerError("Article ID not found".to_string()))?;
-
-    let article_id_str: String = article_id_row.get(0)?;
-
-    // Get tags for this article
-    let mut tag_rows = conn
-        .query(
-            r#"
-            SELECT t.name
-            FROM tags t
-            JOIN article_tags at ON t.id = at.tag_id
-            WHERE at.article_id = ?
-            "#,
-            libsql::params![article_id_str.clone()],
-        )
-        .await?;
-
-    let mut tag_names = Vec::new();
-    while let Some(tag_row) = tag_rows.next().await? {
-        let tag_name: String = tag_row.get(0)?;
-        tag_names.push(tag_name);
+    if article_details.article.draft {
+        match &optional_user.user {
+            Some(auth_user) if auth_user.user_id == article_details.article.author_id => {}
+            _ => return Err(ApiError::NotFound("Article not found".to_string())),
+        }
     }
 
-    // Get favorites count
-    let mut favorites_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
-            libsql::params![article_id_str],
-        )
-        .await?;
+    let rendered_body = markdown_to_html(&article_details.article.body);
+    let response = article_details.to_response(Some(rendered_body));
 
-    let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
-        let count: i64 = fav_row.get(0)?;
-        count as i32
-    } else {
-        0
-    };
-
-    let author = UserProfile {
-        username,
-        bio,
-        image,
-        following: false, // TODO: Implement based on current user if provided
-    };
-
-    let rendered_body = markdown_to_html(&body);
-
-    let article_response = ArticleResponse {
-        slug: article_slug,
-        title,
-        description,
-        body,
-        rendered_body: Some(rendered_body),
-        tag_list: tag_names,
-        category: category_slug,
-        draft: is_draft,
-        created_at,
-        updated_at,
-        favorited: false, // TODO: Implement based on current user if provided
-        favorites_count,
-        author,
-    };
-
-    let response = SingleArticleResponse {
-        article: article_response,
-    };
-
-    Ok(Json(response))
+    Ok(Json(SingleArticleResponse { article: response }))
 }
 
 pub async fn get_editor_page(
@@ -663,6 +377,8 @@ pub async fn update_article(
     Path(slug): Path<String>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
+    use crate::repositories::UpdateArticleData;
+
     let article_data: UpdateArticle = serde_json::from_value(
         payload
             .get("article")
@@ -675,146 +391,83 @@ pub async fn update_article(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state.db.connect()?;
-
     // Check if article exists and user is the author
-    let mut article_rows = conn
-        .query(
-            "SELECT id, author_id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_row = article_rows
-        .next()
+    let article = state
+        .articles
+        .find_by_slug(&slug)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let _article_id_str: String = article_row.get(0)?;
-    let author_id_str: String = article_row.get(1)?;
-
-    let author_id = Uuid::parse_str(&author_id_str)
-        .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
-
-    // Check if the current user is the author
-    if author_id != user.user_id {
+    if article.author_id != user.user_id {
         return Err(ApiError::Forbidden(
             "You can only edit your own articles".to_string(),
         ));
     }
 
-    let now = Utc::now();
-    let mut updates = Vec::new();
-    let mut params = Vec::new();
-
-    if let Some(title) = &article_data.title {
-        updates.push("title = ?");
-        params.push(title.clone());
-    }
-    if let Some(description) = &article_data.description {
-        updates.push("description = ?");
-        params.push(description.clone());
-    }
-    if let Some(body) = &article_data.body {
-        // Process shortcodes in body before storing
-        let processed_body = crate::shortcodes::process_shortcodes(body, &state.db)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to process shortcodes: {}", e);
-                ApiError::InternalServerError("Failed to process article links".to_string())
-            })?;
-        updates.push("body = ?");
-        params.push(processed_body);
-    }
-
-    if let Some(draft) = article_data.draft {
-        updates.push("draft = ?");
-        params.push(draft_bool_to_int(draft).to_string());
-    }
-
-    // Handle category update if provided
-    if let Some(ref cat_slug) = article_data.category {
-        if !cat_slug.is_empty() {
-            // Validate that category exists
-            let mut cat_rows = conn
-                .query(
-                    "SELECT id FROM categories WHERE slug = ?",
-                    libsql::params![cat_slug.clone()],
-                )
-                .await?;
-
-            if let Some(cat_row) = cat_rows.next().await? {
-                let cat_id: String = cat_row.get(0)?;
-                updates.push("category_id = ?");
-                params.push(cat_id);
-            } else {
-                return Err(ApiError::BadRequest(format!(
-                    "Category '{}' does not exist",
-                    cat_slug
-                )));
-            }
-        } else {
-            // Empty string means remove category
-            updates.push("category_id = NULL");
-        }
-    }
-
-    updates.push("updated_at = ?");
-    params.push(now.to_rfc3339());
-    params.push(slug.clone());
-
-    if !updates.is_empty() {
-        let sql = format!("UPDATE articles SET {} WHERE slug = ?", updates.join(", "));
-        let mut libsql_params = Vec::new();
-        for param in &params {
-            libsql_params.push(libsql::Value::from(param.clone()));
-        }
-
-        conn.execute(&sql, libsql_params).await?;
-    }
-
-    // Handle tag updates if provided
-    if let Some(tag_list) = &article_data.tag_list {
-        // Get the article ID first
-        let mut id_rows = conn
-            .query(
-                "SELECT id FROM articles WHERE slug = ?",
-                libsql::params![slug.clone()],
-            )
-            .await?;
-
-        let id_row = id_rows
-            .next()
-            .await?
-            .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
-
-        let article_id: String = id_row.get(0)?;
-
-        // Delete existing tag associations
-        conn.execute(
-            "DELETE FROM article_tags WHERE article_id = ?",
-            libsql::params![article_id.clone()],
+    // Process shortcodes if body is being updated
+    let processed_body = if let Some(body) = &article_data.body {
+        Some(
+            crate::shortcodes::process_shortcodes(body, &state.db)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to process shortcodes: {}", e);
+                    ApiError::InternalServerError("Failed to process article links".to_string())
+                })?,
         )
-        .await?;
+    } else {
+        None
+    };
 
-        // Add new tags using helper function
-        associate_tags_with_article(&conn, &article_id, tag_list).await?;
+    // Resolve category_id from slug if provided
+    let category_id = if let Some(ref cat_slug) = article_data.category {
+        if cat_slug.is_empty() {
+            // Empty string means clear the category
+            Some(None)
+        } else {
+            // Validate category exists
+            let category = state
+                .categories
+                .find_by_slug(cat_slug)
+                .await?
+                .ok_or_else(|| {
+                    ApiError::BadRequest(format!("Category '{}' does not exist", cat_slug))
+                })?;
+            Some(Some(category.id))
+        }
+    } else {
+        None // Don't update category
+    };
+
+    // Build update data
+    let update_data = UpdateArticleData {
+        title: article_data.title.clone(),
+        description: article_data.description.clone(),
+        body: processed_body,
+        category_id,
+        draft: article_data.draft,
+        featured_image_id: None,
+    };
+
+    // Update the article
+    state.articles.update(&slug, &update_data).await?;
+
+    // Update tags if provided
+    if let Some(tag_list) = &article_data.tag_list {
+        state.articles.set_tags(article.id, tag_list).await?;
     }
 
-    // Return the updated article
-    // Convert AuthorUser to AuthenticatedUser for get_article
-    let auth_user = AuthenticatedUser {
-        user_id: user.user_id,
-        role: user.role,
-    };
-    get_article(
-        State(state),
-        Path(slug),
-        OptionalUser {
-            user: Some(auth_user),
-        },
-    )
-    .await
+    // Return updated article with details
+    let details = state
+        .articles
+        .get_with_details(&slug, Some(user.user_id))
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
+
+    let rendered_body = markdown_to_html(&details.article.body);
+
+    Ok(Json(SingleArticleResponse {
+        article: details.to_response(Some(rendered_body)),
+    }))
 }
 
 pub async fn delete_article(
@@ -822,54 +475,21 @@ pub async fn delete_article(
     user: AuthorUser,
     Path(slug): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let conn = state.db.connect()?;
-
     // Check if article exists and user is the author
-    let mut article_rows = conn
-        .query(
-            "SELECT id, author_id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_row = article_rows
-        .next()
+    let article = state
+        .articles
+        .find_by_slug(&slug)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id_str: String = article_row.get(0)?;
-    let author_id_str: String = article_row.get(1)?;
-
-    let author_id = Uuid::parse_str(&author_id_str)
-        .map_err(|_| ApiError::InternalServerError("Invalid author ID".to_string()))?;
-
-    // Check if the current user is the author
-    if author_id != user.user_id {
+    if article.author_id != user.user_id {
         return Err(ApiError::Forbidden(
             "You can only delete your own articles".to_string(),
         ));
     }
 
-    // Delete article tags first (foreign key constraint)
-    conn.execute(
-        "DELETE FROM article_tags WHERE article_id = ?",
-        libsql::params![article_id_str.clone()],
-    )
-    .await?;
-
-    // Delete user favorites
-    conn.execute(
-        "DELETE FROM user_favorites WHERE article_id = ?",
-        libsql::params![article_id_str.clone()],
-    )
-    .await?;
-
-    // Delete the article
-    conn.execute(
-        "DELETE FROM articles WHERE id = ?",
-        libsql::params![article_id_str],
-    )
-    .await?;
+    // Delete the article (repository handles cascading to tags and favorites)
+    state.articles.delete(&slug).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -878,133 +498,15 @@ pub async fn list_articles(
     State(state): State<AppState>,
     Query(query): Query<ArticleQuery>,
 ) -> Result<Json<MultipleArticlesResponse>, ApiError> {
-    let conn = state.db.connect()?;
+    let articles_data = state.articles.list(&query, None, false).await?;
 
-    let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
-
-    // Build the query
-    let mut where_clauses = Vec::new();
-    let mut params = Vec::new();
-
-    if let Some(tag) = &query.tag {
-        where_clauses.push("EXISTS (SELECT 1 FROM article_tags at JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id AND t.name = ?)");
-        params.push(libsql::Value::from(tag.clone()));
-    }
-
-    if let Some(author) = &query.author {
-        where_clauses.push("u.username = ?");
-        params.push(libsql::Value::from(author.clone()));
-    }
-
-    if let Some(favorited_user) = &query.favorited {
-        where_clauses.push("EXISTS (SELECT 1 FROM user_favorites uf JOIN users fu ON uf.user_id = fu.id WHERE uf.article_id = a.id AND fu.username = ?)");
-        params.push(libsql::Value::from(favorited_user.clone()));
-    }
-
-    if let Some(category) = &query.category {
-        where_clauses.push("c.slug = ?");
-        params.push(libsql::Value::from(category.clone()));
-    }
-
-    // Always filter out drafts in public listing
-    where_clauses.push("a.draft = 0");
-
-    let where_clause = if where_clauses.is_empty() {
-        String::new()
-    } else {
-        format!("WHERE {}", where_clauses.join(" AND "))
-    };
-
-    let sql = format!(
-        r#"
-        SELECT
-            a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
-            u.username, u.bio, u.image,
-            c.slug as category_slug, a.draft,
-            GROUP_CONCAT(DISTINCT t.name) as tag_list,
-            COUNT(DISTINCT uf.user_id) as favorites_count
-        FROM articles a
-        JOIN users u ON a.author_id = u.id
-        LEFT JOIN categories c ON a.category_id = c.id
-        LEFT JOIN article_tags at ON a.id = at.article_id
-        LEFT JOIN tags t ON at.tag_id = t.id
-        LEFT JOIN user_favorites uf ON a.id = uf.article_id
-        {}
-        GROUP BY a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
-                 u.username, u.bio, u.image, c.slug, a.draft
-        ORDER BY a.created_at DESC
-        LIMIT ? OFFSET ?
-        "#,
-        where_clause
-    );
-
-    params.push(libsql::Value::from(limit));
-    params.push(libsql::Value::from(offset));
-
-    let mut article_rows = conn.query(&sql, params).await?;
-
-    let mut articles = Vec::new();
-
-    while let Some(row) = article_rows.next().await? {
-        let _article_id: String = row.get(0)?;
-        let slug: String = row.get(1)?;
-        let title: String = row.get(2)?;
-        let description: String = row.get(3)?;
-        let body: String = row.get(4)?;
-        let created_at_str: String = row.get(5)?;
-        let updated_at_str: String = row.get(6)?;
-        let username: String = row.get(7)?;
-        let bio: Option<String> = row.get(8).ok();
-        let image: Option<String> = row.get(9).ok();
-        let category_slug: Option<String> = row.get(10).ok();
-        let draft: i64 = row.get(11)?;
-        let is_draft = draft_int_to_bool(draft);
-
-        // Get tags from GROUP_CONCAT result (comma-separated string)
-        let tag_list_str: Option<String> = row.get(12).ok();
-        let tag_names: Vec<String> = tag_list_str
-            .map(|s| s.split(',').map(|t| t.to_string()).collect())
-            .unwrap_or_default();
-
-        // Get favorites count from the query
-        let favorites_count: i64 = row.get(13)?;
-        let favorites_count = favorites_count as i32;
-
-        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-            .with_timezone(&Utc);
-        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-            .with_timezone(&Utc);
-
-        let author = UserProfile {
-            username,
-            bio,
-            image,
-            following: false,
-        };
-
-        let rendered_body = markdown_to_html(&body);
-
-        let article_response = ArticleResponse {
-            slug,
-            title,
-            description,
-            body,
-            rendered_body: Some(rendered_body),
-            tag_list: tag_names,
-            category: category_slug,
-            draft: is_draft,
-            created_at,
-            updated_at,
-            favorited: false,
-            favorites_count,
-            author,
-        };
-
-        articles.push(article_response);
-    }
+    let articles: Vec<ArticleResponse> = articles_data
+        .into_iter()
+        .map(|details| {
+            let rendered_body = markdown_to_html(&details.article.body);
+            details.to_response(Some(rendered_body))
+        })
+        .collect();
 
     let articles_count = articles.len() as i32;
 
@@ -1269,32 +771,27 @@ pub async fn favorite_article(
     user: AuthenticatedUser,
     Path(slug): Path<String>,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state.db.connect()?;
-
-    // Get the article ID by slug
-    let mut article_rows = conn
-        .query(
-            "SELECT id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_row = article_rows
-        .next()
+    // Get the article to verify it exists and get its ID
+    let article = state
+        .articles
+        .find_by_slug(&slug)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row.get(0)?;
-
-    // Insert favorite (ignore if already exists - idempotent)
-    conn.execute(
-        "INSERT OR IGNORE INTO user_favorites (user_id, article_id) VALUES (?, ?)",
-        libsql::params![user.user_id.to_string(), article_id],
-    )
-    .await?;
+    // Add to favorites (idempotent)
+    state.articles.favorite(article.id, user.user_id).await?;
 
     // Return the article with updated favorite status
-    get_article_with_user_context(State(state), Path(slug), Some(user)).await
+    let details = state
+        .articles
+        .get_with_details(&slug, Some(user.user_id))
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
+
+    let rendered_body = markdown_to_html(&details.article.body);
+    Ok(Json(SingleArticleResponse {
+        article: details.to_response(Some(rendered_body)),
+    }))
 }
 
 pub async fn unfavorite_article(
@@ -1302,166 +799,27 @@ pub async fn unfavorite_article(
     user: AuthenticatedUser,
     Path(slug): Path<String>,
 ) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state.db.connect()?;
-
-    // Get the article ID by slug
-    let mut article_rows = conn
-        .query(
-            "SELECT id FROM articles WHERE slug = ?",
-            libsql::params![slug.clone()],
-        )
-        .await?;
-
-    let article_row = article_rows
-        .next()
+    // Get the article to verify it exists and get its ID
+    let article = state
+        .articles
+        .find_by_slug(&slug)
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row.get(0)?;
-
-    // Remove favorite (ignore if doesn't exist - idempotent)
-    conn.execute(
-        "DELETE FROM user_favorites WHERE user_id = ? AND article_id = ?",
-        libsql::params![user.user_id.to_string(), article_id],
-    )
-    .await?;
+    // Remove from favorites (idempotent)
+    state.articles.unfavorite(article.id, user.user_id).await?;
 
     // Return the article with updated favorite status
-    get_article_with_user_context(State(state), Path(slug), Some(user)).await
-}
-
-// Helper function to get article with user context for favorite status
-async fn get_article_with_user_context(
-    State(state): State<AppState>,
-    Path(slug): Path<String>,
-    user: Option<AuthenticatedUser>,
-) -> Result<Json<SingleArticleResponse>, ApiError> {
-    let conn = state.db.connect()?;
-
-    // Get the article with author information
-    let mut article_rows = conn
-        .query(
-            r#"
-            SELECT
-                a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id,
-                u.username, u.bio, u.image,
-                c.slug as category_slug, a.draft
-            FROM articles a
-            JOIN users u ON a.author_id = u.id
-            LEFT JOIN categories c ON a.category_id = c.id
-            WHERE a.slug = ?
-            "#,
-            libsql::params![slug.clone()],
-        )
-        .await
-        ?;
-
-    let article_row = article_rows
-        .next()
+    let details = state
+        .articles
+        .get_with_details(&slug, Some(user.user_id))
         .await?
         .ok_or_else(|| ApiError::NotFound("Article not found".to_string()))?;
 
-    let article_id: String = article_row.get(0)?;
-    let article_slug: String = article_row.get(1)?;
-    let title: String = article_row.get(2)?;
-    let description: String = article_row.get(3)?;
-    let body: String = article_row.get(4)?;
-    let created_at_str: String = article_row.get(5)?;
-    let updated_at_str: String = article_row.get(6)?;
-    let _author_id: String = article_row.get(7)?;
-    let username: String = article_row.get(8)?;
-    let bio: Option<String> = article_row.get(9).ok();
-    let image: Option<String> = article_row.get(10).ok();
-    let category_slug: Option<String> = article_row.get(11).ok();
-    let draft: i64 = article_row.get(12)?;
-    let is_draft = draft_int_to_bool(draft);
-
-    // Parse the timestamps
-    let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-        .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-        .with_timezone(&Utc);
-    let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-        .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-        .with_timezone(&Utc);
-
-    // Get tags for this article
-    let mut tag_rows = conn
-        .query(
-            r#"
-            SELECT t.name
-            FROM tags t
-            JOIN article_tags at ON t.id = at.tag_id
-            WHERE at.article_id = ?
-            "#,
-            libsql::params![article_id.clone()],
-        )
-        .await?;
-
-    let mut tag_names = Vec::new();
-    while let Some(tag_row) = tag_rows.next().await? {
-        let tag_name: String = tag_row.get(0)?;
-        tag_names.push(tag_name);
-    }
-
-    // Get favorites count
-    let mut favorites_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
-            libsql::params![article_id.clone()],
-        )
-        .await?;
-
-    let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
-        let count: i64 = fav_row.get(0)?;
-        count as i32
-    } else {
-        0
-    };
-
-    // Check if user has favorited this article
-    let favorited = if let Some(ref auth_user) = user {
-        let mut user_fav_rows = conn
-            .query(
-                "SELECT 1 FROM user_favorites WHERE user_id = ? AND article_id = ?",
-                libsql::params![auth_user.user_id.to_string(), article_id],
-            )
-            .await?;
-
-        user_fav_rows.next().await?.is_some()
-    } else {
-        false
-    };
-
-    let author = UserProfile {
-        username,
-        bio,
-        image,
-        following: false, // TODO: Implement based on current user if provided
-    };
-
-    let rendered_body = markdown_to_html(&body);
-
-    let article_response = ArticleResponse {
-        slug: article_slug,
-        title,
-        description,
-        body,
-        rendered_body: Some(rendered_body),
-        tag_list: tag_names,
-        category: category_slug,
-        draft: is_draft,
-        created_at,
-        updated_at,
-        favorited,
-        favorites_count,
-        author,
-    };
-
-    let response = SingleArticleResponse {
-        article: article_response,
-    };
-
-    Ok(Json(response))
+    let rendered_body = markdown_to_html(&details.article.body);
+    Ok(Json(SingleArticleResponse {
+        article: details.to_response(Some(rendered_body)),
+    }))
 }
 
 pub async fn get_articles_feed(
@@ -1469,125 +827,15 @@ pub async fn get_articles_feed(
     user: AuthenticatedUser,
     Query(query): Query<FeedQuery>,
 ) -> Result<Json<MultipleArticlesResponse>, ApiError> {
-    let conn = state.db.connect()?;
+    let articles_data = state.articles.get_feed(user.user_id, &query).await?;
 
-    let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
-
-    // Get articles from users that the current user follows
-    let sql = r#"
-        SELECT
-            a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
-            u.username, u.bio, u.image,
-            c.slug as category_slug, a.draft
-        FROM articles a
-        JOIN users u ON a.author_id = u.id
-        LEFT JOIN categories c ON a.category_id = c.id
-        JOIN user_follows uf ON a.author_id = uf.following_id
-        WHERE uf.follower_id = ? AND a.draft = 0
-        ORDER BY a.created_at DESC
-        LIMIT ? OFFSET ?
-        "#;
-
-    let params = libsql::params![user.user_id.to_string(), limit, offset];
-
-    let mut article_rows = conn.query(sql, params).await?;
-
-    let mut articles = Vec::new();
-
-    while let Some(row) = article_rows.next().await? {
-        let article_id: String = row.get(0)?;
-        let slug: String = row.get(1)?;
-        let title: String = row.get(2)?;
-        let description: String = row.get(3)?;
-        let body: String = row.get(4)?;
-        let created_at_str: String = row.get(5)?;
-        let updated_at_str: String = row.get(6)?;
-        let username: String = row.get(7)?;
-        let bio: Option<String> = row.get(8).ok();
-        let image: Option<String> = row.get(9).ok();
-        let category_slug: Option<String> = row.get(10).ok();
-        let draft: i64 = row.get(11)?;
-        let is_draft = draft_int_to_bool(draft);
-
-        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-            .with_timezone(&Utc);
-        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-            .with_timezone(&Utc);
-
-        // Get tags for this article
-        let mut tag_rows = conn
-            .query(
-                r#"
-                SELECT t.name
-                FROM tags t
-                JOIN article_tags at ON t.id = at.tag_id
-                WHERE at.article_id = ?
-                "#,
-                libsql::params![article_id.clone()],
-            )
-            .await?;
-
-        let mut tag_names = Vec::new();
-        while let Some(tag_row) = tag_rows.next().await? {
-            let tag_name: String = tag_row.get(0)?;
-            tag_names.push(tag_name);
-        }
-
-        // Get favorites count
-        let mut favorites_rows = conn
-            .query(
-                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
-                libsql::params![article_id.clone()],
-            )
-            .await?;
-
-        let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
-            let count: i64 = fav_row.get(0)?;
-            count as i32
-        } else {
-            0
-        };
-
-        // Check if current user has favorited this article
-        let mut user_fav_rows = conn
-            .query(
-                "SELECT 1 FROM user_favorites WHERE user_id = ? AND article_id = ?",
-                libsql::params![user.user_id.to_string(), article_id],
-            )
-            .await?;
-
-        let favorited = user_fav_rows.next().await?.is_some();
-
-        let author = UserProfile {
-            username,
-            bio,
-            image,
-            following: true, // By definition, we're following authors in the feed
-        };
-
-        let rendered_body = markdown_to_html(&body);
-
-        let article_response = ArticleResponse {
-            slug,
-            title,
-            description,
-            body,
-            rendered_body: Some(rendered_body),
-            tag_list: tag_names,
-            category: category_slug,
-            draft: is_draft,
-            created_at,
-            updated_at,
-            favorited,
-            favorites_count,
-            author,
-        };
-
-        articles.push(article_response);
-    }
+    let articles: Vec<ArticleResponse> = articles_data
+        .into_iter()
+        .map(|details| {
+            let rendered_body = markdown_to_html(&details.article.body);
+            details.to_response(Some(rendered_body))
+        })
+        .collect();
 
     let articles_count = articles.len() as i32;
 
@@ -1700,6 +948,8 @@ pub async fn mobile_upload_article(
     api_user: ApiKeyUser,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    use crate::repositories::NewArticle;
+
     // Extract article data from payload
     let title: String = payload
         .get("title")
@@ -1734,93 +984,31 @@ pub async fn mobile_upload_article(
         })
         .unwrap_or_default();
 
-    // Create the article using the same logic as create_article
-    let conn = state.db.connect()?;
+    // Create the article using repository
+    let new_article = NewArticle {
+        title: title.clone(),
+        description,
+        body,
+        author_id: api_user.user_id,
+        category_id: None,
+        draft: false,
+    };
 
-    // Generate base slug from title
-    let base_slug = slugify(&title);
+    let article = state.articles.create(&new_article).await?;
 
-    // Check if slug already exists and generate unique one if needed
-    let mut slug = base_slug.clone();
-    let mut counter = 1;
-
-    loop {
-        let mut slug_check = conn
-            .query(
-                "SELECT id FROM articles WHERE slug = ?",
-                libsql::params![slug.clone()],
-            )
-            .await?;
-
-        if slug_check.next().await?.is_none() {
-            break; // Slug is unique
-        }
-
-        // Generate a new slug with counter
-        slug = format!("{}-{}", base_slug, counter);
-        counter += 1;
-    }
-
-    let article_id = Uuid::new_v4();
-    let now = Utc::now();
-
-    // Insert the article
-    conn.execute(
-        "INSERT INTO articles (id, slug, title, description, body, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        libsql::params![
-            article_id.to_string(),
-            slug.clone(),
-            title.clone(),
-            description.clone(),
-            body.clone(),
-            api_user.user_id.to_string(),
-            now.to_rfc3339(),
-            now.to_rfc3339(),
-        ],
-    )
-    .await
-    ?;
-
-    // Handle tags if provided
+    // Set tags if provided
     if !tags.is_empty() {
-        for tag_name in &tags {
-            // Insert tag if it doesn't exist
-            let tag_id = Uuid::new_v4();
-            conn.execute(
-                "INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)",
-                libsql::params![tag_id.to_string(), tag_name.clone()],
-            )
-            .await?;
-
-            // Get the tag ID (either the one we just created or the existing one)
-            let mut tag_rows = conn
-                .query(
-                    "SELECT id FROM tags WHERE name = ?",
-                    libsql::params![tag_name.clone()],
-                )
-                .await?;
-
-            if let Some(tag_row) = tag_rows.next().await? {
-                let tag_id_str: String = tag_row.get(0)?;
-
-                // Associate tag with article
-                conn.execute(
-                    "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
-                    libsql::params![article_id.to_string(), tag_id_str],
-                )
-                .await?;
-            }
-        }
+        state.articles.set_tags(article.id, &tags).await?;
     }
 
     // Return success response with article URL
-    let article_url = format!("/articles/{}", slug);
+    let article_url = format!("/articles/{}", article.slug);
     Ok(Json(json!({
         "success": true,
         "message": "Article created successfully",
-        "slug": slug,
+        "slug": article.slug,
         "url": article_url,
-        "id": article_id.to_string(),
+        "id": article.id.to_string(),
     })))
 }
 
@@ -2011,110 +1199,15 @@ pub async fn list_user_drafts(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<MultipleArticlesResponse>, ApiError> {
-    let conn = state.db.connect()?;
+    let articles_data = state.articles.list_user_drafts(user.user_id).await?;
 
-    // Query only draft articles for the current user
-    let sql = r#"
-        SELECT
-            a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at,
-            u.username, u.bio, u.image,
-            c.slug as category_slug, a.draft
-        FROM articles a
-        JOIN users u ON a.author_id = u.id
-        LEFT JOIN categories c ON a.category_id = c.id
-        WHERE a.author_id = ? AND a.draft = 1
-        ORDER BY a.updated_at DESC
-        "#;
-
-    let params = libsql::params![user.user_id.to_string()];
-
-    let mut article_rows = conn.query(sql, params).await?;
-
-    let mut articles = Vec::new();
-
-    while let Some(row) = article_rows.next().await? {
-        let article_id: String = row.get(0)?;
-        let slug: String = row.get(1)?;
-        let title: String = row.get(2)?;
-        let description: String = row.get(3)?;
-        let body: String = row.get(4)?;
-        let created_at_str: String = row.get(5)?;
-        let updated_at_str: String = row.get(6)?;
-        let username: String = row.get(7)?;
-        let bio: Option<String> = row.get(8).ok();
-        let image: Option<String> = row.get(9).ok();
-        let category_slug: Option<String> = row.get(10).ok();
-        let draft: i64 = row.get(11)?;
-        let is_draft = draft_int_to_bool(draft);
-
-        let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-            .with_timezone(&Utc);
-        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
-            .map_err(|e| ApiError::InternalServerError(format!("Invalid timestamp: {}", e)))?
-            .with_timezone(&Utc);
-
-        // Get tags for this article
-        let mut tag_rows = conn
-            .query(
-                r#"
-                SELECT t.name
-                FROM tags t
-                JOIN article_tags at ON t.id = at.tag_id
-                WHERE at.article_id = ?
-                "#,
-                libsql::params![article_id.clone()],
-            )
-            .await?;
-
-        let mut tag_names = Vec::new();
-        while let Some(tag_row) = tag_rows.next().await? {
-            let tag_name: String = tag_row.get(0)?;
-            tag_names.push(tag_name);
-        }
-
-        // Get favorites count (drafts won't have many, but for consistency)
-        let mut favorites_rows = conn
-            .query(
-                "SELECT COUNT(*) FROM user_favorites WHERE article_id = ?",
-                libsql::params![article_id],
-            )
-            .await?;
-
-        let favorites_count = if let Some(fav_row) = favorites_rows.next().await? {
-            let count: i64 = fav_row.get(0)?;
-            count as i32
-        } else {
-            0
-        };
-
-        let author = UserProfile {
-            username,
-            bio,
-            image,
-            following: false,
-        };
-
-        let rendered_body = markdown_to_html(&body);
-
-        let article_response = ArticleResponse {
-            slug,
-            title,
-            description,
-            body,
-            rendered_body: Some(rendered_body),
-            tag_list: tag_names,
-            category: category_slug,
-            draft: is_draft,
-            created_at,
-            updated_at,
-            favorited: false,
-            favorites_count,
-            author,
-        };
-
-        articles.push(article_response);
-    }
+    let articles: Vec<ArticleResponse> = articles_data
+        .into_iter()
+        .map(|details| {
+            let rendered_body = markdown_to_html(&details.article.body);
+            details.to_response(Some(rendered_body))
+        })
+        .collect();
 
     let articles_count = articles.len() as i32;
 

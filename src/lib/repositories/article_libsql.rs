@@ -683,16 +683,31 @@ impl ArticleRepository for LibSqlArticleRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let result = conn
-            .execute("DELETE FROM articles WHERE slug = ?", libsql::params![slug])
-            .await?;
+        // First get the article ID for cleaning up related records
+        let article = self.find_by_slug(slug).await?;
+        let article = article.ok_or_else(|| {
+            RepositoryError::NotFound(format!("Article with slug {}", slug))
+        })?;
 
-        if result == 0 {
-            return Err(RepositoryError::NotFound(format!(
-                "Article with slug {}",
-                slug
-            )));
-        }
+        // Delete related records first (article_tags, user_favorites)
+        conn.execute(
+            "DELETE FROM article_tags WHERE article_id = ?",
+            libsql::params![article.id.to_string()],
+        )
+        .await?;
+
+        conn.execute(
+            "DELETE FROM user_favorites WHERE article_id = ?",
+            libsql::params![article.id.to_string()],
+        )
+        .await?;
+
+        // Delete the article
+        conn.execute(
+            "DELETE FROM articles WHERE slug = ?",
+            libsql::params![slug],
+        )
+        .await?;
 
         Ok(())
     }
