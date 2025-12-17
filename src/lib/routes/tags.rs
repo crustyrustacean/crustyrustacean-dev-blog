@@ -1,7 +1,5 @@
 // src/lib/routes/tags.rs
 
-// src/lib/routes/tags.rs
-
 use crate::state::CachedTags;
 use crate::{
     ApiError, AppState,
@@ -30,21 +28,7 @@ pub async fn get_tags(State(state): State<AppState>) -> Result<Json<TagsResponse
         }
     }
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut tag_rows = conn
-        .query("SELECT name FROM tags ORDER BY name ASC", libsql::params![])
-        .await?;
-
-    let mut tags = Vec::new();
-
-    while let Some(row) = tag_rows.next().await? {
-        let tag_name: String = row.get(0)?;
-        tags.push(tag_name);
-    }
+    let tags = state.tags.list_all().await?;
 
     *state.cached_tags.write().await = Some(CachedTags {
         tags: tags.clone(),
@@ -72,52 +56,9 @@ pub async fn update_tag(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
+    let tag = state.tags.rename(&old_name, &update_data.name).await?;
 
-    // Check if old tag exists
-    let mut old_tag_rows = conn
-        .query(
-            "SELECT id FROM tags WHERE name = ?",
-            libsql::params![old_name.clone()],
-        )
-        .await?;
-
-    let tag_row = old_tag_rows
-        .next()
-        .await?
-        .ok_or_else(|| ApiError::NotFound("Tag not found".to_string()))?;
-
-    let _tag_id: String = tag_row.get(0)?;
-
-    // Check if new name already exists (and it's not the same tag)
-    if old_name != update_data.name {
-        let mut new_tag_rows = conn
-            .query(
-                "SELECT id FROM tags WHERE name = ?",
-                libsql::params![update_data.name.clone()],
-            )
-            .await?;
-
-        if new_tag_rows.next().await?.is_some() {
-            return Err(ApiError::Conflict(
-                "A tag with this name already exists".to_string(),
-            ));
-        }
-    }
-
-    // Update the tag
-    conn.execute(
-        "UPDATE tags SET name = ? WHERE name = ?",
-        libsql::params![update_data.name.clone(), old_name],
-    )
-    .await?;
-
-    Ok(Json(SingleTagResponse {
-        tag: update_data.name,
-    }))
+    Ok(Json(SingleTagResponse { tag: tag.name }))
 }
 
 pub async fn delete_tag(
@@ -125,37 +66,7 @@ pub async fn delete_tag(
     Path(name): Path<String>,
     _user: AuthorUser, // Requires author or admin role
 ) -> Result<StatusCode, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    // Check if tag exists
-    let mut tag_rows = conn
-        .query(
-            "SELECT id FROM tags WHERE name = ?",
-            libsql::params![name.clone()],
-        )
-        .await?;
-
-    let tag_row = tag_rows
-        .next()
-        .await?
-        .ok_or_else(|| ApiError::NotFound("Tag not found".to_string()))?;
-
-    let tag_id: String = tag_row.get(0)?;
-
-    // Delete article_tags relationships first (CASCADE should handle this, but being explicit)
-    conn.execute(
-        "DELETE FROM article_tags WHERE tag_id = ?",
-        libsql::params![tag_id.clone()],
-    )
-    .await?;
-
-    // Delete the tag
-    conn.execute("DELETE FROM tags WHERE id = ?", libsql::params![tag_id])
-        .await?;
-
+    state.tags.delete(&name).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -164,33 +75,14 @@ pub async fn get_tags_admin_page(
     user: AuthorUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut user_rows = conn
-        .query(
-            "SELECT username, email, bio, image FROM users WHERE id = ?",
-            libsql::params![user.user_id.to_string()],
-        )
-        .await?;
-
-    let user_info = if let Some(row) = user_rows.next().await? {
-        let username: String = row.get(0)?;
-        let email: String = row.get(1)?;
-        let bio: Option<String> = row.get(2).ok();
-        let image: Option<String> = row.get(3).ok();
-
-        Some(json!({
-            "username": username,
-            "email": email,
-            "bio": bio,
-            "image": image
-        }))
-    } else {
-        None
-    };
+    let user_info = state.users.find_by_id(user.user_id).await?.map(|u| {
+        json!({
+            "username": u.username,
+            "email": u.email,
+            "bio": u.bio,
+            "image": u.image
+        })
+    });
 
     let context = json!({
         "title": "Manage Tags - Admin",

@@ -3,7 +3,8 @@
 use crate::{
     auth::AuthenticatedUser,
     errors::ApiError,
-    models::{Media, MediaQuery, MultipleMediaResponse, SingleMediaResponse, UpdateMedia},
+    models::{MediaQuery, MultipleMediaResponse, SingleMediaResponse, UpdateMedia},
+    repositories::{NewMedia, UpdateMediaData},
     state::AppState,
     storage::generate_media_path,
 };
@@ -14,7 +15,7 @@ use axum::{
     http::{StatusCode, header},
     response::{Html, IntoResponse, Response},
 };
-use chrono::{Datelike, Utc};
+use chrono::Datelike;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -122,45 +123,7 @@ pub async fn upload_media(
         .map_err(|e| ApiError::InternalServerError(format!("Storage upload failed: {}", e)))?;
 
     // Create media record in database
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let id = Uuid::new_v4().to_string();
-    let now = Utc::now().to_rfc3339();
-
-    conn.execute(
-        r#"
-        INSERT INTO media_library (
-            id, user_id, filename, storage_path, title, alt_text,
-            caption, description, mime_type, file_size, width, height,
-            uploaded_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        "#,
-        libsql::params![
-            id.clone(),
-            user.user_id.to_string(),
-            filename.clone(),
-            storage_path.clone(),
-            title.clone(),
-            alt_text.clone(),
-            caption.clone(),
-            description.clone(),
-            content_type
-                .clone()
-                .unwrap_or_else(|| "application/octet-stream".to_string()),
-            file_metadata.size as i64,
-            None::<i64>, // width
-            None::<i64>, // height
-            now.clone(),
-            now.clone(),
-        ],
-    )
-    .await?;
-
-    let media = Media {
-        id: id.clone(),
+    let new_media = NewMedia {
         user_id: user.user_id.to_string(),
         filename,
         storage_path,
@@ -172,9 +135,9 @@ pub async fn upload_media(
         file_size: file_metadata.size as i64,
         width: None,
         height: None,
-        uploaded_at: now.clone(),
-        updated_at: now,
     };
+
+    let media = state.media.create(&new_media).await?;
 
     Ok(Json(SingleMediaResponse {
         media: media.into(),
@@ -188,88 +151,18 @@ pub async fn list_media(
     user: AuthenticatedUser,
     Query(query): Query<MediaQuery>,
 ) -> Result<Json<MultipleMediaResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let limit = query.limit.unwrap_or(20);
-    let offset = query.offset.unwrap_or(0);
-
-    let (sql, params): (String, Vec<libsql::Value>) = if let Some(mime_type) = query.mime_type {
-        (
-            r#"
-            SELECT id, user_id, filename, storage_path, title, alt_text,
-                   caption, description, mime_type, file_size, width, height,
-                   uploaded_at, updated_at
-            FROM media_library
-            WHERE user_id = ? AND mime_type = ?
-            ORDER BY uploaded_at DESC
-            LIMIT ? OFFSET ?
-            "#
-            .to_string(),
-            vec![
-                user.user_id.to_string().into(),
-                mime_type.into(),
-                limit.into(),
-                offset.into(),
-            ],
-        )
-    } else {
-        (
-            r#"
-            SELECT id, user_id, filename, storage_path, title, alt_text,
-                   caption, description, mime_type, file_size, width, height,
-                   uploaded_at, updated_at
-            FROM media_library
-            WHERE user_id = ?
-            ORDER BY uploaded_at DESC
-            LIMIT ? OFFSET ?
-            "#
-            .to_string(),
-            vec![user.user_id.to_string().into(), limit.into(), offset.into()],
-        )
-    };
-
-    let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
-
-    let mut media_list = Vec::new();
-    while let Some(row) = rows.next().await? {
-        let media = Media {
-            id: row.get(0)?,
-            user_id: row.get(1)?,
-            filename: row.get(2)?,
-            storage_path: row.get(3)?,
-            title: row.get(4)?,
-            alt_text: row.get(5)?,
-            caption: row.get(6)?,
-            description: row.get(7)?,
-            mime_type: row.get(8)?,
-            file_size: row.get(9)?,
-            width: row.get(10)?,
-            height: row.get(11)?,
-            uploaded_at: row.get(12)?,
-            updated_at: row.get(13)?,
-        };
-        media_list.push(media.into());
-    }
-
-    // Get total count
-    let mut count_rows = conn
-        .query(
-            "SELECT COUNT(*) as count FROM media_library WHERE user_id = ?",
-            libsql::params![user.user_id.to_string()],
-        )
+    let media_list = state
+        .media
+        .list_for_user(&user.user_id.to_string(), &query)
         .await?;
 
-    let media_count = if let Some(row) = count_rows.next().await? {
-        row.get::<i64>(0)?
-    } else {
-        0
-    };
+    let media_count = state
+        .media
+        .count_for_user(&user.user_id.to_string(), &query)
+        .await?;
 
     Ok(Json(MultipleMediaResponse {
-        media: media_list,
+        media: media_list.into_iter().map(|m| m.into()).collect(),
         media_count,
     }))
 }
@@ -281,44 +174,11 @@ pub async fn get_media_metadata(
     user: AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<Json<SingleMediaResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut rows = conn
-        .query(
-            r#"
-        SELECT id, user_id, filename, storage_path, title, alt_text,
-               caption, description, mime_type, file_size, width, height,
-               uploaded_at, updated_at
-        FROM media_library
-        WHERE id = ?
-        "#,
-            libsql::params![id],
-        )
-        .await?;
-
-    let media = if let Some(row) = rows.next().await? {
-        Media {
-            id: row.get(0)?,
-            user_id: row.get(1)?,
-            filename: row.get(2)?,
-            storage_path: row.get(3)?,
-            title: row.get(4)?,
-            alt_text: row.get(5)?,
-            caption: row.get(6)?,
-            description: row.get(7)?,
-            mime_type: row.get(8)?,
-            file_size: row.get(9)?,
-            width: row.get(10)?,
-            height: row.get(11)?,
-            uploaded_at: row.get(12)?,
-            updated_at: row.get(13)?,
-        }
-    } else {
-        return Err(ApiError::NotFound("Media not found".to_string()));
-    };
+    let media = state
+        .media
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Media not found".to_string()))?;
 
     // Verify ownership
     if media.user_id != user.user_id.to_string() {
@@ -340,86 +200,28 @@ pub async fn update_media_metadata(
     Path(id): Path<String>,
     Json(payload): Json<UpdateMedia>,
 ) -> Result<Json<SingleMediaResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // First, check if media exists and user owns it
-    let mut check_rows = conn
-        .query(
-            "SELECT user_id FROM media_library WHERE id = ?",
-            libsql::params![id.clone()],
-        )
-        .await?;
+    let existing = state
+        .media
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Media not found".to_string()))?;
 
-    let owner_id: String = if let Some(row) = check_rows.next().await? {
-        row.get(0)?
-    } else {
-        return Err(ApiError::NotFound("Media not found".to_string()));
-    };
-
-    if owner_id != user.user_id.to_string() {
+    if existing.user_id != user.user_id.to_string() {
         return Err(ApiError::Forbidden(
             "You don't have permission to update this media".to_string(),
         ));
     }
 
     // Update the media
-    let now = Utc::now().to_rfc3339();
-    conn.execute(
-        r#"
-        UPDATE media_library
-        SET title = ?, alt_text = ?, caption = ?, description = ?, updated_at = ?
-        WHERE id = ?
-        "#,
-        libsql::params![
-            payload.title,
-            payload.alt_text,
-            payload.caption,
-            payload.description,
-            now,
-            id.clone(),
-        ],
-    )
-    .await?;
-
-    // Fetch updated media
-    let mut rows = conn
-        .query(
-            r#"
-        SELECT id, user_id, filename, storage_path, title, alt_text,
-               caption, description, mime_type, file_size, width, height,
-               uploaded_at, updated_at
-        FROM media_library
-        WHERE id = ?
-        "#,
-            libsql::params![id],
-        )
-        .await?;
-
-    let media = if let Some(row) = rows.next().await? {
-        Media {
-            id: row.get(0)?,
-            user_id: row.get(1)?,
-            filename: row.get(2)?,
-            storage_path: row.get(3)?,
-            title: row.get(4)?,
-            alt_text: row.get(5)?,
-            caption: row.get(6)?,
-            description: row.get(7)?,
-            mime_type: row.get(8)?,
-            file_size: row.get(9)?,
-            width: row.get(10)?,
-            height: row.get(11)?,
-            uploaded_at: row.get(12)?,
-            updated_at: row.get(13)?,
-        }
-    } else {
-        return Err(ApiError::NotFound(
-            "Media not found after update".to_string(),
-        ));
+    let update_data = UpdateMediaData {
+        title: payload.title,
+        alt_text: payload.alt_text,
+        caption: payload.caption,
+        description: payload.description,
     };
+
+    let media = state.media.update(&id, &update_data).await?;
 
     Ok(Json(SingleMediaResponse {
         media: media.into(),
@@ -433,26 +235,14 @@ pub async fn delete_media(
     user: AuthenticatedUser,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Fetch media to get storage path and verify ownership
-    let mut rows = conn
-        .query(
-            "SELECT user_id, storage_path FROM media_library WHERE id = ?",
-            libsql::params![id.clone()],
-        )
-        .await?;
+    let media = state
+        .media
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Media not found".to_string()))?;
 
-    let (owner_id, storage_path): (String, String) = if let Some(row) = rows.next().await? {
-        (row.get(0)?, row.get(1)?)
-    } else {
-        return Err(ApiError::NotFound("Media not found".to_string()));
-    };
-
-    if owner_id != user.user_id.to_string() {
+    if media.user_id != user.user_id.to_string() {
         return Err(ApiError::Forbidden(
             "You don't have permission to delete this media".to_string(),
         ));
@@ -461,16 +251,12 @@ pub async fn delete_media(
     // Delete from storage
     state
         .storage
-        .delete(&storage_path)
+        .delete(&media.storage_path)
         .await
         .map_err(|e| ApiError::InternalServerError(format!("Storage deletion failed: {}", e)))?;
 
     // Delete from database
-    conn.execute(
-        "DELETE FROM media_library WHERE id = ?",
-        libsql::params![id],
-    )
-    .await?;
+    state.media.delete(&id).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -481,44 +267,33 @@ pub async fn download_media(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Response, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut rows = conn
-        .query(
-            "SELECT storage_path, filename, mime_type FROM media_library WHERE id = ?",
-            libsql::params![id],
-        )
-        .await?;
-
-    let (storage_path, filename, mime_type): (String, String, String) =
-        if let Some(row) = rows.next().await? {
-            (row.get(0)?, row.get(1)?, row.get(2)?)
-        } else {
-            return Err(ApiError::NotFound("Media not found".to_string()));
-        };
+    let media = state
+        .media
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Media not found".to_string()))?;
 
     // Download from storage
-    let file_data =
-        state.storage.download(&storage_path).await.map_err(|e| {
-            ApiError::InternalServerError(format!("Storage download failed: {}", e))
-        })?;
+    let file_data = state
+        .storage
+        .download(&media.storage_path)
+        .await
+        .map_err(|e| ApiError::InternalServerError(format!("Storage download failed: {}", e)))?;
 
     // Return file with appropriate headers
     let mut response = (StatusCode::OK, Bytes::from(file_data)).into_response();
 
     response.headers_mut().insert(
         header::CONTENT_TYPE,
-        mime_type
+        media
+            .mime_type
             .parse()
             .unwrap_or_else(|_| "application/octet-stream".parse().unwrap()),
     );
 
     response.headers_mut().insert(
         header::CONTENT_DISPOSITION,
-        format!("inline; filename=\"{}\"", filename)
+        format!("inline; filename=\"{}\"", media.filename)
             .parse()
             .unwrap(),
     );
@@ -533,33 +308,14 @@ pub async fn get_media_library_page(
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, ApiError> {
     // Get user info for template context
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
-    let mut user_rows = conn
-        .query(
-            "SELECT username, email, bio, image FROM users WHERE id = ?",
-            libsql::params![user.user_id.to_string()],
-        )
-        .await?;
-
-    let user_info = if let Some(row) = user_rows.next().await? {
-        let username: String = row.get(0)?;
-        let email: String = row.get(1)?;
-        let bio: Option<String> = row.get(2).ok();
-        let image: Option<String> = row.get(3).ok();
-
-        Some(json!({
-            "username": username,
-            "email": email,
-            "bio": bio,
-            "image": image
-        }))
-    } else {
-        None
-    };
+    let user_info = state.users.find_by_id(user.user_id).await?.map(|u| {
+        json!({
+            "username": u.username,
+            "email": u.email,
+            "bio": u.bio,
+            "image": u.image
+        })
+    });
 
     let context = json!({
         "title": "Media Library - Admin",

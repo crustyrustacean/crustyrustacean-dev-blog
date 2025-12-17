@@ -127,6 +127,46 @@ impl CategoryRepository for LibSqlCategoryRepository {
         }
     }
 
+    async fn find_by_slug_with_count(&self, slug: &str) -> RepoResult<Option<CategoryWithCount>> {
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
+
+        let mut rows = conn
+            .query(
+                r"SELECT c.id, c.name, c.slug, c.description, COUNT(a.id) as article_count
+                  FROM categories c
+                  LEFT JOIN articles a ON a.category_id = c.id AND a.draft = 0
+                  WHERE c.slug = ?
+                  GROUP BY c.id, c.name, c.slug, c.description",
+                libsql::params![slug],
+            )
+            .await?;
+
+        if let Some(row) = rows.next().await? {
+            let id_str: String = row.get(0)?;
+            let id = Uuid::parse_str(&id_str)
+                .map_err(|e| RepositoryError::InternalError(format!("Invalid UUID: {}", e)))?;
+            let name: String = row.get(1)?;
+            let slug: String = row.get(2)?;
+            let description: Option<String> = row.get(3).ok();
+            let article_count: i64 = row.get(4).unwrap_or(0);
+
+            Ok(Some(CategoryWithCount {
+                category: CategoryRecord {
+                    id,
+                    name,
+                    slug,
+                    description,
+                },
+                article_count,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     async fn find_by_name(&self, name: &str) -> RepoResult<Option<CategoryRecord>> {
         let conn = self
             .db

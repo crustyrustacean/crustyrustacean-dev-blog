@@ -5,8 +5,9 @@ use crate::email::{AuthorArticleSummary, NewsletterIssueParams};
 use crate::errors::ApiError;
 use crate::models::{
     CreateNewsletterIssue, NewsletterIssueResponse, NewsletterStats, SubscribeRequest,
-    UpdateNewsletterIssue,
+    SubscriberResponse, UpdateNewsletterIssue,
 };
+use crate::repositories::{NewNewsletterIssue, NewSubscriber, UpdateNewsletterIssueData};
 use crate::response::ApiResponse;
 use crate::state::AppState;
 use axum::{
@@ -15,7 +16,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse},
 };
-use chrono::{Datelike, Utc};
+use chrono::Datelike;
 use libsql::params;
 use serde_json::json;
 use tracing::{error, info, warn};
@@ -47,38 +48,27 @@ pub async fn subscribe(
     // Validate request
     payload.validate()?;
 
-    let conn = state.db.connect()?;
     let email = payload.email.to_lowercase();
     let name = payload.name;
     let base_url = get_base_url(&headers);
 
     // Check if email already subscribed
-    let mut existing = conn
-        .query(
-            "SELECT id, confirmed, unsubscribed_at, confirmation_token FROM newsletter_subscribers WHERE email = ?",
-            params![email.clone()],
-        )
-        .await?;
-
-    if let Some(row) = existing.next().await? {
-        let confirmed: i64 = row.get(1)?;
-        let unsubscribed_at: Option<String> = row.get(2)?;
-        let existing_token: Option<String> = row.get(3)?;
-
+    if let Some(existing) = state.newsletters.find_subscriber_by_email(&email).await? {
         // If already confirmed and not unsubscribed
-        if confirmed == 1 && unsubscribed_at.is_none() {
+        if existing.confirmed && existing.unsubscribed_at.is_none() {
             return Ok(ApiResponse::success(json!({
                 "message": "You are already subscribed to our newsletter!",
                 "email": email
             })));
         }
 
-        // If unsubscribed, allow re-subscription
-        if unsubscribed_at.is_some() {
+        // If unsubscribed, allow re-subscription (requires direct DB for updating tokens)
+        if existing.unsubscribed_at.is_some() {
+            let conn = state.db.connect()?;
             let confirmation_token = Uuid::new_v4().to_string();
             conn.execute(
                 "UPDATE newsletter_subscribers SET confirmation_token = ?, unsubscribed_at = NULL, confirmed = 0, updated_at = ? WHERE email = ?",
-                params![confirmation_token.clone(), Utc::now().to_rfc3339(), email.clone()],
+                params![confirmation_token.clone(), chrono::Utc::now().to_rfc3339(), email.clone()],
             )
             .await?;
 
@@ -108,7 +98,7 @@ pub async fn subscribe(
         }
 
         // If not confirmed yet, resend confirmation email
-        if let Some(token) = existing_token {
+        if let Some(token) = existing.confirmation_token {
             if let Err(e) = state
                 .email
                 .send_newsletter_confirmation(&email, name.as_deref(), &token, &base_url)
@@ -130,39 +120,24 @@ pub async fn subscribe(
     }
 
     // Create new subscriber
-    let id = Uuid::new_v4();
-    let confirmation_token = Uuid::new_v4().to_string();
-    let unsubscribe_token = Uuid::new_v4().to_string();
-    let now = Utc::now().to_rfc3339();
+    let new_sub = NewSubscriber {
+        email: email.clone(),
+        name: name.clone(),
+    };
 
-    conn.execute(
-        r"INSERT INTO newsletter_subscribers (id, email, name, confirmation_token, unsubscribe_token, confirmed, subscribed_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)",
-        params![
-            id.to_string(),
-            email.clone(),
-            name.clone(),
-            confirmation_token.clone(),
-            unsubscribe_token,
-            now.clone(),
-            now.clone(),
-            now.clone()
-        ],
-    )
-    .await?;
+    let subscriber = state.newsletters.subscribe(&new_sub).await?;
 
     // Send confirmation email
-    if let Err(e) = state
-        .email
-        .send_newsletter_confirmation(&email, name.as_deref(), &confirmation_token, &base_url)
-        .await
-    {
-        warn!(
-            "Failed to send newsletter confirmation email to {}: {}",
-            email, e
-        );
-    } else {
-        info!("Sent newsletter confirmation email to {}", email);
+    if let Some(token) = &subscriber.confirmation_token {
+        if let Err(e) = state
+            .email
+            .send_newsletter_confirmation(&email, name.as_deref(), token, &base_url)
+            .await
+        {
+            warn!("Failed to send newsletter confirmation email to {}: {}", email, e);
+        } else {
+            info!("Sent newsletter confirmation email to {}", email);
+        }
     }
 
     Ok(ApiResponse::success(json!({
@@ -177,6 +152,8 @@ pub async fn confirm_subscription(
     State(state): State<AppState>,
     Path(token): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
+    // The repository clears the token, but we need to keep it for idempotency
+    // Use direct DB access for this specific case
     let conn = state.db.connect()?;
 
     // Find subscriber with this confirmation token
@@ -205,7 +182,7 @@ pub async fn confirm_subscription(
     }
 
     // Update subscriber to confirmed (keep confirmation_token for idempotency)
-    let now = Utc::now().to_rfc3339();
+    let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "UPDATE newsletter_subscribers SET confirmed = 1, confirmed_at = ?, updated_at = ? WHERE id = ?",
         params![now.clone(), now.clone(), id],
@@ -252,7 +229,7 @@ pub async fn unsubscribe(
     }
 
     // Update subscriber to unsubscribed
-    let now = Utc::now().to_rfc3339();
+    let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "UPDATE newsletter_subscribers SET unsubscribed_at = ?, updated_at = ? WHERE id = ?",
         params![now.clone(), now.clone(), id],
@@ -271,47 +248,26 @@ pub async fn list_newsletters(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state.db.connect()?;
+    let issues = state.newsletters.list_issues().await?;
 
-    let mut rows = conn
-        .query(
-            "SELECT id, title, subject, body, status, author_id, scheduled_at, sent_at, recipient_count, created_at, updated_at
-             FROM newsletter_issues
-             ORDER BY created_at DESC",
-            params![],
-        )
-        .await?;
+    let response: Vec<NewsletterIssueResponse> = issues
+        .into_iter()
+        .map(|i| NewsletterIssueResponse {
+            id: i.id,
+            title: i.title,
+            subject: i.subject,
+            body: i.body,
+            status: i.status.as_str().to_string(),
+            author_id: i.author_id,
+            scheduled_at: i.scheduled_at,
+            sent_at: i.sent_at,
+            recipient_count: i.recipient_count,
+            created_at: i.created_at,
+            updated_at: i.updated_at,
+        })
+        .collect();
 
-    let mut issues = Vec::new();
-    while let Some(row) = rows.next().await? {
-        let id: String = row.get(0)?;
-        let title: String = row.get(1)?;
-        let subject: String = row.get(2)?;
-        let body: String = row.get(3)?;
-        let status: String = row.get(4)?;
-        let author_id: String = row.get(5)?;
-        let scheduled_at: Option<String> = row.get(6)?;
-        let sent_at: Option<String> = row.get(7)?;
-        let recipient_count: i32 = row.get(8)?;
-        let created_at: String = row.get(9)?;
-        let updated_at: String = row.get(10)?;
-
-        issues.push(NewsletterIssueResponse {
-            id: Uuid::parse_str(&id)?,
-            title,
-            subject,
-            body,
-            status,
-            author_id: Uuid::parse_str(&author_id)?,
-            scheduled_at: scheduled_at.and_then(|s| s.parse().ok()),
-            sent_at: sent_at.and_then(|s| s.parse().ok()),
-            recipient_count,
-            created_at: created_at.parse()?,
-            updated_at: updated_at.parse()?,
-        });
-    }
-
-    Ok(ApiResponse::success(json!({ "newsletters": issues })))
+    Ok(ApiResponse::success(json!({ "newsletters": response })))
 }
 
 /// Create newsletter issue (author or admin)
@@ -324,31 +280,21 @@ pub async fn create_newsletter(
     // Validate request
     payload.validate()?;
 
-    let conn = state.db.connect()?;
-    let id = Uuid::new_v4();
-    let now = Utc::now().to_rfc3339();
+    let new_issue = NewNewsletterIssue {
+        title: payload.title,
+        subject: payload.subject,
+        body: payload.body,
+        author_id: auth_user.user_id,
+        scheduled_at: payload.scheduled_at,
+    };
 
-    conn.execute(
-        r"INSERT INTO newsletter_issues (id, title, subject, body, status, author_id, scheduled_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)",
-        params![
-            id.to_string(),
-            payload.title,
-            payload.subject,
-            payload.body,
-            auth_user.user_id.to_string(),
-            payload.scheduled_at.map(|dt| dt.to_rfc3339()),
-            now.clone(),
-            now.clone()
-        ],
-    )
-    .await?;
+    let issue = state.newsletters.create_issue(&new_issue).await?;
 
     Ok(ApiResponse::success_with_status(
         StatusCode::CREATED,
         json!({
             "message": "Newsletter created successfully",
-            "id": id
+            "id": issue.id
         }),
     ))
 }
@@ -360,48 +306,30 @@ pub async fn get_newsletter(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state.db.connect()?;
+    let id_uuid = Uuid::parse_str(&id)
+        .map_err(|_| ApiError::BadRequest("Invalid newsletter ID".to_string()))?;
 
-    let mut rows = conn
-        .query(
-            "SELECT id, title, subject, body, status, author_id, scheduled_at, sent_at, recipient_count, created_at, updated_at
-             FROM newsletter_issues WHERE id = ?",
-            params![id],
-        )
-        .await?;
-
-    let row = rows
-        .next()
+    let issue = state
+        .newsletters
+        .find_issue_by_id(id_uuid)
         .await?
         .ok_or_else(|| ApiError::NotFound("Newsletter not found".to_string()))?;
 
-    let id: String = row.get(0)?;
-    let title: String = row.get(1)?;
-    let subject: String = row.get(2)?;
-    let body: String = row.get(3)?;
-    let status: String = row.get(4)?;
-    let author_id: String = row.get(5)?;
-    let scheduled_at: Option<String> = row.get(6)?;
-    let sent_at: Option<String> = row.get(7)?;
-    let recipient_count: i32 = row.get(8)?;
-    let created_at: String = row.get(9)?;
-    let updated_at: String = row.get(10)?;
-
-    let issue = NewsletterIssueResponse {
-        id: Uuid::parse_str(&id)?,
-        title,
-        subject,
-        body,
-        status,
-        author_id: Uuid::parse_str(&author_id)?,
-        scheduled_at: scheduled_at.and_then(|s| s.parse().ok()),
-        sent_at: sent_at.and_then(|s| s.parse().ok()),
-        recipient_count,
-        created_at: created_at.parse()?,
-        updated_at: updated_at.parse()?,
+    let response = NewsletterIssueResponse {
+        id: issue.id,
+        title: issue.title,
+        subject: issue.subject,
+        body: issue.body,
+        status: issue.status.as_str().to_string(),
+        author_id: issue.author_id,
+        scheduled_at: issue.scheduled_at,
+        sent_at: issue.sent_at,
+        recipient_count: issue.recipient_count,
+        created_at: issue.created_at,
+        updated_at: issue.updated_at,
     };
 
-    Ok(ApiResponse::success(json!({ "newsletter": issue })))
+    Ok(ApiResponse::success(json!({ "newsletter": response })))
 }
 
 /// Update newsletter issue (author or admin)
@@ -415,67 +343,28 @@ pub async fn update_newsletter(
     // Validate request
     payload.validate()?;
 
-    let conn = state.db.connect()?;
+    let id_uuid = Uuid::parse_str(&id)
+        .map_err(|_| ApiError::BadRequest("Invalid newsletter ID".to_string()))?;
 
-    // Check if newsletter exists
-    let mut rows = conn
-        .query(
-            "SELECT id FROM newsletter_issues WHERE id = ?",
-            params![id.clone()],
-        )
-        .await?;
-
-    if rows.next().await?.is_none() {
-        return Err(ApiError::NotFound("Newsletter not found".to_string()));
-    }
-
-    // Build update query dynamically
-    let mut updates = Vec::new();
-    let mut params_vec: Vec<String> = Vec::new();
-
-    if let Some(title) = payload.title {
-        updates.push("title = ?");
-        params_vec.push(title);
-    }
-
-    if let Some(subject) = payload.subject {
-        updates.push("subject = ?");
-        params_vec.push(subject);
-    }
-
-    if let Some(body) = payload.body {
-        updates.push("body = ?");
-        params_vec.push(body);
-    }
-
-    if let Some(status) = payload.status {
-        updates.push("status = ?");
-        params_vec.push(status);
-    }
-
-    if let Some(scheduled_at) = payload.scheduled_at {
-        updates.push("scheduled_at = ?");
-        params_vec.push(scheduled_at.to_rfc3339());
-    }
-
-    if updates.is_empty() {
+    // Check if at least one field is being updated
+    if payload.title.is_none()
+        && payload.subject.is_none()
+        && payload.body.is_none()
+        && payload.status.is_none()
+        && payload.scheduled_at.is_none()
+    {
         return Err(ApiError::BadRequest("No fields to update".to_string()));
     }
 
-    updates.push("updated_at = ?");
-    params_vec.push(Utc::now().to_rfc3339());
+    let update_data = UpdateNewsletterIssueData {
+        title: payload.title,
+        subject: payload.subject,
+        body: payload.body,
+        status: payload.status.and_then(|s| s.parse().ok()),
+        scheduled_at: payload.scheduled_at.map(Some),
+    };
 
-    let query = format!(
-        "UPDATE newsletter_issues SET {} WHERE id = ?",
-        updates.join(", ")
-    );
-
-    params_vec.push(id.clone());
-
-    // Convert Vec<String> to params
-    let params_refs: Vec<&str> = params_vec.iter().map(|s| s.as_str()).collect();
-    conn.execute(&query, libsql::params_from_iter(params_refs))
-        .await?;
+    state.newsletters.update_issue(id_uuid, &update_data).await?;
 
     Ok(ApiResponse::success(json!({
         "message": "Newsletter updated successfully",
@@ -490,18 +379,10 @@ pub async fn delete_newsletter(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state.db.connect()?;
+    let id_uuid = Uuid::parse_str(&id)
+        .map_err(|_| ApiError::BadRequest("Invalid newsletter ID".to_string()))?;
 
-    let result = conn
-        .execute(
-            "DELETE FROM newsletter_issues WHERE id = ?",
-            params![id.clone()],
-        )
-        .await?;
-
-    if result == 0 {
-        return Err(ApiError::NotFound("Newsletter not found".to_string()));
-    }
+    state.newsletters.delete_issue(id_uuid).await?;
 
     Ok(ApiResponse::success(json!({
         "message": "Newsletter deleted successfully"
@@ -514,39 +395,22 @@ pub async fn list_subscribers(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state.db.connect()?;
+    let subscribers = state.newsletters.list_all_subscribers().await?;
 
-    let mut rows = conn
-        .query(
-            r"SELECT id, email, name, confirmed, subscribed_at, confirmed_at, unsubscribed_at
-              FROM newsletter_subscribers
-              ORDER BY subscribed_at DESC",
-            params![],
-        )
-        .await?;
+    let response: Vec<SubscriberResponse> = subscribers
+        .into_iter()
+        .map(|s| SubscriberResponse {
+            id: s.id,
+            email: s.email,
+            name: s.name,
+            confirmed: s.confirmed,
+            subscribed_at: s.subscribed_at,
+            confirmed_at: s.confirmed_at,
+            unsubscribed_at: s.unsubscribed_at,
+        })
+        .collect();
 
-    let mut subscribers = Vec::new();
-    while let Some(row) = rows.next().await? {
-        let id: String = row.get(0)?;
-        let email: String = row.get(1)?;
-        let name: Option<String> = row.get(2)?;
-        let confirmed: i64 = row.get(3)?;
-        let subscribed_at: String = row.get(4)?;
-        let confirmed_at: Option<String> = row.get(5)?;
-        let unsubscribed_at: Option<String> = row.get(6)?;
-
-        subscribers.push(crate::models::SubscriberResponse {
-            id: Uuid::parse_str(&id)?,
-            email,
-            name,
-            confirmed: confirmed == 1,
-            subscribed_at: subscribed_at.parse()?,
-            confirmed_at: confirmed_at.and_then(|s| s.parse().ok()),
-            unsubscribed_at: unsubscribed_at.and_then(|s| s.parse().ok()),
-        });
-    }
-
-    Ok(ApiResponse::success(json!({ "subscribers": subscribers })))
+    Ok(ApiResponse::success(json!({ "subscribers": response })))
 }
 
 /// Delete a subscriber (admin only)
@@ -558,26 +422,10 @@ pub async fn delete_subscriber(
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Attempting to delete subscriber with id: {}", id);
 
-    let conn = state.db.connect()?;
+    let id_uuid = Uuid::parse_str(&id)
+        .map_err(|_| ApiError::BadRequest("Invalid subscriber ID".to_string()))?;
 
-    // Delete the subscriber directly (delivery logs will be deleted by CASCADE)
-    let result = match conn
-        .execute(
-            "DELETE FROM newsletter_subscribers WHERE id = ?",
-            params![id.clone()],
-        )
-        .await
-    {
-        Ok(r) => r,
-        Err(e) => {
-            error!("Database error deleting subscriber {}: {:?}", id, e);
-            return Err(ApiError::from(e));
-        }
-    };
-
-    if result == 0 {
-        return Err(ApiError::NotFound("Subscriber not found".to_string()));
-    }
+    state.newsletters.delete_subscriber(id_uuid).await?;
 
     info!("Subscriber {} deleted by admin", id);
 
@@ -605,33 +453,25 @@ pub async fn send_newsletter(
     let conn = state.db.connect()?;
     let base_url = get_base_url(&headers);
 
-    // Get newsletter
-    let mut rows = conn
-        .query(
-            "SELECT id, title, subject, body, status FROM newsletter_issues WHERE id = ?",
-            params![id.clone()],
-        )
-        .await?;
+    let id_uuid = Uuid::parse_str(&id)
+        .map_err(|_| ApiError::BadRequest("Invalid newsletter ID".to_string()))?;
 
-    let row = rows
-        .next()
+    // Get newsletter
+    let issue = state
+        .newsletters
+        .find_issue_by_id(id_uuid)
         .await?
         .ok_or_else(|| ApiError::NotFound("Newsletter not found".to_string()))?;
 
-    let newsletter_title: String = row.get(1)?;
-    let newsletter_subject: String = row.get(2)?;
-    let newsletter_body: String = row.get(3)?;
-    let status: String = row.get(4)?;
-
     // Check if already sent
-    if status == "sent" {
+    if issue.status.as_str() == "sent" {
         return Err(ApiError::BadRequest(
             "Newsletter has already been sent".to_string(),
         ));
     }
 
     // Update newsletter status to "sending"
-    let now = Utc::now().to_rfc3339();
+    let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "UPDATE newsletter_issues SET status = 'sending', updated_at = ? WHERE id = ?",
         params![now.clone(), id.clone()],
@@ -685,7 +525,7 @@ pub async fn send_newsletter(
 
         // Create delivery log entry with "pending" status
         let log_id = Uuid::new_v4();
-        let send_time = Utc::now().to_rfc3339();
+        let send_time = chrono::Utc::now().to_rfc3339();
 
         conn.execute(
             "INSERT INTO newsletter_delivery_logs (id, issue_id, subscriber_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
@@ -699,9 +539,9 @@ pub async fn send_newsletter(
             .send_newsletter_issue(NewsletterIssueParams {
                 to_email: &subscriber.email,
                 subscriber_name: subscriber.name.as_deref(),
-                subject: &newsletter_subject,
-                newsletter_title: &newsletter_title,
-                newsletter_body: &newsletter_body,
+                subject: &issue.subject,
+                newsletter_title: &issue.title,
+                newsletter_body: &issue.body,
                 unsubscribe_token: &subscriber.unsubscribe_token,
                 base_url: &base_url,
                 author_articles: author_articles_ref,
@@ -712,7 +552,7 @@ pub async fn send_newsletter(
                 // Update delivery log to "sent"
                 conn.execute(
                     "UPDATE newsletter_delivery_logs SET status = 'sent', sent_at = ? WHERE id = ?",
-                    params![Utc::now().to_rfc3339(), log_id.to_string()],
+                    params![chrono::Utc::now().to_rfc3339(), log_id.to_string()],
                 )
                 .await?;
                 sent_count += 1;
@@ -735,19 +575,10 @@ pub async fn send_newsletter(
     }
 
     // Update newsletter status based on results
-    let final_status = if failed_count == 0 {
-        "sent"
-    } else if sent_count == 0 {
-        "failed"
-    } else {
-        "sent" // Partial success still counts as sent
-    };
-
-    conn.execute(
-        "UPDATE newsletter_issues SET status = ?, sent_at = ?, recipient_count = ?, updated_at = ? WHERE id = ?",
-        params![final_status, Utc::now().to_rfc3339(), sent_count, Utc::now().to_rfc3339(), id.clone()],
-    )
-    .await?;
+    state
+        .newsletters
+        .mark_issue_sent(id_uuid, sent_count)
+        .await?;
 
     let message = if failed_count > 0 {
         format!(
@@ -816,46 +647,13 @@ pub async fn get_newsletter_stats(
     _auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let conn = state.db.connect()?;
-
-    // Get total subscribers
-    let mut total_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM newsletter_subscribers WHERE unsubscribed_at IS NULL",
-            params![],
-        )
-        .await?;
-    let total_subscribers: i32 = total_rows.next().await?.unwrap().get(0)?;
-
-    // Get confirmed subscribers
-    let mut confirmed_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM newsletter_subscribers WHERE confirmed = 1 AND unsubscribed_at IS NULL",
-            params![],
-        )
-        .await?;
-    let confirmed_subscribers: i32 = confirmed_rows.next().await?.unwrap().get(0)?;
-
-    // Get total issues
-    let mut issues_rows = conn
-        .query("SELECT COUNT(*) FROM newsletter_issues", params![])
-        .await?;
-    let total_issues: i32 = issues_rows.next().await?.unwrap().get(0)?;
-
-    // Get sent issues
-    let mut sent_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM newsletter_issues WHERE status = 'sent'",
-            params![],
-        )
-        .await?;
-    let sent_issues: i32 = sent_rows.next().await?.unwrap().get(0)?;
+    let stats_data = state.newsletters.get_stats().await?;
 
     let stats = NewsletterStats {
-        total_subscribers,
-        confirmed_subscribers,
-        total_issues,
-        sent_issues,
+        total_subscribers: stats_data.total_subscribers,
+        confirmed_subscribers: stats_data.confirmed_subscribers,
+        total_issues: stats_data.total_issues,
+        sent_issues: stats_data.sent_issues,
     };
 
     Ok(ApiResponse::success(json!({ "stats": stats })))
@@ -902,7 +700,7 @@ pub async fn newsletter_confirmed_page(
 
     // If not already confirmed, confirm now
     if confirmed != 1 {
-        let now = Utc::now().to_rfc3339();
+        let now = chrono::Utc::now().to_rfc3339();
         conn.execute(
             "UPDATE newsletter_subscribers SET confirmed = 1, confirmed_at = ?, updated_at = ? WHERE id = ?",
             params![now.clone(), now, id],
@@ -961,34 +759,15 @@ pub async fn admin_newsletters_page(
     auth_user: AuthorUser,
     State(state): State<AppState>,
 ) -> Result<Html<String>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Get user info for template
-    let mut user_rows = conn
-        .query(
-            "SELECT username, email, bio, image FROM users WHERE id = ?",
-            libsql::params![auth_user.user_id.to_string()],
-        )
-        .await?;
-
-    let user_info = if let Some(row) = user_rows.next().await? {
-        let username: String = row.get(0)?;
-        let email: String = row.get(1)?;
-        let bio: Option<String> = row.get(2).ok();
-        let image: Option<String> = row.get(3).ok();
-
-        serde_json::json!({
-            "username": username,
-            "email": email,
-            "bio": bio,
-            "image": image,
+    let user_info = state.users.find_by_id(auth_user.user_id).await?.map(|u| {
+        json!({
+            "username": u.username,
+            "email": u.email,
+            "bio": u.bio,
+            "image": u.image,
         })
-    } else {
-        serde_json::json!(null)
-    };
+    });
 
     let mut context = tera::Context::new();
     context.insert("title", "Newsletter Management");

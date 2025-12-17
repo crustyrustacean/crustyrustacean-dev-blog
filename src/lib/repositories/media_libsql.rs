@@ -81,6 +81,16 @@ impl MediaRepository for LibSqlMediaRepository {
             None => libsql::Value::Null,
         };
 
+        let caption_param = match &media.caption {
+            Some(c) => libsql::Value::Text(c.clone()),
+            None => libsql::Value::Null,
+        };
+
+        let description_param = match &media.description {
+            Some(d) => libsql::Value::Text(d.clone()),
+            None => libsql::Value::Null,
+        };
+
         let width_param = match media.width {
             Some(w) => libsql::Value::Integer(w),
             None => libsql::Value::Null,
@@ -92,8 +102,8 @@ impl MediaRepository for LibSqlMediaRepository {
         };
 
         conn.execute(
-            r"INSERT INTO media (id, user_id, filename, storage_path, title, alt_text, mime_type, file_size, width, height, uploaded_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            r"INSERT INTO media_library (id, user_id, filename, storage_path, title, alt_text, caption, description, mime_type, file_size, width, height, uploaded_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             vec![
                 libsql::Value::Text(id.clone()),
                 libsql::Value::Text(media.user_id.clone()),
@@ -101,6 +111,8 @@ impl MediaRepository for LibSqlMediaRepository {
                 libsql::Value::Text(media.storage_path.clone()),
                 title_param,
                 alt_text_param,
+                caption_param,
+                description_param,
                 libsql::Value::Text(media.mime_type.clone()),
                 libsql::Value::Integer(media.file_size),
                 width_param,
@@ -125,7 +137,7 @@ impl MediaRepository for LibSqlMediaRepository {
         let mut rows = conn
             .query(
                 r"SELECT id, user_id, filename, storage_path, title, alt_text, caption, description, mime_type, file_size, width, height, uploaded_at, updated_at
-                  FROM media WHERE id = ?",
+                  FROM media_library WHERE id = ?",
                 libsql::params![id],
             )
             .await?;
@@ -145,7 +157,7 @@ impl MediaRepository for LibSqlMediaRepository {
 
         let mut sql = String::from(
             r"SELECT id, user_id, filename, storage_path, title, alt_text, caption, description, mime_type, file_size, width, height, uploaded_at, updated_at
-              FROM media WHERE user_id = ?",
+              FROM media_library WHERE user_id = ?",
         );
         let mut params: Vec<libsql::Value> = vec![libsql::Value::Text(user_id.to_string())];
 
@@ -178,7 +190,7 @@ impl MediaRepository for LibSqlMediaRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
-        let mut sql = String::from("SELECT COUNT(*) FROM media WHERE user_id = ?");
+        let mut sql = String::from("SELECT COUNT(*) FROM media_library WHERE user_id = ?");
         let mut params: Vec<libsql::Value> = vec![libsql::Value::Text(user_id.to_string())];
 
         if let Some(ref mime_type) = query.mime_type {
@@ -238,7 +250,7 @@ impl MediaRepository for LibSqlMediaRepository {
 
         params.push(libsql::Value::Text(id.to_string()));
 
-        let update_query = format!("UPDATE media SET {} WHERE id = ?", updates.join(", "));
+        let update_query = format!("UPDATE media_library SET {} WHERE id = ?", updates.join(", "));
 
         conn.execute(&update_query, libsql::params_from_iter(params))
             .await?;
@@ -262,7 +274,7 @@ impl MediaRepository for LibSqlMediaRepository {
         .await?;
 
         let result = conn
-            .execute("DELETE FROM media WHERE id = ?", libsql::params![id])
+            .execute("DELETE FROM media_library WHERE id = ?", libsql::params![id])
             .await?;
 
         if result == 0 {

@@ -4,12 +4,12 @@ use crate::{
     ApiError, AppState,
     auth::{AuthenticatedUser, generate_api_key, hash_api_key},
     models::{ApiKeyInfo, ApiKeyResponse, ApiKeysResponse, CreateApiKey},
+    repositories::NewApiKey,
 };
 use axum::{
     extract::{Path, State},
     response::Json,
 };
-use chrono::Utc;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -22,35 +22,23 @@ pub async fn create_api_key(
         .validate()
         .map_err(|e| ApiError::BadRequest(format!("Validation error: {}", e)))?;
 
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
-
     // Generate API key
     let api_key = generate_api_key();
     let key_hash = hash_api_key(&api_key)?;
-    let key_id = Uuid::new_v4();
-    let now = Utc::now();
 
-    // Insert into database
-    conn.execute(
-        "INSERT INTO api_keys (id, user_id, name, key_hash, created_at) VALUES (?, ?, ?, ?, ?)",
-        libsql::params![
-            key_id.to_string(),
-            user.user_id.to_string(),
-            payload.name.clone(),
-            key_hash,
-            now.to_rfc3339(),
-        ],
-    )
-    .await?;
+    let new_key = NewApiKey {
+        user_id: user.user_id,
+        name: payload.name.clone(),
+        key_hash,
+    };
+
+    let record = state.api_keys.create(&new_key).await?;
 
     let response = ApiKeyResponse {
-        id: key_id,
-        name: payload.name,
-        key: api_key,
-        created_at: now,
+        id: record.id,
+        name: record.name,
+        key: api_key, // Return the raw key (only shown once)
+        created_at: record.created_at,
     };
 
     Ok(Json(response))
@@ -60,52 +48,18 @@ pub async fn list_api_keys(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<ApiKeysResponse>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
+    let records = state.api_keys.list_for_user(user.user_id).await?;
 
-    let mut rows = conn
-        .query(
-            "SELECT id, name, created_at, last_used_at, expires_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC",
-            libsql::params![user.user_id.to_string()],
-        )
-        .await
-        ?;
-
-    let mut api_keys = Vec::new();
-
-    while let Some(row) = rows.next().await? {
-        let id: String = row.get(0)?;
-        let name: String = row.get(1)?;
-        let created_at: String = row.get(2)?;
-        let last_used_at: Option<String> = row.get(3).ok();
-        let expires_at: Option<String> = row.get(4).ok();
-
-        let id_uuid = Uuid::parse_str(&id)
-            .map_err(|_| ApiError::InternalServerError("Invalid key ID".to_string()))?;
-        let created_at_dt = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_err(|_| ApiError::InternalServerError("Invalid created_at".to_string()))?
-            .with_timezone(&Utc);
-        let last_used_at_dt = last_used_at.and_then(|s| {
-            chrono::DateTime::parse_from_rfc3339(&s)
-                .ok()
-                .map(|dt| dt.with_timezone(&Utc))
-        });
-        let expires_at_dt = expires_at.and_then(|s| {
-            chrono::DateTime::parse_from_rfc3339(&s)
-                .ok()
-                .map(|dt| dt.with_timezone(&Utc))
-        });
-
-        api_keys.push(ApiKeyInfo {
-            id: id_uuid,
-            name,
-            created_at: created_at_dt,
-            last_used_at: last_used_at_dt,
-            expires_at: expires_at_dt,
-        });
-    }
+    let api_keys: Vec<ApiKeyInfo> = records
+        .into_iter()
+        .map(|r| ApiKeyInfo {
+            id: r.id,
+            name: r.name,
+            created_at: r.created_at,
+            last_used_at: r.last_used_at,
+            expires_at: r.expires_at,
+        })
+        .collect();
 
     Ok(Json(ApiKeysResponse { api_keys }))
 }
@@ -115,22 +69,19 @@ pub async fn delete_api_key(
     user: AuthenticatedUser,
     Path(key_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let conn = state
-        .db
-        .connect()
-        .map_err(ApiError::from_connection_error)?;
+    // First verify the key belongs to the user
+    let key = state
+        .api_keys
+        .find_by_id(key_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("API key not found".to_string()))?;
 
-    // Delete the API key (only if it belongs to the user)
-    let result = conn
-        .execute(
-            "DELETE FROM api_keys WHERE id = ? AND user_id = ?",
-            libsql::params![key_id.to_string(), user.user_id.to_string()],
-        )
-        .await?;
-
-    if result == 0 {
+    if key.user_id != user.user_id {
         return Err(ApiError::NotFound("API key not found".to_string()));
     }
+
+    // Delete the API key
+    state.api_keys.delete(key_id).await?;
 
     Ok(Json(serde_json::json!({ "message": "API key deleted" })))
 }
