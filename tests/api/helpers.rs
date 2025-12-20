@@ -3,7 +3,7 @@
 // types and functions used across all integration tests
 
 // dependencies
-use anyhow::{Context, Result, anyhow};
+use anyhow::Result;
 use crustyrustacean_dev_blog_lib::config::AppConfig;
 use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
 use crustyrustacean_dev_blog_lib::service::AppService;
@@ -12,15 +12,10 @@ use crustyrustacean_dev_blog_lib::storage::{OpenDalStorage, StorageBackend};
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
 use opendal::Operator;
 use reqwest::{Client, Response, StatusCode};
-use shuttle_common::secrets::Secret;
-use shuttle_runtime::SecretStore;
-use std::collections::BTreeMap;
 use std::env::var;
-use std::fs;
 use std::io::{sink, stdout};
 use std::sync::{Arc, LazyLock};
 use tokio::net::TcpListener;
-use toml::Value;
 
 // static constant which creates one instance of tracing
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -43,37 +38,29 @@ fn create_test_storage() -> Result<Operator, Box<dyn std::error::Error>> {
     Ok(op)
 }
 
-// Load Shuttle secrets for tests from Secrets.dev.toml (preferred) or Secrets.toml.
-fn load_test_secret_store() -> Result<SecretStore> {
-    let path = if fs::metadata("Secrets.dev.toml").is_ok() {
-        "Secrets.dev.toml"
-    } else if fs::metadata("Secrets.toml").is_ok() {
-        "Secrets.toml"
-    } else {
-        return Err(anyhow!(
-            "Neither Secrets.dev.toml nor Secrets.toml found in project root"
-        ));
-    };
-
-    let txt = fs::read_to_string(path).with_context(|| format!("Reading {}", path))?;
-    let val: Value = toml::from_str(&txt).with_context(|| format!("Parsing {}", path))?;
-    let table = val
-        .as_table()
-        .ok_or_else(|| anyhow!("Root of {} must be a TOML table", path))?;
-
-    let mut map: BTreeMap<String, Secret<String>> = BTreeMap::new();
-    for (k, v) in table {
-        let s = v
-            .as_str()
-            .ok_or_else(|| anyhow!("Secret {k} must be a string in {}", path))?;
-        // Skip Mailtrap API token in tests - we want to use LoggingEmailSender
-        if k == "MAILTRAP_API_TOKEN" {
-            continue;
-        }
-        map.insert(k.clone(), Secret::new(s.to_owned()));
+// Load test environment variables from .env.test or .env file.
+// Sets up minimal required environment variables for testing.
+//
+// SAFETY: This function is called once during test initialization before any
+// multi-threaded test execution begins, so there are no data races.
+fn load_test_env() {
+    // Try to load from .env.test first, fall back to .env
+    if dotenvy::from_filename(".env.test").is_err() {
+        dotenvy::dotenv().ok();
     }
 
-    Ok(SecretStore::new(map))
+    // Set test-specific defaults if not already set
+    // SAFETY: Called during single-threaded test initialization
+    unsafe {
+        if std::env::var("JWT_SECRET").is_err() {
+            std::env::set_var("JWT_SECRET", "test-secret-key-for-integration-tests");
+        }
+        if std::env::var("TEMPLATES_DIR").is_err() {
+            std::env::set_var("TEMPLATES_DIR", "templates/**/*");
+        }
+        // Skip Mailtrap in tests - we want to use LoggingEmailSender
+        std::env::remove_var("MAILTRAP_API_TOKEN");
+    }
 }
 
 // struct type which models a test application
@@ -90,10 +77,11 @@ pub async fn spawn_app() -> TestApp {
     // ensure that the tracing is only initialized once
     LazyLock::force(&TRACING);
 
-    // set up the configuration with test JWT secret
-    let secrets = load_test_secret_store().expect("Failed to load Shuttle secrets for tests.");
-    let app_config =
-        AppConfig::try_from(&secrets).expect("Failed to build AppConfig from Shuttle secrets.");
+    // load test environment variables
+    load_test_env();
+
+    // set up the configuration from environment variables
+    let app_config = AppConfig::from_env().expect("Failed to build AppConfig from environment.");
 
     // create a test database connection (local SQLite for testing)
     use std::env::temp_dir;
