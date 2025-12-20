@@ -212,17 +212,27 @@ impl ArticleRepository for LibSqlArticleRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
+        let user_id_param = current_user_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+
+        // Optimized query that fetches all data in one round trip
         let mut rows = conn
             .query(
                 r"SELECT a.id, a.slug, a.title, a.description, a.body, a.author_id,
                          a.category_id, a.draft, a.created_at, a.updated_at, a.featured_image_id,
                          c.slug as category_slug,
-                         u.username, u.bio, u.image
+                         u.username, u.bio, u.image,
+                         (SELECT GROUP_CONCAT(t.name, ',') FROM article_tags at
+                          JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id) as tags,
+                         (SELECT COUNT(*) FROM user_favorites WHERE article_id = a.id) as favorites_count,
+                         (SELECT 1 FROM user_favorites WHERE article_id = a.id AND user_id = ?) as is_favorited,
+                         (SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = a.author_id) as is_following
                   FROM articles a
                   LEFT JOIN categories c ON a.category_id = c.id
                   JOIN users u ON a.author_id = u.id
                   WHERE a.slug = ?",
-                libsql::params![slug],
+                libsql::params![user_id_param.clone(), user_id_param, slug],
             )
             .await?;
 
@@ -233,18 +243,20 @@ impl ArticleRepository for LibSqlArticleRepository {
             let bio: Option<String> = row.get(13).ok();
             let image: Option<String> = row.get(14).ok();
 
-            // Check if current user is following the author
-            let following = if let Some(user_id) = current_user_id {
-                let mut follow_rows = conn
-                    .query(
-                        "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
-                        libsql::params![user_id.to_string(), article.author_id.to_string()],
-                    )
-                    .await?;
-                follow_rows.next().await?.is_some()
-            } else {
-                false
-            };
+            // Parse aggregated tags from GROUP_CONCAT result
+            let tags_str: Option<String> = row.get(15).ok();
+            let tag_list: Vec<String> = tags_str
+                .map(|s| s.split(',').map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).collect())
+                .unwrap_or_default();
+
+            // Get favorites count from subquery result
+            let favorites_count: i32 = row.get(16).unwrap_or(0);
+
+            // Check if current user favorited (subquery returns 1 or NULL)
+            let favorited = current_user_id.is_some() && row.get::<i64>(17).unwrap_or(0) == 1;
+
+            // Check if current user follows author (subquery returns 1 or NULL)
+            let following = current_user_id.is_some() && row.get::<i64>(18).unwrap_or(0) == 1;
 
             let author = UserProfile {
                 username,
@@ -252,14 +264,6 @@ impl ArticleRepository for LibSqlArticleRepository {
                 image,
                 following,
             };
-
-            let tag_list = self.get_tags(article.id).await?;
-            let favorited = if let Some(user_id) = current_user_id {
-                self.is_favorited(article.id, user_id).await?
-            } else {
-                false
-            };
-            let favorites_count = self.favorites_count(article.id).await?;
 
             Ok(Some(ArticleWithDetails {
                 article,
@@ -324,11 +328,26 @@ impl ArticleRepository for LibSqlArticleRepository {
             format!("WHERE {}", where_clauses.join(" AND "))
         };
 
+        // Build optimized query that fetches all data in one round trip:
+        // - Article data with author and category
+        // - Aggregated tags using GROUP_CONCAT
+        // - Favorites count using subquery
+        // - User's favorited status (if logged in)
+        // - User's following status (if logged in)
+        let user_id_param = current_user_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+
         let query_str = format!(
             r"SELECT a.id, a.slug, a.title, a.description, a.body, a.author_id,
                      a.category_id, a.draft, a.created_at, a.updated_at, a.featured_image_id,
                      c.slug as category_slug,
-                     u.username, u.bio, u.image
+                     u.username, u.bio, u.image,
+                     (SELECT GROUP_CONCAT(t.name, ',') FROM article_tags at
+                      JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id) as tags,
+                     (SELECT COUNT(*) FROM user_favorites WHERE article_id = a.id) as favorites_count,
+                     (SELECT 1 FROM user_favorites WHERE article_id = a.id AND user_id = ?) as is_favorited,
+                     (SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = a.author_id) as is_following
               FROM articles a
               LEFT JOIN categories c ON a.category_id = c.id
               JOIN users u ON a.author_id = u.id
@@ -338,6 +357,9 @@ impl ArticleRepository for LibSqlArticleRepository {
             where_clause
         );
 
+        // Add user_id params for the subqueries (twice: once for favorites, once for follows)
+        params.insert(0, libsql::Value::Text(user_id_param.clone()));
+        params.insert(1, libsql::Value::Text(user_id_param));
         params.push(libsql::Value::Integer(limit as i64));
         params.push(libsql::Value::Integer(offset as i64));
 
@@ -353,17 +375,20 @@ impl ArticleRepository for LibSqlArticleRepository {
             let bio: Option<String> = row.get(13).ok();
             let image: Option<String> = row.get(14).ok();
 
-            let following = if let Some(user_id) = current_user_id {
-                let mut follow_rows = conn
-                    .query(
-                        "SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?",
-                        libsql::params![user_id.to_string(), article.author_id.to_string()],
-                    )
-                    .await?;
-                follow_rows.next().await?.is_some()
-            } else {
-                false
-            };
+            // Parse aggregated tags from GROUP_CONCAT result
+            let tags_str: Option<String> = row.get(15).ok();
+            let tag_list: Vec<String> = tags_str
+                .map(|s| s.split(',').map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).collect())
+                .unwrap_or_default();
+
+            // Get favorites count from subquery result
+            let favorites_count: i32 = row.get(16).unwrap_or(0);
+
+            // Check if current user favorited (subquery returns 1 or NULL)
+            let favorited = current_user_id.is_some() && row.get::<i64>(17).unwrap_or(0) == 1;
+
+            // Check if current user follows author (subquery returns 1 or NULL)
+            let following = current_user_id.is_some() && row.get::<i64>(18).unwrap_or(0) == 1;
 
             let author = UserProfile {
                 username,
@@ -371,14 +396,6 @@ impl ArticleRepository for LibSqlArticleRepository {
                 image,
                 following,
             };
-
-            let tag_list = self.get_tags(article.id).await?;
-            let favorited = if let Some(user_id) = current_user_id {
-                self.is_favorited(article.id, user_id).await?
-            } else {
-                false
-            };
-            let favorites_count = self.favorites_count(article.id).await?;
 
             articles.push(ArticleWithDetails {
                 article,
@@ -468,10 +485,15 @@ impl ArticleRepository for LibSqlArticleRepository {
         let limit = query.limit.unwrap_or(20);
         let offset = query.offset.unwrap_or(0);
 
+        // Optimized query that fetches all data in one round trip
         let query_str = r"SELECT a.id, a.slug, a.title, a.description, a.body, a.author_id,
                                  a.category_id, a.draft, a.created_at, a.updated_at, a.featured_image_id,
                                  c.slug as category_slug,
-                                 u.username, u.bio, u.image
+                                 u.username, u.bio, u.image,
+                                 (SELECT GROUP_CONCAT(t.name, ',') FROM article_tags at
+                                  JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id) as tags,
+                                 (SELECT COUNT(*) FROM user_favorites WHERE article_id = a.id) as favorites_count,
+                                 (SELECT 1 FROM user_favorites WHERE article_id = a.id AND user_id = ?) as is_favorited
                           FROM articles a
                           LEFT JOIN categories c ON a.category_id = c.id
                           JOIN users u ON a.author_id = u.id
@@ -480,10 +502,11 @@ impl ArticleRepository for LibSqlArticleRepository {
                           ORDER BY a.created_at DESC
                           LIMIT ? OFFSET ?";
 
+        let user_id_str = user_id.to_string();
         let mut rows = conn
             .query(
                 query_str,
-                libsql::params![user_id.to_string(), limit, offset],
+                libsql::params![user_id_str.clone(), user_id_str, limit, offset],
             )
             .await?;
 
@@ -495,16 +518,24 @@ impl ArticleRepository for LibSqlArticleRepository {
             let bio: Option<String> = row.get(13).ok();
             let image: Option<String> = row.get(14).ok();
 
+            // Parse aggregated tags from GROUP_CONCAT result
+            let tags_str: Option<String> = row.get(15).ok();
+            let tag_list: Vec<String> = tags_str
+                .map(|s| s.split(',').map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).collect())
+                .unwrap_or_default();
+
+            // Get favorites count from subquery result
+            let favorites_count: i32 = row.get(16).unwrap_or(0);
+
+            // Check if current user favorited (subquery returns 1 or NULL)
+            let favorited = row.get::<i64>(17).unwrap_or(0) == 1;
+
             let author = UserProfile {
                 username,
                 bio,
                 image,
                 following: true, // They're in the feed because we follow them
             };
-
-            let tag_list = self.get_tags(article.id).await?;
-            let favorited = self.is_favorited(article.id, user_id).await?;
-            let favorites_count = self.favorites_count(article.id).await?;
 
             articles.push(ArticleWithDetails {
                 article,
@@ -547,18 +578,24 @@ impl ArticleRepository for LibSqlArticleRepository {
             .connect()
             .map_err(|e| RepositoryError::ConnectionError(e.to_string()))?;
 
+        // Optimized query that fetches all data in one round trip
         let query_str = r"SELECT a.id, a.slug, a.title, a.description, a.body, a.author_id,
                                  a.category_id, a.draft, a.created_at, a.updated_at, a.featured_image_id,
                                  c.slug as category_slug,
-                                 u.username, u.bio, u.image
+                                 u.username, u.bio, u.image,
+                                 (SELECT GROUP_CONCAT(t.name, ',') FROM article_tags at
+                                  JOIN tags t ON at.tag_id = t.id WHERE at.article_id = a.id) as tags,
+                                 (SELECT COUNT(*) FROM user_favorites WHERE article_id = a.id) as favorites_count,
+                                 (SELECT 1 FROM user_favorites WHERE article_id = a.id AND user_id = ?) as is_favorited
                           FROM articles a
                           LEFT JOIN categories c ON a.category_id = c.id
                           JOIN users u ON a.author_id = u.id
                           WHERE a.draft = 1 AND a.author_id = ?
                           ORDER BY a.updated_at DESC";
 
+        let user_id_str = user_id.to_string();
         let mut rows = conn
-            .query(query_str, libsql::params![user_id.to_string()])
+            .query(query_str, libsql::params![user_id_str.clone(), user_id_str])
             .await?;
 
         let mut articles = Vec::new();
@@ -569,16 +606,24 @@ impl ArticleRepository for LibSqlArticleRepository {
             let bio: Option<String> = row.get(13).ok();
             let image: Option<String> = row.get(14).ok();
 
+            // Parse aggregated tags from GROUP_CONCAT result
+            let tags_str: Option<String> = row.get(15).ok();
+            let tag_list: Vec<String> = tags_str
+                .map(|s| s.split(',').map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).collect())
+                .unwrap_or_default();
+
+            // Get favorites count from subquery result
+            let favorites_count: i32 = row.get(16).unwrap_or(0);
+
+            // Check if current user favorited (subquery returns 1 or NULL)
+            let favorited = row.get::<i64>(17).unwrap_or(0) == 1;
+
             let author = UserProfile {
                 username,
                 bio,
                 image,
-                following: false,
+                following: false, // User viewing their own drafts
             };
-
-            let tag_list = self.get_tags(article.id).await?;
-            let favorited = self.is_favorited(article.id, user_id).await?;
-            let favorites_count = self.favorites_count(article.id).await?;
 
             articles.push(ArticleWithDetails {
                 article,

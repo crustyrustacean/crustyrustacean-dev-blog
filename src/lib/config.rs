@@ -3,7 +3,7 @@
 // dependencies
 use crate::email::EmailConfig;
 use anyhow::{Result, anyhow};
-use shuttle_runtime::{CustomError, SecretStore};
+use std::env;
 
 // struct type to represent the application configuration
 #[derive(Clone, Debug)]
@@ -19,37 +19,42 @@ pub struct AppConfig {
     pub email: EmailConfig,
 }
 
-// implement the TryFrom trait for the AppConfig type
-impl TryFrom<&SecretStore> for AppConfig {
-    type Error = CustomError;
+impl AppConfig {
+    /// Load application configuration from environment variables.
+    ///
+    /// Required environment variables:
+    /// - `JWT_SECRET`: Secret key for JWT token signing
+    /// - `TEMPLATES_DIR`: Glob pattern for template directory (e.g., "templates/**/*")
+    ///
+    /// Optional environment variables:
+    /// - `ALLOWED_ORIGINS`: Comma-separated list of allowed CORS origins
+    /// - `MAILTRAP_API_TOKEN`: Mailtrap API token for email sending
+    /// - `MAILTRAP_SANDBOX_INBOX_ID`: Mailtrap sandbox inbox ID (for development)
+    /// - `MAILTRAP_SENDER_EMAIL`: Sender email address
+    /// - `MAILTRAP_SENDER_NAME`: Sender display name
+    pub fn from_env() -> Result<Self> {
+        let jwt_secret = env::var("JWT_SECRET")
+            .map_err(|_| anyhow!("Missing required environment variable: JWT_SECRET"))?;
 
-    fn try_from(secrets: &SecretStore) -> Result<Self> {
-        let jwt_secret = secrets
-            .get("JWT_SECRET")
-            .ok_or_else(|| anyhow!("Missing required configuration secret: JWT_SECRET"))?;
-
-        let templates_dir = secrets
-            .get("TEMPLATES_DIR")
-            .ok_or_else(|| anyhow!("Missing required templates directory: TEMPLATES_DIR"))?;
+        let templates_dir = env::var("TEMPLATES_DIR")
+            .map_err(|_| anyhow!("Missing required environment variable: TEMPLATES_DIR"))?;
 
         // Deprecated: Bootstrap has been removed. These now default to empty strings.
-        let external_stylesheet = secrets.get("EXTERNAL_STYLESHEET").unwrap_or_default();
-
-        let override_stylesheet = secrets.get("OVERRIDE_STYLESHEET").unwrap_or_default();
+        let external_stylesheet = env::var("EXTERNAL_STYLESHEET").unwrap_or_default();
+        let override_stylesheet = env::var("OVERRIDE_STYLESHEET").unwrap_or_default();
 
         // Get version from Cargo.toml at compile time
         let app_version = env!("CARGO_PKG_VERSION").to_string();
 
         // Parse allowed origins (optional, defaults to localhost for development)
-        let allowed_origins = secrets
-            .get("ALLOWED_ORIGINS")
+        let allowed_origins = env::var("ALLOWED_ORIGINS")
             .map(|s| {
                 s.split(',')
                     .map(|origin| origin.trim().to_string())
                     .filter(|origin| !origin.is_empty())
                     .collect::<Vec<String>>()
             })
-            .unwrap_or_else(|| {
+            .unwrap_or_else(|_| {
                 // Default to localhost for development
                 vec![
                     "http://localhost:8000".to_string(),
@@ -60,16 +65,14 @@ impl TryFrom<&SecretStore> for AppConfig {
         // Load email configuration (all optional - falls back to logging sender)
         // If MAILTRAP_SANDBOX_INBOX_ID is set, uses sandbox mode for development
         let email = EmailConfig {
-            mailtrap_api_token: secrets.get("MAILTRAP_API_TOKEN").filter(|s| !s.is_empty()),
-            mailtrap_sandbox_inbox_id: secrets
-                .get("MAILTRAP_SANDBOX_INBOX_ID")
+            mailtrap_api_token: env::var("MAILTRAP_API_TOKEN").ok().filter(|s| !s.is_empty()),
+            mailtrap_sandbox_inbox_id: env::var("MAILTRAP_SANDBOX_INBOX_ID")
+                .ok()
                 .filter(|s| !s.is_empty()),
-            sender_email: secrets
-                .get("MAILTRAP_SENDER_EMAIL")
-                .unwrap_or_else(|| "noreply@example.com".to_string()),
-            sender_name: secrets
-                .get("MAILTRAP_SENDER_NAME")
-                .unwrap_or_else(|| "CrustyRustacean Dev Blog".to_string()),
+            sender_email: env::var("MAILTRAP_SENDER_EMAIL")
+                .unwrap_or_else(|_| "noreply@example.com".to_string()),
+            sender_name: env::var("MAILTRAP_SENDER_NAME")
+                .unwrap_or_else(|_| "CrustyRustacean Dev Blog".to_string()),
         };
 
         Ok(Self {

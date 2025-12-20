@@ -1,7 +1,0 @@
-[build]
-assets = [
-  "templates/*",
-  "static/*",
-  "assets/*",
-  "themes/*"
-]

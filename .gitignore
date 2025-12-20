@@ -13,7 +13,13 @@ CLAUDE.*
 # Build outputs
 target/
 
-# Shuttle specific
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.test
+!.env.example
+
+# Legacy Shuttle files
 .shuttle*
 Secrets*.toml
 
