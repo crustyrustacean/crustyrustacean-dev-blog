@@ -1,0 +1,41 @@
+application:
+  port: 8000
+  host: 0.0.0.0
+  base_url: "http://localhost:8000"
+
+database:
+  host: "127.0.0.1"
+  port: 5432
+  username: "postgres"
+  password: "password"
+  database_name: "crustyrustacean_blog"
+  require_ssl: false
+
+jwt:
+  secret: "change-me-in-production-use-secure-random-string"
+  expiration_hours: 24
+
+email:
+  smtp_host: "smtp.example.com"
+  smtp_port: 587
+  smtp_username: ""
+  smtp_password: ""
+  from_address: "noreply@example.com"
+  from_name: "CrustyRustacean Blog"
+
+storage:
+  backend: "fs"
+  fs_root: "./uploads"
+  s3_bucket: ""
+  s3_region: ""
+  s3_access_key: ""
+  s3_secret_key: ""
+
+templates:
+  dir: "templates/**/*"
+
+app:
+  version: "3.0.0"
+  allowed_origins:
+    - "http://localhost:8000"
+    - "http://127.0.0.1:8000"

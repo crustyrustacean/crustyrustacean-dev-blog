@@ -1,0 +1,15 @@
+application:
+  host: 127.0.0.1
+  base_url: "http://127.0.0.1:8000"
+
+database:
+  require_ssl: false
+
+jwt:
+  secret: "local-development-secret-change-in-production"
+
+email:
+  smtp_host: "localhost"
+  smtp_port: 1025
+  smtp_username: ""
+  smtp_password: ""

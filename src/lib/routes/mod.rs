@@ -1,47 +1,28 @@
 // src/lib/routes/mod.rs
 
-// modules
-pub mod account;
-pub mod admin_users;
-pub mod api_keys;
-pub mod articles;
-pub mod auth;
-pub mod categories;
-pub mod comments;
-pub mod error_pages;
-pub mod health_check;
-pub mod index;
-pub mod media;
-pub mod newsletters;
-pub mod password_reset;
-pub mod profile;
-pub mod robots;
-pub mod rss;
-pub mod search;
-pub mod sitemap;
-pub mod tags;
-pub mod users;
-pub mod verify_email;
+//! HTTP route handlers.
+//!
+//! This module contains all route handlers organized by domain.
 
-// re-exports
-pub use account::*;
-pub use admin_users::*;
-pub use api_keys::*;
-pub use articles::*;
-pub use auth::*;
-pub use categories::*;
-pub use comments::*;
-pub use error_pages::*;
+// Module declarations
+pub mod health_check;
+
+// Re-exports
 pub use health_check::*;
-pub use index::*;
-pub use media::*;
-pub use newsletters::*;
-pub use password_reset::*;
-pub use profile::*;
-pub use robots::*;
-pub use rss::*;
-pub use search::*;
-pub use sitemap::*;
-pub use tags::*;
-pub use users::*;
-pub use verify_email::*;
+
+use actix_web::web;
+
+/// Configure all application routes.
+///
+/// This function is called by the startup module to register all routes
+/// with the Actix Web application.
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg
+        // Health check
+        .route("/health_check", web::get().to(health_check))
+        // TODO: Add more routes as they are migrated
+        // .route("/", web::get().to(get_index))
+        // .route("/api/users", web::post().to(register_user))
+        // etc.
+        ;
+}

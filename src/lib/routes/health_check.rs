@@ -1,9 +1,16 @@
 // src/lib/routes/health_check.rs
 
-// dependencies
-use crate::response::ApiResponse;
+//! Health check endpoint for monitoring.
 
-// health check handler; returns a 200 OK with a small JSON envelope
-pub async fn health_check() -> ApiResponse<()> {
-    ApiResponse::success(())
+use actix_web::{HttpResponse, Responder};
+use serde_json::json;
+
+/// Health check endpoint.
+///
+/// Returns a 200 OK response to indicate the service is healthy.
+pub async fn health_check() -> impl Responder {
+    HttpResponse::Ok().json(json!({
+        "status": "healthy",
+        "service": "crustyrustacean-dev-blog"
+    }))
 }

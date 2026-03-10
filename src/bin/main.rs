@@ -1,30 +1,17 @@
-// src/main.rs
+// src/bin/main.rs
 
-// dependencies
-use crustyrustacean_dev_blog_lib::OpenDalStorage;
-use crustyrustacean_dev_blog_lib::config::AppConfig;
-use crustyrustacean_dev_blog_lib::database::DatabaseConnection;
-use crustyrustacean_dev_blog_lib::service::AppService;
-use crustyrustacean_dev_blog_lib::state::AppState;
-use crustyrustacean_dev_blog_lib::storage::StorageBackend;
+//! Application entry point.
+//!
+//! This is the main entry point for the CrustyRustacean Dev Blog application.
+//! It initializes tracing, loads configuration, and starts the Actix Web server.
+
+use crustyrustacean_dev_blog_lib::configuration::get_configuration;
+use crustyrustacean_dev_blog_lib::startup::Application;
 use crustyrustacean_dev_blog_lib::telemetry::{get_subscriber, init_subscriber};
-use opendal::Operator;
-use shuttle_runtime::{CustomError, Error, SecretStore, Secrets};
-use std::sync::Arc;
 
-// Shuttle entry point
-#[shuttle_runtime::main]
-async fn main(
-    #[shuttle_turso::Turso(
-        addr = "{secrets.TURSO_DATABASE_URL}",
-        token = "{secrets.TURSO_AUTH_TOKEN}"
-    )]
-    turso_client: libsql::Database,
-    #[shuttle_opendal::Opendal(scheme = "s3")] operator: Operator,
-    #[Secrets] secrets: SecretStore,
-) -> Result<AppService, Error> {
-    // initialize tracing
-    tracing::info!("Starting tracing...");
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Initialize tracing/logging
     let subscriber = get_subscriber(
         "crustyrustacean-dev-blog".into(),
         "info".into(),
@@ -32,32 +19,21 @@ async fn main(
     );
     init_subscriber(subscriber);
 
-    // Initialize database connection
-    tracing::info!("Getting database connection...");
-    let db = DatabaseConnection {
-        db: std::sync::Arc::new(turso_client),
-    };
+    // Load configuration from YAML files and environment variables
+    tracing::info!("Loading configuration...");
+    let configuration = get_configuration().expect("Failed to read configuration.");
 
-    // Run database migrations
-    tracing::info!("Running database migrations...");
-    db.run_migrations().await.map_err(CustomError::new)?;
+    // Build and run the application
+    tracing::info!("Building application...");
+    let application = Application::build(configuration).await?;
 
-    // Load configuration with JWT secret
-    tracing::info!("Loading application configuration from secrets...");
-    let app_config = AppConfig::try_from(&secrets)?;
+    tracing::info!(
+        "Application started on port {}",
+        application.port()
+    );
 
-    // create the storage backend
-    tracing::info!("Creating storage backend...");
-    let storage: Arc<dyn StorageBackend> = Arc::new(OpenDalStorage::new(operator));
+    // Run until stopped (Ctrl+C or SIGTERM)
+    application.run_until_stopped().await?;
 
-    // Build the application state
-    tracing::info!("Building application state...");
-    let app_state = AppState::new(db, storage, app_config).map_err(CustomError::new)?;
-
-    // Initialize the application
-    tracing::info!("Initializing the application...");
-    let app_service = AppService::new(app_state);
-
-    // Return the Axum router to Shuttle
-    Ok(app_service)
+    Ok(())
 }

@@ -1,30 +1,23 @@
 // src/lib/telemetry.rs
 
-// dependencies
-use axum::http::Request;
-use tower_http::request_id::{MakeRequestId, RequestId};
+//! Tracing and logging configuration.
+//!
+//! This module provides utilities for setting up structured logging
+//! using the tracing ecosystem with Bunyan formatting.
+
 use tracing::Subscriber;
 use tracing::subscriber::set_global_default;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
-use uuid::Uuid;
 
-// a struct to represent a RequestUuid
-#[derive(Clone)]
-pub struct MakeRequestUuid;
-
-// implementation clock to create a RequestId
-impl MakeRequestId for MakeRequestUuid {
-    fn make_request_id<B>(&mut self, _: &Request<B>) -> Option<RequestId> {
-        let request_id = Uuid::new_v4().to_string();
-
-        Some(RequestId::new(request_id.parse().unwrap()))
-    }
-}
-
-// get subscriber function, sets up a tracing subscriber
+/// Compose multiple layers into a `tracing`'s subscriber.
+///
+/// # Implementation Notes
+///
+/// We are using `impl Subscriber` as return type to avoid having to spell out the actual
+/// type of the returned subscriber, which is indeed quite complex.
 pub fn get_subscriber<Sink>(
     name: String,
     env_filter: String,
@@ -36,16 +29,16 @@ where
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
     let formatting_layer = BunyanFormattingLayer::new(name, sink);
-
     Registry::default()
         .with(env_filter)
         .with(JsonStorageLayer)
         .with(formatting_layer)
 }
 
-// init subscriber function, initialize the tracing subscriber
+/// Register a subscriber as global default to process span data.
+///
+/// It should only be called once!
 pub fn init_subscriber(subscriber: impl Subscriber + Sync + Send) {
-    // Redirect logs to subscriber
     LogTracer::init().expect("Failed to set logger");
     set_global_default(subscriber).expect("Failed to set subscriber");
 }

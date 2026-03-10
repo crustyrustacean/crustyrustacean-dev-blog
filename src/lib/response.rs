@@ -1,63 +1,67 @@
 // src/lib/response.rs
 
-// common API response type
+//! Standard API response types.
+//!
+//! This module provides a unified response format for all API endpoints.
 
-// dependencies
-use crate::errors::ApiError;
-use axum::Json;
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
-use serde::Serialize;
+use actix_web::{HttpRequest, HttpResponse, Responder, body::BoxBody, http::header::ContentType};
+use serde::{Deserialize, Serialize};
 
-// convenience alias fo results returned by handlers
-pub type ApiResult<T> = Result<ApiResponse<T>, ApiError>;
-
-// struct type to represent and API response
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+/// Standard API response wrapper.
+#[derive(Deserialize, Serialize)]
 pub struct ApiResponse<T> {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    pub status: u16,
-    pub time: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
-// methods for the ApiResponse type
-impl<T> ApiResponse<T> {
+impl<T: Serialize> ApiResponse<T> {
+    /// Create a successful response with data.
     pub fn success(data: T) -> Self {
-        Self::success_with_status(StatusCode::OK, data)
-    }
-
-    pub fn success_with_status(status: StatusCode, data: T) -> Self {
         Self {
             success: true,
-            message: Some("ok".into()),
-            status: status.as_u16(),
-            time: Utc::now(),
             data: Some(data),
+            error: None,
         }
     }
 
-    pub fn error(message: &str, status: StatusCode) -> Self {
+    /// Create an error response with a message.
+    pub fn error(message: &str) -> Self {
         Self {
             success: false,
-            message: Some(message.to_string()),
-            status: status.as_u16(),
-            time: Utc::now(),
             data: None,
+            error: Some(message.to_string()),
         }
     }
 }
 
-// implement the IntoResponse trait for the ApiResponse type
-impl<T: Serialize> IntoResponse for ApiResponse<T> {
-    fn into_response(self) -> Response {
-        let status = StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+impl<T: Serialize> Responder for ApiResponse<T> {
+    type Body = BoxBody;
 
-        (status, Json(self)).into_response()
+    fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
+        match serde_json::to_string(&self) {
+            Ok(body) => HttpResponse::Ok()
+                .content_type(ContentType::json())
+                .body(body),
+            Err(e) => {
+                tracing::error!("Failed to serialize API response: {:?}", e);
+                HttpResponse::InternalServerError()
+                    .content_type(ContentType::plaintext())
+                    .body("Internal Server Error")
+            }
+        }
+    }
+}
+
+impl ApiResponse<()> {
+    /// Create a success response without data.
+    pub fn success_empty() -> Self {
+        Self {
+            success: true,
+            data: None,
+            error: None,
+        }
     }
 }
