@@ -11,7 +11,7 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::database::DatabaseConnection;
+use sqlx::PgPool;
 use crate::errors::ApiError;
 
 /// Represents a parsed shortcode
@@ -79,46 +79,33 @@ pub fn parse_shortcodes(text: &str) -> Vec<Shortcode> {
 /// - If custom text provided: `[Custom Text](/articles/slug)`
 async fn resolve_shortcode(
     shortcode: &Shortcode,
-    db: &DatabaseConnection,
+    db: &PgPool,
 ) -> Result<String, ApiError> {
-    // Get database connection
-    let conn = db.connect().map_err(|e| {
-        tracing::error!("Database connection failed: {}", e);
-        ApiError::InternalServerError(e.to_string())
-    })?;
-
     // Query database for article with this slug
-    let query = "SELECT title FROM articles WHERE slug = ?1";
-    let mut rows = conn
-        .query(query, libsql::params![shortcode.slug.clone()])
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to query article for shortcode: {}", e);
-            ApiError::InternalServerError(e.to_string())
-        })?;
+    let article_title: Option<String> =
+        sqlx::query_scalar("SELECT title FROM articles WHERE slug = $1")
+            .bind(&shortcode.slug)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to query article for shortcode: {}", e);
+                ApiError::InternalServerError(e.to_string())
+            })?;
 
-    // Check if article exists
-    let article_title = if let Some(row) = rows.next().await.map_err(|e| {
-        tracing::error!("Failed to fetch row: {}", e);
-        ApiError::InternalServerError(e.to_string())
-    })? {
-        row.get::<String>(0).map_err(|e| {
-            tracing::error!("Failed to get title from row: {}", e);
-            ApiError::InternalServerError(e.to_string())
-        })?
-    } else {
-        // Article not found - use slug as fallback text and add tooltip
-        let link_text = shortcode.custom_text.as_deref().unwrap_or(&shortcode.slug);
-        return Ok(format!(
-            r#"[{}](/articles/{} "Article not found")"#,
-            link_text, shortcode.slug
-        ));
-    };
-
-    // Article found - use custom text if provided, otherwise use article title
-    let link_text = shortcode.custom_text.as_deref().unwrap_or(&article_title);
-
-    Ok(format!("[{}](/articles/{})", link_text, shortcode.slug))
+    match article_title {
+        Some(title) => {
+            let link_text = shortcode.custom_text.as_deref().unwrap_or(&title);
+            Ok(format!("[{}](/articles/{})", link_text, shortcode.slug))
+        }
+        None => {
+            // Article not found - use slug as fallback text and add tooltip
+            let link_text = shortcode.custom_text.as_deref().unwrap_or(&shortcode.slug);
+            Ok(format!(
+                r#"[{}](/articles/{} \"Article not found\")"#,
+                link_text, shortcode.slug
+            ))
+        }
+    }
 }
 
 /// Process all shortcodes in the given text
@@ -136,7 +123,7 @@ async fn resolve_shortcode(
 /// // If the article exists: "Check out [Introduction to Rust](/articles/rust-intro) for more"
 /// // If not: "Check out [rust-intro](/articles/rust-intro \"Article not found\") for more"
 /// ```
-pub async fn process_shortcodes(text: &str, db: &DatabaseConnection) -> Result<String, ApiError> {
+pub async fn process_shortcodes(text: &str, db: &PgPool) -> Result<String, ApiError> {
     let shortcodes = parse_shortcodes(text);
 
     // If no shortcodes found, return original text

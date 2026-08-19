@@ -139,7 +139,8 @@ impl StorageBackend for OpenDalStorage {
             size: meta.content_length(),
             content_type: meta.content_type().map(|s| s.to_string()),
             last_modified: meta.last_modified().map(|t| {
-                chrono::DateTime::from_timestamp(t.timestamp(), 0).unwrap_or_else(chrono::Utc::now)
+                let systime: std::time::SystemTime = t.into();
+                systime.into()
             }),
         })
     }

@@ -12,6 +12,7 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, deco
 use serde::{Deserialize, Serialize};
 use actix_web::{FromRequest, HttpRequest, dev::Payload};
 use actix_web::http::header::{AUTHORIZATION, COOKIE};
+use secrecy::ExposeSecret;
 use thiserror::Error;
 use uuid::Uuid;
 use std::future::{ready, Ready};
@@ -91,70 +92,65 @@ pub struct OptionalUser {
     pub user: Option<AuthenticatedUser>,
 }
 
+/// Attempt to authenticate a request from its headers (Bearer token or
+/// `authToken` cookie).
+fn authenticate(req: &HttpRequest) -> Result<AuthenticatedUser, ApiError> {
+    // Try to get token from Authorization header first
+    let token = if let Some(auth_header) = req.headers().get(AUTHORIZATION) {
+        if let Ok(auth_str) = auth_header.to_str() {
+            auth_str.strip_prefix("Bearer ").map(|s| s.to_string())
+        } else {
+            None
+        }
+    } else if let Some(cookie_header) = req.headers().get(COOKIE) {
+        // Fall back to cookie
+        if let Ok(cookie_str) = cookie_header.to_str() {
+            cookie_str
+                .split(';')
+                .find_map(|c| c.trim().strip_prefix("authToken=").map(|s| s.to_string()))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let token = match token {
+        Some(t) => t,
+        None => return Err(AuthError::MissingToken.into()),
+    };
+
+    // Get JWT keys from app data
+    let keys = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
+        Some(state) => state.jwt_keys.clone(),
+        None => return Err(ApiError::InternalServerError("App state not available".to_string())),
+    };
+
+    // Validate token
+    match validate_token(&token, &keys) {
+        Ok(claims) => {
+            let user_id = match Uuid::parse_str(&claims.sub) {
+                Ok(id) => id,
+                Err(_) => return Err(AuthError::InvalidToken.into()),
+            };
+
+            // TODO: Fetch user role from database
+            // For now, default to Subscriber
+            Ok(AuthenticatedUser {
+                user_id,
+                role: crate::models::Role::Subscriber,
+            })
+        }
+        Err(e) => Err(e),
+    }
+}
+
 impl FromRequest for AuthenticatedUser {
     type Error = ApiError;
     type Future = Ready<Result<Self, Self::Error>>;
 
     fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
-        // Try to get token from Authorization header first
-        let token = if let Some(auth_header) = req.headers().get(AUTHORIZATION) {
-            if let Ok(auth_str) = auth_header.to_str() {
-                if auth_str.starts_with("Bearer ") {
-                    Some(auth_str[7..].to_string())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else if let Some(cookie_header) = req.headers().get(COOKIE) {
-            // Fall back to cookie
-            if let Ok(cookie_str) = cookie_header.to_str() {
-                cookie_str
-                    .split(';')
-                    .find_map(|c| {
-                        let c = c.trim();
-                        if c.starts_with("authToken=") {
-                            Some(c[10..].to_string())
-                        } else {
-                            None
-                        }
-                    })
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let token = match token {
-            Some(t) => t,
-            None => return ready(Err(AuthError::MissingToken.into())),
-        };
-
-        // Get JWT keys from app data
-        let keys = match req.app_data::<actix_web::web::Data<crate::state::AppState>>() {
-            Some(state) => state.jwt_keys.clone(),
-            None => return ready(Err(ApiError::InternalServerError("App state not available".to_string()))),
-        };
-
-        // Validate token
-        match validate_token(&token, &keys) {
-            Ok(claims) => {
-                let user_id = match Uuid::parse_str(&claims.sub) {
-                    Ok(id) => id,
-                    Err(_) => return ready(Err(AuthError::InvalidToken.into())),
-                };
-                
-                // TODO: Fetch user role from database
-                // For now, default to Subscriber
-                ready(Ok(AuthenticatedUser {
-                    user_id,
-                    role: crate::models::Role::Subscriber,
-                }))
-            }
-            Err(e) => ready(Err(e)),
-        }
+        ready(authenticate(req))
     }
 }
 
@@ -162,8 +158,8 @@ impl FromRequest for OptionalUser {
     type Error = ApiError;
     type Future = Ready<Result<Self, Self::Error>>;
 
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        match AuthenticatedUser::from_request(req, payload) {
+    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        match authenticate(req) {
             Ok(user) => ready(Ok(OptionalUser { user: Some(user) })),
             Err(_) => ready(Ok(OptionalUser { user: None })),
         }
@@ -229,8 +225,8 @@ impl FromRequest for AuthorUser {
     type Error = ApiError;
     type Future = Ready<Result<Self, Self::Error>>;
 
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        match AuthenticatedUser::from_request(req, payload) {
+    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        match authenticate(req) {
             Ok(user) => {
                 if user.role.is_author() || user.role.is_admin() {
                     ready(Ok(AuthorUser {
@@ -255,8 +251,8 @@ impl FromRequest for AdminUser {
     type Error = ApiError;
     type Future = Ready<Result<Self, Self::Error>>;
 
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        match AuthenticatedUser::from_request(req, payload) {
+    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        match authenticate(req) {
             Ok(user) => {
                 if user.role.is_admin() {
                     ready(Ok(AdminUser { user_id: user.user_id }))
@@ -280,7 +276,7 @@ impl FromRequest for ApiKeyUser {
 
     fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
         // Check for X-API-Key header
-        let api_key = match req.headers().get("X-API-Key") {
+        let _api_key = match req.headers().get("X-API-Key") {
             Some(header) => match header.to_str() {
                 Ok(key) => key.to_string(),
                 Err(_) => return ready(Err(ApiError::Unauthorized("Invalid API key header".to_string()))),

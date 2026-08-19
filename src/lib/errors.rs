@@ -34,6 +34,12 @@ pub enum ApiError {
     InternalServerError(String),
 }
 
+impl From<tera::Error> for ApiError {
+    fn from(e: tera::Error) -> Self {
+        crate::ApiError::InternalServerError(format!("Template error: {}", e))
+    }
+}
+
 impl ResponseError for ApiError {
     fn status_code(&self) -> StatusCode {
         match self {

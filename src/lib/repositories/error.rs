@@ -45,44 +45,51 @@ pub enum RepositoryError {
 /// Result type alias for repository operations.
 pub type RepoResult<T> = Result<T, RepositoryError>;
 
-// Convert from libsql errors to repository errors
-impl From<libsql::Error> for RepositoryError {
-    fn from(err: libsql::Error) -> Self {
+// Convert from sqlx (Postgres) errors to repository errors
+impl From<sqlx::Error> for RepositoryError {
+    fn from(err: sqlx::Error) -> Self {
         let err_string = err.to_string();
 
-        // Check for UNIQUE constraint violations
-        if err_string.contains("UNIQUE constraint failed") {
-            // Extract the field name if possible
-            if err_string.contains("users.email") {
-                return RepositoryError::AlreadyExists("Email already in use".to_string());
+        // Check for UNIQUE constraint violations (Postgres error code 23505)
+        if let sqlx::Error::Database(db_err) = &err {
+            if db_err.code().as_deref() == Some("23505") {
+                // Extract constraint name if possible for better messages
+                let constraint = db_err.constraint().unwrap_or("");
+                let message = match constraint {
+                    "users_email_key" | "idx_users_email" => "Email already in use",
+                    "users_username_key" | "idx_users_username" => "Username already taken",
+                    "categories_slug_key" | "idx_categories_slug" => "Category slug already exists",
+                    "categories_name_key" => "Category name already exists",
+                    "newsletter_subscribers_email_key" => "Email already subscribed",
+                    "tags_name_key" | "idx_tags_name" => "Tag already exists",
+                    "articles_slug_key" | "idx_articles_slug" => "Article slug already exists",
+                    "password_reset_tokens_token_key" | "idx_password_reset_tokens_token" => {
+                        "Token already exists"
+                    }
+                    "email_verification_tokens_token_key" | "idx_email_verification_tokens_token" => {
+                        "Token already exists"
+                    }
+                    "media_usage_article_slug_fkey" => "Media usage already exists",
+                    _ => "Duplicate entry",
+                };
+                return RepositoryError::AlreadyExists(message.to_string());
             }
-            if err_string.contains("users.username") {
-                return RepositoryError::AlreadyExists("Username already taken".to_string());
+
+            // Check for foreign key violations (Postgres error code 23503)
+            if db_err.code().as_deref() == Some("23503") {
+                return RepositoryError::InvalidReference(
+                    "Referenced entity does not exist".to_string(),
+                );
             }
-            if err_string.contains("categories.slug") {
-                return RepositoryError::AlreadyExists("Category slug already exists".to_string());
-            }
-            if err_string.contains("categories.name") {
-                return RepositoryError::AlreadyExists("Category name already exists".to_string());
-            }
-            if err_string.contains("newsletter_subscribers.email") {
-                return RepositoryError::AlreadyExists("Email already subscribed".to_string());
-            }
-            return RepositoryError::AlreadyExists("Duplicate entry".to_string());
         }
 
-        // Check for foreign key violations
-        if err_string.contains("FOREIGN KEY constraint failed") {
-            return RepositoryError::InvalidReference(
-                "Referenced entity does not exist".to_string(),
-            );
-        }
-
-        // Default to database error
-        RepositoryError::DatabaseError(err_string)
+        let _ = err_string;
+        RepositoryError::DatabaseError(err.to_string())
     }
 }
 
+// Convert from libsql errors to repository errors
+// (kept for backwards compatibility during the migration)
 #[cfg(test)]
 mod tests {
     use super::*;
