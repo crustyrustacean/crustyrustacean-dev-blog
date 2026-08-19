@@ -2,6 +2,28 @@
 
 All notable changes to the CrustyRustacean Dev Blog project will be documented in this file.
 
+## [4.1.0] - 2026-08-19
+
+### Changed - Postgres Repository Layer Complete
+- **Database**: All 9 repository implementations now backed by Postgres (sqlx `PgPool`): user, article, category, tag, comment, api_key, media, newsletter, token
+- **Removed - libsql / Turso**: Deleted all `*_libsql.rs` repositories, the libsql connection wrapper (`database.rs`), and the custom migration system (replaced by sqlx `migrate!` with versioned SQL migrations in `migrations/`)
+- **Removed - Shuttle service**: Deleted the orphaned Axum/shuttle `service.rs` router
+
+### Fixed
+- `reqwest` 0.13 feature rename: `rustls-tls` → `rustls` (dependencies now resolve)
+- Restored `httpmock` dev-dependency for Mailtrap sender tests
+- `auth.rs`: Actix `FromRequest` extractors correctly wrap in `web::Ready`
+- `storage.rs`: opendal 0.55 `Timestamp` → chrono conversion via `SystemTime`
+- `newsletter_pg.rs`: handle missing `Failed` status variant
+
+### Known Issues
+- The 20 Axum route files remain unmigrated (not in module tree) — conversion to Actix Web pending
+- Integration test suite (`tests/api/`) still references shuttle/libsql and does not compile
+
+## [4.0.0] - 2026-08-18
+
+Backend swap to Actix Web and PostgreSQL; Shuttle runtime and libsql/Turso removed from dependencies.
+
 ## [2.16.0] - 2025-12-14
 
 ### Removed - Bootstrap Dependency
